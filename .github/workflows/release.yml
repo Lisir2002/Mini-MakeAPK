@@ -51,6 +51,10 @@ jobs:
 
       - uses: android-actions/setup-android@v3
 
+      # 出成品前先过同一套验证闸门，失败则不发布
+      - name: 验证闸门（测试 + 截图回归）
+        run: ./gradlew testDebugUnitTest verifyPaparazziDebug --no-daemon
+
       - name: 构建 Release APK
         run: ./gradlew assembleRelease --no-daemon --stacktrace
 
