@@ -91,8 +91,10 @@
   - 质量/截图回归：`compose-screenshot-testing`（Paparazzi 优先、Roborazzi 备选的 Compose 截图回归工作流，锁死视觉规范不漂移）
 - **约束注入完成**：每个 `SKILL.md` 顶部已加「项目设计约束」区块（网络工具为「本项目上下文」），强制对齐 `/workspace/DESIGN_LANGUAGE.md` §2–§10 与 §3 锁定基调（可爱简约·iOS·色彩单调），避免各 skill 各自发明色值/风格。
 - **文档矩阵已立（2026-10-24）**：建立 `docs/DOC_CHARTER.md` **文档宪章**（所有文档的总纲：矩阵/命名/格式/SemVer/Conventional Commits/Agent 协同/质量门禁），并补全 `README.md`、`CHANGELOG.md`、`CONTRIBUTING.md`、`docs/INDEX.md`、`docs/ARCHITECTURE.md`、`docs/AGENT_COLLABORATION.md`、`docs/CODE_STYLE.md`、`docs/SETUP.md`、`docs/DEPLOYMENT.md`，以及 **`docs/qa/sprint-1-checklist.md`（Sprint-1 合并前质量闸门）**——全部联网学习最佳实践（README 五问、Keep a Changelog、SemVer、Conventional Commits、Agent 交接契约、Docs-as-Code、WCAG 2.2 AA）后生成，且对齐本宪法与 `DESIGN_LANGUAGE.md`。导航见 `docs/INDEX.md`。
-- **待补**：云端构建服务实现（Phase 2，契约见 `docs/build-api-contract.md`）。
-- **下一步**：① 用 `ai-team-orchestration` 推进 Phase 2（云端构建落地）；② 把截图回归接入 CI（见 `docs/qa/screenshot-testing.md` §7），让 `verifyPaparazziDebug` 成为合并前强制闸门；③ 随新界面（构建进度屏/错误态/结果庆祝屏）持续补 Paparazzi 测试与 baseline。
+- **数据层已落地（2026-10-24）**：**`Room 2.6.1 + SQLCipher 4.13.0`（加密 SQLite）**接入完成并**编译 + 测试实证通过**（`assembleDebug` 成功、14 个测试全绿、APK 内含 `libsqlcipher.so` 四 ABI）。分层：`data/model`（领域模型，UI 唯一可见）· `data/local`（实体/DAO/AppDatabase/转换器）· `data/security`（口令经 **Android Keystore** 加密存储，不落明文）· `data/repository`（上层唯一出口，只暴露领域模型）。高性能实践：**WAL**、`synchronous=NORMAL`、覆盖索引、`status+createdAt` 复合索引、单事务批量写、Flow 响应式读、Paging3 分页。选型与排错实证见 `docs/data-layer.md`。
+  - **版本红线**：SQLCipher **不得升到 4.14+**（4.14.1+ 传递 `androidx.sqlite 2.6.x`，由 Kotlin 2.1 编译，与本项目 Kotlin 1.9.24 不兼容；4.18+ 还要求 compileSdk ≥ 37）。升级需整体升 Kotlin/KSP/Room/AGP/compileSdk。
+- **待补**：云端构建服务实现（Phase 2，契约见 `docs/build-api-contract.md`）；SQLCipher 实际加解密与 DAO 语义的**真机/Instrumented 测试**（当前仅覆盖纯 JVM 逻辑）；发布前用显式 `Migration` 替换 `fallbackToDestructiveMigration()`。
+- **下一步**：① 把构建历史 UI 接上数据层（ViewModel + `pagedHistory()` + 进度/错误/成功三态，遵循 `DESIGN_LANGUAGE.md`）；② 用 `ai-team-orchestration` 推进 Phase 2（云端构建落地）；③ 把截图回归接入 CI（见 `docs/qa/screenshot-testing.md` §7），让 `verifyPaparazziDebug` 成为合并前强制闸门；④ 随新界面持续补 Paparazzi 测试与 baseline。
 
 ---
 

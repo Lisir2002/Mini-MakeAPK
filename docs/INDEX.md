@@ -27,6 +27,7 @@
 | [`SETUP.md`](SETUP.md) | Tutorial | 本地环境搭建 |
 | [`DEPLOYMENT.md`](DEPLOYMENT.md) | How-to | 构建、签名、发版流程 |
 | [`build-api-contract.md`](build-api-contract.md) | Reference | 云端构建 API 契约（Phase 2 后端规格） |
+| [`data-layer.md`](data-layer.md) | Reference | **数据层设计**：Room + SQLCipher 加密 SQLite（选型实证 / 分层 / 加密 / 性能 / 迁移 / 排错） |
 
 ## QA / 质量闸门
 

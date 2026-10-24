@@ -16,6 +16,9 @@
 - **截图回归测试（Paparazzi 1.3.4，纯 JVM）**：覆盖首屏（亮/暗/已填 URL）、可爱组件（按钮/卡片/脉冲）、WebView 外壳，golden 图片随源码提交 `app/src/test/snapshots/`
 - **截图回归技能**：`compose-screenshot-testing` 安装至 `~/.codebuddy/skills/` 并注入项目设计约束（珊瑚粉/圆角/圆体），编码 Paparazzi 优先、Roborazzi 备选的工作流与模板
 - 截图回归指南：`docs/qa/screenshot-testing.md`（选型 / 运行 / 基线管理 / CI / 排错）
+- **数据层（SQLite）**：`Room 2.6.1 + SQLCipher 4.13.0` 加密数据库落地——领域模型/实体/类型转换器/DAO/`AppDatabase`/仓储分层，口令经 Android Keystore 加密存储（不落明文），含索引、WAL、PRAGMA 调优、单事务批量写、Flow 观察、Paging3 分页
+- 数据层设计文档：`docs/data-layer.md`（选型实证 / 分层 / 加密方案 / 性能清单 / 迁移策略 / 排错）
+- 数据层单元测试：`BuildRecordMapperTest`（6 用例，实体⇄领域无损往返、枚举转换、未知值回退）
 
 ## [0.1.0] - 2026-10-24
 

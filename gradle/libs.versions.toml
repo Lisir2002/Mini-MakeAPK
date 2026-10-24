@@ -9,6 +9,25 @@ lifecycleRuntimeKtx = "2.8.4"
 activityCompose = "1.9.2"
 junit = "4.13.2"
 
+# ── 数据层 ──────────────────────────────────────────────────────────
+# Room 2.6.1：与 Kotlin 1.9.24 / KSP 1.9.24-1.0.20 对齐（升级需同步 KSP 版本）
+room = "2.6.1"
+# SQLCipher for Android：自带 SupportOpenHelperFactory，直连 androidx.sqlite.db（Room 2.x）
+# 版本上限注意（双重约束，实测）：
+#   1) 4.18.0+ 的 AAR 要求 compileSdk ≥ 37，本项目 compileSdk 34 / AGP 8.5.2。
+#   2) 4.14.1+ 传递依赖 androidx.sqlite 2.6.2（Kotlin 2.1 元数据），
+#      与本项目 Kotlin 1.9.24 编译器不兼容。4.13.0 传递的是 androidx.sqlite 2.2.0，安全。
+# 升级 SQLCipher 前必须同步升级 AGP + compileSdk + Kotlin/KSP，并回归 Paparazzi 截图基线。
+sqlcipher = "4.13.0"
+# 安全存储：SQLCipher 口令经 Android Keystore 加密后落盘（不落明文）
+securityCrypto = "1.0.0"
+# Paging3：构建历史长列表分页加载
+paging = "3.3.0"
+# 协程：Room suspend / Flow 必需
+coroutines = "1.7.3"
+# KSP：必须与 kotlin 版本严格匹配（1.9.24 → 1.9.24-1.0.20）
+ksp = "1.9.24-1.0.20"
+
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycleRuntimeKtx" }
@@ -22,7 +41,19 @@ androidx-material-icons-extended = { group = "androidx.compose.material", name =
 paparazzi = { group = "app.cash.paparazzi", name = "paparazzi", version.ref = "paparazzi" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 
+# ── 数据层依赖 ──────────────────────────────────────────────────────
+androidx-room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }
+androidx-room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "room" }
+androidx-room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
+androidx-room-paging = { group = "androidx.room", name = "room-paging", version.ref = "room" }
+androidx-paging-runtime = { group = "androidx.paging", name = "paging-runtime", version.ref = "paging" }
+# 加密 SQLite 引擎（提供 androidx.sqlite.db.SupportSQLiteOpenHelper.Factory 实现）
+sqlcipher-android = { group = "net.zetetic", name = "sqlcipher-android", version.ref = "sqlcipher" }
+androidx-security-crypto = { group = "androidx.security", name = "security-crypto", version.ref = "securityCrypto" }
+kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
+
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 paparazzi = { id = "app.cash.paparazzi", version.ref = "paparazzi" }
+ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
