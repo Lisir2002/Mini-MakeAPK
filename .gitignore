@@ -1,0 +1,35 @@
+# Android / Gradle 构建产物
+build/
+.gradle/
+captures/
+.externalNativeBuild/
+.cxx/
+
+# 本地 SDK 路径（环境相关，不入库）
+local.properties
+
+# IDE
+*.iml
+.idea/
+.project
+.classpath
+
+# 密钥
+*.jks
+*.keystore
+
+# 日志
+*.log
+
+# 编译中间产物
+*.class
+*.dex
+*.apk
+*.aab
+
+# 本地项目数据（非源码，不入库）
+.codebuddy/
+
+# 系统/编辑器
+.DS_Store
+Thumbs.db
