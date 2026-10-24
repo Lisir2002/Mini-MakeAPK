@@ -30,8 +30,11 @@ flowchart LR
 |------|------|------|
 | `ui/theme` | `app/.../ui/theme/` | 设计令牌（OKLCH→Compose）、主题、动效 |
 | `ui/components` | `app/.../ui/components/` | 可爱组件：胶囊按钮、柔卡、打包脉冲 |
-| `ui/screens` | `app/.../ui/screens/` | HomeScreen（输入）、WebViewScreen（预览/封装） |
-| `ui/MmaApp` | `app/.../ui/MmaApp.kt` | 应用根：主题绑定 + 状态路由 |
+| `ui/screens` | `app/.../ui/screens/` | HomeScreen（输入）、BuildingScreen（进度）、ResultScreen（成功/失败）、HistoryScreen（历史）、PreviewScreen（预览） |
+| `ui/navigation` | `app/.../ui/navigation/` | 页面骨架：路由清单 `MmaRoute` + 导航宿主 `MmaNavHost` |
+| `ui/viewmodel` | `app/.../ui/viewmodel/` | `BuildViewModel`（构建流程）、`HistoryViewModel`（历史）；手工 DI 工厂 |
+| `MainActivity` | `app/.../MainActivity.kt` | 唯一载体 Activity：`setContent` + `reportFullyDrawn()`（启动终点） |
+| `ui/MmaApp` | `app/.../ui/MmaApp.kt` | 应用根：主题绑定 + 持有 NavController |
 | `data/model` | `app/.../data/model/` | 领域模型 + 枚举（无持久化注解，UI 唯一可见） |
 | `data/local` | `app/.../data/local/` | SQLite 持久化：实体、DAO、AppDatabase、类型转换器、SQLCipher 工厂 |
 | `data/security` | `app/.../data/security/` | 数据库口令经 Android Keystore 加密存储 |
@@ -49,6 +52,30 @@ flowchart LR
 5. **SQLite 采用 Room + SQLCipher**：SQLCipher 自带 `SupportOpenHelperFactory`（实现 `androidx.sqlite.db` 接口）可**直连** Room 2.x，无需手写桥接；数据库全程加密，口令存于 Keystore。（对比评估过的 WCDB：其官方适配层仅实现旧版 `android.arch.persistence` 接口，与 AndroidX Room 不兼容，已否决。）
 
 > 完整决策记录见 [`brainstorm/`](brainstorm/)。
+
+## 3.1 页面骨架与导航
+
+```
+MainActivity ─ setContent ─▶ MmaApp（主题 + NavController）
+                                └─▶ MmaNavHost
+        home ────────┬──▶ history ──▶ preview
+                     └──▶ building/{id} ──▶ result/{id} ──▶ preview/{id}
+```
+
+| 路由 | 页面 | 取数来源 |
+|------|------|---------|
+| `home` | HomeScreen | —（用户输入） |
+| `building/{recordId}` | BuildingScreen | `BuildHistoryRepository.observeById` |
+| `result/{recordId}` | ResultScreen | `BuildHistoryRepository.observeById` |
+| `history` | HistoryScreen | `BuildHistoryRepository.observeAll`（Flow） |
+| `preview/{recordId}` | PreviewScreen | `BuildHistoryRepository.observeById` |
+
+**分层约定：路由负责取数，页面负责渲染。**
+所有页面都是**无状态** Composable（参数进、事件出），
+因此 Paparazzi 可以直接渲染页面做截图回归，不需要数据库与导航环境。
+
+**单一数据源是数据库而非内存**：构建一经登记即落加密库，
+"构建中"页面被杀后重建仍能读到真实状态，不会出现假进度或转圈卡死。
 
 ## 4. 数据流
 

@@ -3,37 +3,32 @@ package com.make.apk.ui
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import com.make.apk.ui.screens.HomeScreen
-import com.make.apk.ui.screens.WebViewScreen
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.Modifier
+import androidx.navigation.compose.rememberNavController
+import com.make.apk.ui.navigation.MmaNavHost
 import com.make.apk.ui.theme.MmaTheme
 
-// 应用根：绑定团队主题，首屏 → 构建预览的简单状态路由（无需 Navigation 依赖）。
+/**
+ * 应用根：主题绑定 + 页面骨架导航。
+ *
+ * 只做三件事：绑定团队主题、持有 NavController、在首帧后回调 [onFirstFrameDrawn]
+ * （供 `Activity.reportFullyDrawn()` 与 `StartupTracer` 使用）。
+ * 业务与取数都在 `MmaNavHost` 与各页面里，本函数保持极薄，便于整体截图测试。
+ */
 @Composable
-fun MmaApp() {
-    MmaTheme {
-        var built by remember { mutableStateOf<BuiltSource?>(null) }
-        Surface(modifier = androidx.compose.ui.Modifier.fillMaxSize()) {
-            if (built == null) {
-                HomeScreen(onBuild = { input -> built = BuiltSource.from(input) })
-            } else {
-                WebViewScreen(url = built?.url, html = built?.html)
-            }
-        }
-    }
-}
+fun MmaApp(
+    modifier: Modifier = Modifier,
+    onFirstFrameDrawn: () -> Unit = {},
+) {
+    val navController = rememberNavController()
 
-// 构建源：根据首屏输入判定为 URL 还是 HTML。
-private data class BuiltSource(val url: String? = null, val html: String? = null) {
-    companion object {
-        fun from(input: String): BuiltSource =
-            if (input.trim().startsWith("http", ignoreCase = true) || input.contains("://")) {
-                BuiltSource(url = input.trim())
-            } else {
-                BuiltSource(html = input)
-            }
+    // 首帧合成完成后回调：这才是用户真正"看到内容"的时刻
+    LaunchedEffect(Unit) { onFirstFrameDrawn() }
+
+    MmaTheme {
+        Surface(modifier = modifier.fillMaxSize()) {
+            MmaNavHost(navController = navController)
+        }
     }
 }

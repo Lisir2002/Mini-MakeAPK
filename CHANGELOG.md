@@ -30,6 +30,11 @@
 - 启动监控：`StartupTracer` 冷/温/热分型 + 阶段耗时（用 `elapsedRealtime`，不受改时间影响）
 - 数据库 v2：新增 `log_entries` 表 + 显式 `Migration(1,2)`，**移除** `fallbackToDestructiveMigration()`
 - 日志层单元测试 38 例（脱敏 / 轮转策略 / 限流 / 追踪上下文 / 门面分发 / 落库映射）
+- **页面骨架**：补齐 `MainActivity`（此前工程**未声明任何 Activity**，页面无法运行）并在 Manifest 注册为 LAUNCHER；新增 `MmaRoute` 路由清单 + `MmaNavHost` 导航宿主（Navigation Compose 2.8.9）
+- 页面补齐：构建中页（可爱脉冲进度）、结果页（成功庆祝 / 失败错误态，含人话原因与重试出口）、历史页（**对接加密数据库真实数据**）、预览页（WebView 外壳 + 返回栏）；首页增加历史入口
+- ViewModel 层：`BuildViewModel`（登记→执行→成/败，全程写操作与性能日志）、`HistoryViewModel`（Flow 列表 + 删除审计日志），手工 DI 工厂（保持零 Hilt）
+- 启动终点改为**首帧绘制完成**（`Activity.reportFullyDrawn()` + `StartupTracer.complete()`），粗分冷/温启动，取代原先以 `onCreate` 结束为终点的近似口径
+- 新页面截图回归 9 例（构建中亮暗 / 结果成功与失败 / 历史有数据与空态 / 预览外壳），golden 基线 8 → 17 张
 - CI 验证闸门：`.github/workflows/verify.yml`（PR / 推送 main 时跑测试 + 截图回归比对，与本地同套闸门）
 
 ### Changed

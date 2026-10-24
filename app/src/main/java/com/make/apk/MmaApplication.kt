@@ -50,9 +50,9 @@ class MmaApplication : Application() {
         registerLifecycleLogging()
         attachLogDatabaseInBackground()
 
-        // 冷启动终点：本项目尚无 Activity，暂以 onCreate 结束为终点。
-        // 待接入首屏后应改由首帧绘制完成（Activity.reportFullyDrawn()）触发。
-        StartupTracer.complete(startType = "cold")
+        // 启动终点**不在这里**：onCreate 结束早于用户真正看到内容。
+        // 真正的终点是首帧绘制完成，由 MainActivity 通过
+        // reportFullyDrawn() + StartupTracer.complete() 触发（见 MainActivity）。
     }
 
     // ── 日志系统 ──────────────────────────────────────────────────────

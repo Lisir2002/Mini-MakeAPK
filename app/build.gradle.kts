@@ -88,6 +88,11 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.androidx.paging.runtime)
 
+    // ── 页面骨架：导航 + ViewModel ───────────────────────────────────
+    implementation(libs.androidx.navigation.compose)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.lifecycle.runtime.compose)
+
     // 截图回归测试（Paparazzi，纯 JVM，无需模拟器）
     testImplementation(libs.junit)
     testImplementation(libs.paparazzi)

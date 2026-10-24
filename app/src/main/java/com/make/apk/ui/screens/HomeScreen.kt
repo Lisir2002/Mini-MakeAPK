@@ -12,6 +12,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -26,9 +27,15 @@ import com.make.apk.ui.components.CuteButton
 // initialInput 仅用于测试/深链预填，默认空（用户态以内部 state 为准）。
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen(onBuild: (String) -> Unit, initialInput: String = "") {
+fun HomeScreen(
+    onBuild: (String) -> Unit,
+    initialInput: String = "",
+    // 可选：历史入口。传 null 时不渲染该按钮（截图测试可保持纯净构图）。
+    onOpenHistory: (() -> Unit)? = null,
+    modifier: Modifier = Modifier,
+) {
     var input by remember { mutableStateOf(initialInput) }
-    Surface(color = MaterialTheme.colorScheme.background) {
+    Surface(color = MaterialTheme.colorScheme.background, modifier = modifier) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -65,6 +72,12 @@ fun HomeScreen(onBuild: (String) -> Unit, initialInput: String = "") {
                 onClick = { onBuild(input) },
                 modifier = Modifier.fillMaxWidth(),
             )
+
+            if (onOpenHistory != null) {
+                TextButton(onClick = onOpenHistory) {
+                    Text("查看构建历史")
+                }
+            }
         }
     }
 }
