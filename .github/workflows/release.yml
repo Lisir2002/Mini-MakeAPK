@@ -49,7 +49,14 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - uses: android-actions/setup-android@v3
+      # GitHub 托管 runner 自带 Android SDK（ANDROID_HOME=/usr/local/lib/android/sdk，许可已接受），
+      # 无需 android-actions/setup-android——该 action 内部执行 sdkmanager tools，
+      # 而遗留 tools 包已从 SDK 仓库移除，会直接失败（2026-10-24 实测）。
+      - name: 确认 Android SDK 环境
+        run: |
+          echo "ANDROID_HOME=${ANDROID_HOME}"
+          ls "${ANDROID_HOME}/platforms" 2>/dev/null || true
+          ls "${ANDROID_HOME}/build-tools" 2>/dev/null || true
 
       # 出成品前先过同一套验证闸门，失败则不发布
       - name: 验证闸门（测试 + 截图回归）

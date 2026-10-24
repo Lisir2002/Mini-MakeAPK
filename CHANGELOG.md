@@ -8,6 +8,9 @@
 
 ## [Unreleased]
 
+### Fixed
+- CI 环境：两个工作流移除 `android-actions/setup-android@v3`——其内部 `sdkmanager tools` 因遗留 `tools` 包已从 SDK 仓库移除而必崩，改用 GitHub 托管 runner 自带的 Android SDK（`ANDROID_HOME` 已预置且许可已接受）
+
 ## [0.0.0.0+1] - 2026-10-25
 
 > 首个整合发布：sprint-1 可评审原型（设计系统 + 首屏 + WebView 封装 + 云端构建契约）
