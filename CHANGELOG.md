@@ -8,6 +8,13 @@
 
 ## [Unreleased]
 
+## [0.0.0.0+1] - 2026-10-25
+
+> 首个整合发布：sprint-1 可评审原型（设计系统 + 首屏 + WebView 封装 + 云端构建契约）
+> 叠加 Android 工程基座、加密数据层、全类别日志层、页面骨架与发版闸门后的首次成体系发布。
+> 版本号按 `docs/VERSIONING.md` 采用四段式（sprint-1 原型原记为 `0.1.0`；
+> 2026-10-24 曾预记本版本但未打 tag，该记录已并入本条，随首个 tag `v0.0.0.0+1` 正式发布）。
+
 ### Added
 - 文档矩阵：建立 `docs/DOC_CHARTER.md` 文档宪章与 `docs/INDEX.md` 文档地图
 - Agent 协同协议：`docs/AGENT_COLLABORATION.md` 定义角色 RACI 与交接契约
@@ -36,20 +43,6 @@
 - 启动终点改为**首帧绘制完成**（`Activity.reportFullyDrawn()` + `StartupTracer.complete()`），粗分冷/温启动，取代原先以 `onCreate` 结束为终点的近似口径
 - 新页面截图回归 9 例（构建中亮暗 / 结果成功与失败 / 历史有数据与空态 / 预览外壳），golden 基线 8 → 17 张
 - CI 验证闸门：`.github/workflows/verify.yml`（PR / 推送 main 时跑测试 + 截图回归比对，与本地同套闸门）
-
-### Changed
-- **包名迁移**：源码包 `com.web2apk.app` → `com.make.apk`（main + test 目录整体迁移）
-- **类名对齐**：`Web2ApkApp` → `MmaApp`、`Web2ApkTheme` → `MmaTheme`、`Web2ApkApplication` → `MmaApplication`、`requireWeb2ApkApplication()` → `requireMmaApplication()`
-- 随包名迁移：Paparazzi golden 基线文件名（`app/src/test/snapshots/images/`）与 Room schema 目录（`app/schemas/`）同步更新
-- 版本号从 `0.1.0` 迁移为四段式 `0.0.0.0`（`versionCode = 1`，tag `v0.0.0.0+1`）
-- `docs/DEPLOYMENT.md` 改写：本地只验证不出成品；发版改为「改版本 → 打 tag → GitHub 出成品」
-
-## [0.0.0.0+1] - 2026-10-24
-
-> sprint-1 首个可评审原型：设计系统地基 + 首屏 + WebView 封装屏 + 云端构建契约。
-> 版本号已按 `docs/VERSIONING.md` 迁移为四段式（原记为 `0.1.0`）。
-
-### Added
 - 设计令牌：OKLCH 色板精确转换为 Compose 颜色，亮/暗双主题（`ui/theme/Color.kt`）
 - 主题系统：Material 3 改造为 iOS 风——圆角 16/24/999、圆体字、弹簧动效（`ui/theme/Theme.kt`、`Motion.kt`）
 - 可爱组件：胶囊按钮、柔和卡片、打包脉冲动效（`ui/components/CuteComponents.kt`）
@@ -62,6 +55,11 @@
 - 本地技能栈：10 个开发 skill 安装至 `~/.codebuddy/skills/` 并注入项目约束（本次新增 `accessibility`）
 
 ### Changed
+- **包名迁移**：源码包 `com.web2apk.app` → `com.make.apk`（main + test 目录整体迁移）
+- **类名对齐**：`Web2ApkApp` → `MmaApp`、`Web2ApkTheme` → `MmaTheme`、`Web2ApkApplication` → `MmaApplication`、`requireWeb2ApkApplication()` → `requireMmaApplication()`
+- 随包名迁移：Paparazzi golden 基线文件名（`app/src/test/snapshots/images/`）与 Room schema 目录（`app/schemas/`）同步更新
+- 版本号从 `0.1.0` 迁移为四段式 `0.0.0.0`（`versionCode = 1`，tag `v0.0.0.0+1`）
+- `docs/DEPLOYMENT.md` 改写：本地只验证不出成品；发版改为「改版本 → 打 tag → GitHub 出成品」
 - 构建策略定为**混合路径**：sprint-1 设备端 WebView 即时封装，Phase 2 云端真构建（见 `PROJECT_BRIEF.md` §2）
 
 ### Fixed
