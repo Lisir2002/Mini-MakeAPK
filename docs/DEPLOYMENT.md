@@ -63,11 +63,31 @@ sequenceDiagram
 ## 5. 签名（Signing）
 
 - `debug`：使用 Android 默认 debug keystore（仅本地验证用）。
-- `release`：**当前仓库尚未配置签名**（`isMinifyEnabled = false`，无 `signingConfig`），
-  由 GitHub Actions 产出的 APK 为 **unsigned**，适用于自分发/内测。
-- 后续上架：配置上传密钥（Upload Key）为 GitHub Secret，在 `release.yml` 中接入签名；
-  由 Google Play 重签，密钥不落地仓库。
-- 密钥与证书管理见内部密钥库（不入库）。
+- `release`：**环境变量驱动签名**（已落地，见 `app/build.gradle.kts` 顶部约定）。
+  以下四个环境变量**齐备**时 release 自动签名，缺任一则维持未签名（自分发/内测）：
+
+  | 变量 | 说明 |
+  |-----|------|
+  | `MMA_KEYSTORE_FILE` | 密钥库文件路径（`.jks`） |
+  | `MMA_KEYSTORE_PASSWORD` | 密钥库口令 |
+  | `MMA_KEY_ALIAS` | 密钥别名 |
+  | `MMA_KEY_PASSWORD` | 密钥口令 |
+
+- GitHub 端对应四个 Secret：`MMA_KEYSTORE_BASE64`（`.jks` 的 base64）、
+  `MMA_KEYSTORE_PASSWORD`、`MMA_KEY_ALIAS`、`MMA_KEY_PASSWORD`；
+  `release.yml` 会先解码密钥到 `RUNNER_TEMP` 再注入上述环境变量，
+  **密钥与口令不落仓库、日志自动脱敏**。未配置 Secret 时产出 **unsigned** APK。
+- 本地出签名包（仅供验证，不作交付物）：
+
+  ```bash
+  keytool -genkeypair -v -keystore mma-release.jks -alias mma \
+    -keyalg RSA -keysize 4096 -validity 10000
+  MMA_KEYSTORE_FILE=$PWD/mma-release.jks MMA_KEYSTORE_PASSWORD=… \
+  MMA_KEY_ALIAS=mma MMA_KEY_PASSWORD=… ./gradlew assembleRelease
+  ```
+
+- 上架 Google Play：以上传密钥（Upload Key）签名即可，由 Play 重签；
+  **密钥一旦丢失无法找回**，`.jks` 与口令须离线备份（见 §7 内部密钥库，不入库）。
 
 ## 6. 发版流程（Release）
 

@@ -8,6 +8,9 @@
 
 ## [Unreleased]
 
+### Added
+- **Release 签名基础设施（环境变量驱动）**：`app/build.gradle.kts` 顶部约定四个变量（`MMA_KEYSTORE_FILE` / `MMA_KEYSTORE_PASSWORD` / `MMA_KEY_ALIAS` / `MMA_KEY_PASSWORD`），齐备即自动签名、缺任一维持未签名；`release.yml` 新增「配置 Release 签名」步骤，从 GitHub Secrets（`MMA_KEYSTORE_BASE64` 等四件套）解码密钥库至 `RUNNER_TEMP` 并注入环境变量，密钥不落仓库、日志自动脱敏；`docs/DEPLOYMENT.md` §5 同步重写（含量表 / keytool 生成命令 / Play 上架说明）
+
 ### Fixed
 - CI 环境：两个工作流移除 `android-actions/setup-android@v3`——其内部 `sdkmanager tools` 因遗留 `tools` 包已从 SDK 仓库移除而必崩，改用 GitHub 托管 runner 自带的 Android SDK（`ANDROID_HOME` 已预置且许可已接受）
 

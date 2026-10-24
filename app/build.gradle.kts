@@ -5,6 +5,25 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
+// ── Release 签名（环境变量驱动，密钥不落地）──────────────────────
+// 约定：由 CI 或本地环境提供以下变量，仓库/日志/CI 配置中不出现任何口令：
+//   MMA_KEYSTORE_FILE      密钥库文件路径（.jks）
+//   MMA_KEYSTORE_PASSWORD  密钥库口令
+//   MMA_KEY_ALIAS          密钥别名
+//   MMA_KEY_PASSWORD       密钥口令
+// 四者齐备 → release 自动签名；缺任一 → release 保持未签名（自分发/内测场景）。
+// GitHub 端对应 Secret：MMA_KEYSTORE_BASE64 / MMA_KEYSTORE_PASSWORD / MMA_KEY_ALIAS / MMA_KEY_PASSWORD，
+// 由 .github/workflows/release.yml 解码后注入环境变量。
+// 注意：以下变量名刻意不带 keyAlias/keyPassword/storePassword 等与
+// SigningConfig 成员同名的拼写——Kotlin 会把 lambda 内同名裸标识符解析到
+// 接收者属性上，导致 `this.keyAlias = keyAlias` 实际是自赋 null（2026-10-24 实测踩坑）。
+val mmaKeystorePath: String? = System.getenv("MMA_KEYSTORE_FILE")
+val mmaKeystorePassword: String? = System.getenv("MMA_KEYSTORE_PASSWORD")
+val mmaKeyAlias: String? = System.getenv("MMA_KEY_ALIAS")
+val mmaKeyPassword: String? = System.getenv("MMA_KEY_PASSWORD")
+val hasReleaseSigning: Boolean =
+    listOf(mmaKeystorePath, mmaKeystorePassword, mmaKeyAlias, mmaKeyPassword).all { !it.isNullOrBlank() }
+
 android {
     namespace = "com.make.apk"
     compileSdk = 34
@@ -21,10 +40,24 @@ android {
         versionName = "0.0.0.0"
     }
 
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = file(mmaKeystorePath!!)
+                storePassword = mmaKeystorePassword
+                keyAlias = mmaKeyAlias
+                keyPassword = mmaKeyPassword
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            if (hasReleaseSigning) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
 
