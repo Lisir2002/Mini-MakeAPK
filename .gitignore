@@ -33,3 +33,6 @@ local.properties
 # 系统/编辑器
 .DS_Store
 Thumbs.db
+
+# 发布签名密钥库（绝密，绝不入库；本地备份见 keystore/README.md）
+keystore/
