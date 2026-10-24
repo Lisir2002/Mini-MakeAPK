@@ -1,9 +1,10 @@
 # Changelog
 
-> 状态：已生效（2026-10-24 由 QA 评审）— 遵循 Keep a Changelog + SemVer，受 `docs/DOC_CHARTER.md` 约束
+> 状态：已生效（2026-10-25 由 QA 评审）— 遵循 Keep a Changelog，受 `docs/DOC_CHARTER.md` 约束
+> **版本号规则见 [`docs/VERSIONING.md`](docs/VERSIONING.md)：四段式 `MAJOR.MINOR.PATCH.BUILD+构建号`（当前 `0.0.0.0+1`）。**
 
 本项目所有重要变更记录于此。
-格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，版本遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
+格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)。
 
 ## [Unreleased]
 
@@ -19,10 +20,22 @@
 - **数据层（SQLite）**：`Room 2.6.1 + SQLCipher 4.13.0` 加密数据库落地——领域模型/实体/类型转换器/DAO/`AppDatabase`/仓储分层，口令经 Android Keystore 加密存储（不落明文），含索引、WAL、PRAGMA 调优、单事务批量写、Flow 观察、Paging3 分页
 - 数据层设计文档：`docs/data-layer.md`（选型实证 / 分层 / 加密方案 / 性能清单 / 迁移策略 / 排错）
 - 数据层单元测试：`BuildRecordMapperTest`（6 用例，实体⇄领域无损往返、枚举转换、未知值回退）
+- **应用身份敲定**：应用名 **MMA**，包名 **`com.make.apk`**（`namespace` + `applicationId`），Gradle 项目名 `MMA`
+- **版本规范**：采用四段式 `MAJOR.MINOR.PATCH.BUILD` + 构建号 `+N`（当前 **`0.0.0.0+1`**），新增 `docs/VERSIONING.md` 定义各段递增规则与发布 tag 格式 `v0.0.0.0+1`
+- **发版约束：本地不做编译成品** —— APK 只在 GitHub 打 `v*` tag 时由 `.github/workflows/release.yml` 构建并发布 Release；本地**仅做验证**（`testDebugUnitTest` / `verifyPaparazziDebug`）
+- CI 验证闸门：`.github/workflows/verify.yml`（PR / 推送 main 时跑测试 + 截图回归比对，与本地同套闸门）
 
-## [0.1.0] - 2026-10-24
+### Changed
+- **包名迁移**：源码包 `com.web2apk.app` → `com.make.apk`（main + test 目录整体迁移）
+- **类名对齐**：`Web2ApkApp` → `MmaApp`、`Web2ApkTheme` → `MmaTheme`、`Web2ApkApplication` → `MmaApplication`、`requireWeb2ApkApplication()` → `requireMmaApplication()`
+- 随包名迁移：Paparazzi golden 基线文件名（`app/src/test/snapshots/images/`）与 Room schema 目录（`app/schemas/`）同步更新
+- 版本号从 `0.1.0` 迁移为四段式 `0.0.0.0`（`versionCode = 1`，tag `v0.0.0.0+1`）
+- `docs/DEPLOYMENT.md` 改写：本地只验证不出成品；发版改为「改版本 → 打 tag → GitHub 出成品」
+
+## [0.0.0.0+1] - 2026-10-24
 
 > sprint-1 首个可评审原型：设计系统地基 + 首屏 + WebView 封装屏 + 云端构建契约。
+> 版本号已按 `docs/VERSIONING.md` 迁移为四段式（原记为 `0.1.0`）。
 
 ### Added
 - 设计令牌：OKLCH 色板精确转换为 Compose 颜色，亮/暗双主题（`ui/theme/Color.kt`）
@@ -30,7 +43,7 @@
 - 可爱组件：胶囊按钮、柔和卡片、打包脉冲动效（`ui/components/CuteComponents.kt`）
 - 首屏：单一输入流（URL / HTML / 文件），珊瑚粉主按钮 + 8pt 留白（`ui/screens/HomeScreen.kt`）
 - WebView 封装屏：URL/HTML 本地预览与封装入口（`ui/screens/WebViewScreen.kt`）
-- 应用根：主题绑定与状态路由（`ui/Web2ApkApp.kt`）
+- 应用根：主题绑定与状态路由（`ui/MmaApp.kt`）
 - 团队宪法：`PROJECT_BRIEF.md` 锁定平台、审美、角色、工作流、质量闸门
 - 设计语言：`DESIGN_LANGUAGE.md` 固化可爱简约 iOS 风令牌与反模式
 - 云端构建契约：`docs/build-api-contract.md` 定义 `POST /build → 轮询 → 下载 APK`

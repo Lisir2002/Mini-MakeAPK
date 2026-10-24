@@ -1,0 +1,71 @@
+name: Release
+
+# 成品（APK）**只在 GitHub 上产出**：推送 v* tag 时构建并发布 Release。
+# 本地不做编译成品（见 docs/VERSIONING.md §4）。
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  # ① 强制校验：tag 必须与 app/build.gradle.kts 中的版本严格一致
+  validate-version:
+    name: 校验 tag 与版本一致
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 提取版本并比对 tag
+        run: |
+          set -euo pipefail
+          VN=$(grep -oE 'versionName *= *"[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+"' app/build.gradle.kts \
+              | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+')
+          VC=$(grep -oE 'versionCode *= *[0-9]+' app/build.gradle.kts \
+              | grep -oE '[0-9]+' | head -1)
+          EXPECTED="v${VN}+${VC}"
+          echo "versionName=${VN}  versionCode=${VC}"
+          echo "期望 tag = ${EXPECTED}"
+          echo "实际 tag = ${GITHUB_REF_NAME}"
+          if [ "${GITHUB_REF_NAME}" != "${EXPECTED}" ]; then
+            echo "::error::tag 与版本不一致：应为 ${EXPECTED}，实为 ${GITHUB_REF_NAME}"
+            exit 1
+          fi
+          echo "expected_tag=${EXPECTED}" >> "$GITHUB_OUTPUT"
+
+  # ② 构建成品并发布
+  release:
+    name: 构建并发布 APK
+    needs: validate-version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - name: 构建 Release APK
+        run: ./gradlew assembleRelease --no-daemon --stacktrace
+
+      - name: 整理产物（以 tag 命名）
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          for apk in app/build/outputs/apk/release/*.apk; do
+            cp "$apk" "out/MMA-${GITHUB_REF_NAME}.apk"
+          done
+          ls -la out
+
+      - name: 创建 Release 并上传 APK
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "MMA ${{ github.ref_name }}"
+          files: out/*.apk
+          generate_release_notes: true

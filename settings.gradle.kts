@@ -20,5 +20,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Web2APK"
+rootProject.name = "MMA"
 include(":app")

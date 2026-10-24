@@ -8,6 +8,17 @@
 
 ## 1. 产品概述
 
+> **应用身份（已敲定，不可擅自改动）**
+>
+> | 项 | 值 |
+> |----|-----|
+> | **应用名称** | **`MMA`**（Mini Make APK；`android:label` 与 Gradle `rootProject.name`） |
+> | **应用包名** | **`com.make.apk`**（`namespace` + `applicationId`；源码根包同此） |
+> | **版本格式** | **四段式 `MAJOR.MINOR.PATCH.BUILD` + 构建号 `+N`**（当前 **`0.0.0.0+1`**），规范见 `docs/VERSIONING.md` |
+> | **发布 tag** | `v<versionName>+<versionCode>`，例 **`v0.0.0.0+1`**（由 CI 强制校验一致性） |
+> | **成品产出** | **只在 GitHub 打 `v*` tag 时产出**（`.github/workflows/release.yml` → Release 附件） |
+> | **本地职责** | **本地不做编译成品，只做验证**（`testDebugUnitTest` / `verifyPaparazziDebug`） |
+
 - **是什么**：一款**纯原生安卓 App**，把"网页 / 前端代码"一键打包成可安装的 Android APK。输入来源支持：① 粘贴或上传 HTML/CSS/JS；② 上传 Vue 等前端工程（zip 包）；③ 输入网址 URL（WebView 封装）；④（可选）PHP 项目（经云端构建或 URL 形式接入）。输出：可直接安装到手机的 `.apk` 文件。
 - **目标用户**：**全年龄段、低技术门槛**。既服务想快速把网页/原型封装成 App 的开发者，也服务不会写代码、但希望把自己的网页/内容变成 App 的普通用户。UX 必须极简、友好、零恐吓感。
 - **核心价值**：把"网页变 App"的门槛降到最低——过程**舒适**、可视、有正反馈（可爱进度提示与成果庆祝），让任何人都能在手机上完成打包。
@@ -27,6 +38,10 @@
 | 语言 | Kotlin |
 | 架构 | **混合路径**（sprint-1=设备端 WebView 封装即时出包；Phase 2=云端构建服务出正式签名 APK），见 `docs/brainstorm/05-summary.md`。App 层推荐 MVVM + 单向数据流 |
 | 设计令牌 | OKLCH 色板 + 8pt 栅格（见 §3 / `DESIGN_LANGUAGE.md`） |
+| 应用名称 / 包名 | **`MMA`** / **`com.make.apk`**（见 §1 应用身份） |
+| 版本规范 | **四段式 `0.0.0.0` + 构建号 `+N`**，见 `docs/VERSIONING.md` |
+| 本地存储 | **Room + SQLCipher** 加密 SQLite，见 `docs/data-layer.md` |
+| 发布策略 | **成品只在 GitHub 打 tag 产出**；本地仅验证（`.github/workflows/`） |
 
 ---
 
@@ -93,7 +108,8 @@
 - **文档矩阵已立（2026-10-24）**：建立 `docs/DOC_CHARTER.md` **文档宪章**（所有文档的总纲：矩阵/命名/格式/SemVer/Conventional Commits/Agent 协同/质量门禁），并补全 `README.md`、`CHANGELOG.md`、`CONTRIBUTING.md`、`docs/INDEX.md`、`docs/ARCHITECTURE.md`、`docs/AGENT_COLLABORATION.md`、`docs/CODE_STYLE.md`、`docs/SETUP.md`、`docs/DEPLOYMENT.md`，以及 **`docs/qa/sprint-1-checklist.md`（Sprint-1 合并前质量闸门）**——全部联网学习最佳实践（README 五问、Keep a Changelog、SemVer、Conventional Commits、Agent 交接契约、Docs-as-Code、WCAG 2.2 AA）后生成，且对齐本宪法与 `DESIGN_LANGUAGE.md`。导航见 `docs/INDEX.md`。
 - **数据层已落地（2026-10-24）**：**`Room 2.6.1 + SQLCipher 4.13.0`（加密 SQLite）**接入完成并**编译 + 测试实证通过**（`assembleDebug` 成功、14 个测试全绿、APK 内含 `libsqlcipher.so` 四 ABI）。分层：`data/model`（领域模型，UI 唯一可见）· `data/local`（实体/DAO/AppDatabase/转换器）· `data/security`（口令经 **Android Keystore** 加密存储，不落明文）· `data/repository`（上层唯一出口，只暴露领域模型）。高性能实践：**WAL**、`synchronous=NORMAL`、覆盖索引、`status+createdAt` 复合索引、单事务批量写、Flow 响应式读、Paging3 分页。选型与排错实证见 `docs/data-layer.md`。
   - **版本红线**：SQLCipher **不得升到 4.14+**（4.14.1+ 传递 `androidx.sqlite 2.6.x`，由 Kotlin 2.1 编译，与本项目 Kotlin 1.9.24 不兼容；4.18+ 还要求 compileSdk ≥ 37）。升级需整体升 Kotlin/KSP/Room/AGP/compileSdk。
-- **待补**：云端构建服务实现（Phase 2，契约见 `docs/build-api-contract.md`）；SQLCipher 实际加解密与 DAO 语义的**真机/Instrumented 测试**（当前仅覆盖纯 JVM 逻辑）；发布前用显式 `Migration` 替换 `fallbackToDestructiveMigration()`。
+- **应用身份与发版约束已敲定（2026-10-25）**：应用名 **MMA**（`android:label` + `rootProject.name`）、包名 **`com.make.apk`**（`namespace` + `applicationId`，源码根包整体迁移，Paparazzi golden 基线文件名与 Room schema 目录同步迁移）；版本改为**四段式 `MAJOR.MINOR.PATCH.BUILD` + 构建号 `+N`**（当前 **`0.0.0.0+1`**，规范见 `docs/VERSIONING.md`）；**本地不做编译成品**，APK 只由 `.github/workflows/release.yml` 在推送 `v*` tag 时构建并发布到 Release，且 CI **强制校验 tag 与 `versionName`/`versionCode` 一致**；`.github/workflows/verify.yml` 在 PR / 推送时跑与本地同套的验证闸门。
+- **待补**：云端构建服务实现（Phase 2，契约见 `docs/build-api-contract.md`）；release 签名配置（`signingConfig` 尚未接入，当前产物为 unsigned）；SQLCipher 实际加解密与 DAO 语义的**真机/Instrumented 测试**（当前仅覆盖纯 JVM 逻辑）；发布前用显式 `Migration` 替换 `fallbackToDestructiveMigration()`。
 - **下一步**：① 把构建历史 UI 接上数据层（ViewModel + `pagedHistory()` + 进度/错误/成功三态，遵循 `DESIGN_LANGUAGE.md`）；② 用 `ai-team-orchestration` 推进 Phase 2（云端构建落地）；③ 把截图回归接入 CI（见 `docs/qa/screenshot-testing.md` §7），让 `verifyPaparazziDebug` 成为合并前强制闸门；④ 随新界面持续补 Paparazzi 测试与 baseline。
 
 ---

@@ -35,7 +35,7 @@
 |---|--------|------|-------------|
 | 2.1 | 纯 Jetpack Compose + Material 3（改造风），未混入 XML 布局或 View 系统 | 🟡 | 查 `app/` 下无 `res/layout/*.xml` |
 | 2.2 | `ColorScheme` 由 OKLCH 令牌构建，`lightScheme`/`darkScheme` 成对定义 | 🔴 | 查 `Theme.kt` 的 `lightColorScheme(...)` |
-| 2.3 | 主题通过 `CompositionLocalProvider` + `MaterialTheme` 注入，应用根 `Web2ApkApp.kt` 绑定深浅色 | 🔴 | 查 `Web2ApkApp.kt` |
+| 2.3 | 主题通过 `CompositionLocalProvider` + `MaterialTheme` 注入，应用根 `MmaApp.kt` 绑定深浅色 | 🔴 | 查 `MmaApp.kt` |
 | 2.4 | 动效规格符合 `Motion.kt`：`spring(stiffness≈300, dampingRatio≈0.3)` 带轻微回弹，按压 `scale 1→0.96`，时长 200–400ms | 🟡 | 查 `Motion.kt` 与组件调用 |
 | 2.5 | 首屏 `HomeScreen` 采用「单一输入流」（URL/HTML/本地文件统一入口），不暴露三种割裂输入 | 🔴 | 对照 `../brainstorm/05-summary.md` 决策 C |
 | 2.6 | `WebViewScreen` 对 URL/HTML 做本地预览与封装，代码示例可编译（语法、导入、类型正确） | 🟡 | 本沙箱无 Android SDK，做静态评审；标注"待 `gradle build` 验证" |

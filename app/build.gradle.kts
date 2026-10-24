@@ -6,15 +6,19 @@ plugins {
 }
 
 android {
-    namespace = "com.web2apk.app"
+    namespace = "com.make.apk"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.web2apk.app"
+        applicationId = "com.make.apk"
         minSdk = 24
         targetSdk = 34
+        // ── 版本约束（唯一改动点）────────────────────────────────────
+        // versionName：四段式 MAJOR.MINOR.PATCH.BUILD（如 0.0.0.0）
+        // versionCode：构建号，单调递增、永不重置；发布 tag = v<versionName>+<versionCode>
+        // 递增规则与发版流程见 docs/VERSIONING.md
         versionCode = 1
-        versionName = "0.1.0"
+        versionName = "0.0.0.0"
     }
 
     buildTypes {

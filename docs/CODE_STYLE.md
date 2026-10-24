@@ -9,8 +9,8 @@
 
 ## 1. 包结构与命名
 
-- 根包：`com.web2apk.app`
-- 分层：`ui/theme`、`ui/components`、`ui/screens`、`ui/Web2ApkApp.kt`
+- 根包：`com.make.apk`
+- 分层：`ui/theme`、`ui/components`、`ui/screens`、`ui/MmaApp.kt`
 - 类/对象：PascalCase（`HomeScreen`、`CuteButton`）
 - 函数/变量：camelCase（`loadInput`、`primaryColor`）
 - 常量：SCREAMING_SNAKE_CASE（`MAX_INPUT_LENGTH`）

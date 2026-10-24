@@ -5,8 +5,8 @@
     <uses-permission android:name="android.permission.INTERNET" />
 
     <application
-        android:name=".Web2ApkApplication"
-        android:label="Web2APK"
+        android:name=".MmaApplication"
+        android:label="MMA"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
     </application>

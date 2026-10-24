@@ -31,7 +31,7 @@ flowchart LR
 | `ui/theme` | `app/.../ui/theme/` | 设计令牌（OKLCH→Compose）、主题、动效 |
 | `ui/components` | `app/.../ui/components/` | 可爱组件：胶囊按钮、柔卡、打包脉冲 |
 | `ui/screens` | `app/.../ui/screens/` | HomeScreen（输入）、WebViewScreen（预览/封装） |
-| `ui/Web2ApkApp` | `app/.../ui/Web2ApkApp.kt` | 应用根：主题绑定 + 状态路由 |
+| `ui/MmaApp` | `app/.../ui/MmaApp.kt` | 应用根：主题绑定 + 状态路由 |
 | `data/model` | `app/.../data/model/` | 领域模型 + 枚举（无持久化注解，UI 唯一可见） |
 | `data/local` | `app/.../data/local/` | SQLite 持久化：实体、DAO、AppDatabase、类型转换器、SQLCipher 工厂 |
 | `data/security` | `app/.../data/security/` | 数据库口令经 Android Keystore 加密存储 |

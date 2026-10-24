@@ -1,0 +1,38 @@
+name: Verify
+
+# 每次 PR / 推送执行验证：单元测试 + 截图回归比对。
+# 本地同样只做验证（docs/VERSIONING.md §4），此工作流是同一套闸门的 CI 版本。
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  verify:
+    name: 测试 + 截图回归
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - name: 运行单元测试（含数据层逻辑）
+        run: ./gradlew testDebugUnitTest --no-daemon
+
+      - name: 截图回归比对（与已提交基线逐像素比较）
+        run: ./gradlew verifyPaparazziDebug --no-daemon
+
+      - name: 上传测试与截图报告
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verification-reports
+          path: |
+            app/build/reports
+            app/build/test-results

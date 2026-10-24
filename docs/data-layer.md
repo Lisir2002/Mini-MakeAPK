@@ -13,7 +13,7 @@
 | ORM | **Room 2.6.1**（AndroidX `androidx.room`） |
 | 加密 / 引擎插件 | **SQLCipher for Android 4.13.0**（`net.zetetic:sqlcipher-android`） |
 | 接入方式 | `Room.databaseBuilder(...).openHelperFactory(SupportOpenHelperFactory(passphrase, null, true))` —— **官方直连，零手写桥接** |
-| 依赖注入 | 轻量手工单例（`Web2ApkApplication`），不引入 Hilt |
+| 依赖注入 | 轻量手工单例（`MmaApplication`），不引入 Hilt |
 | 响应式 | 读返回 `kotlinx.coroutines.flow.Flow`；写为 `suspend` |
 | 长列表 | Paging3（`room-paging` + `paging-runtime`） |
 
@@ -144,7 +144,7 @@ ksp {
 
 ```
 app/src/main/java/com/web2apk/app/
-├── Web2ApkApplication.kt              # 进程级单例：database / repository
+├── MmaApplication.kt              # 进程级单例：database / repository
 └── data/
     ├── model/BuildRecord.kt           # 领域模型 + 枚举（无 Room 注解，UI 可见）
     ├── local/
@@ -229,7 +229,7 @@ indices = [
 | **按需分页** | Paging3 `PagingSource` | 长列表不一次性读入内存 |
 | **写全 suspend** | 所有 `@Insert/@Update/@Query(写)` | 主线程零阻塞（配合 `Dispatchers.IO`） |
 | **读返回 Flow** | `observeAll` / `observeById` | 表变更自动推送，UI 免手动刷新 |
-| **惰性打开** | `by lazy` 于 `Web2ApkApplication` | 不拖慢冷启动 |
+| **惰性打开** | `by lazy` 于 `MmaApplication` | 不拖慢冷启动 |
 | **列级更新** | `updateStatus` 仅写状态列 | 避免整行回写 |
 
 ---
@@ -248,7 +248,7 @@ indices = [
 
 ```kotlin
 // 取得仓储（任意 Context）
-val repo = context.requireWeb2ApkApplication().buildHistoryRepository
+val repo = context.requireMmaApplication().buildHistoryRepository
 
 // 登记一次构建
 val id = repo.start(
