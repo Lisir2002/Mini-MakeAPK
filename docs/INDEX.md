@@ -29,6 +29,7 @@
 | [`build-api-contract.md`](build-api-contract.md) | Reference | 云端构建 API 契约（Phase 2 后端规格） |
 | [`data-layer.md`](data-layer.md) | Reference | **数据层设计**：Room + SQLCipher 加密 SQLite（选型实证 / 分层 / 加密 / 性能 / 迁移 / 排错） |
 | [`VERSIONING.md`](VERSIONING.md) | Reference | **版本规范**：四段式 `0.0.0.0+1`、各段递增规则、tag 格式、本地只验证不出成品 |
+| [`logging.md`](logging.md) | Reference | **日志层设计**：九大类别、结构化事件、强制脱敏、崩溃/ANR 自研捕获、保留期与合规 |
 
 ## QA / 质量闸门
 

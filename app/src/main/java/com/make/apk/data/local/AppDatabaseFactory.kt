@@ -3,6 +3,7 @@ package com.make.apk.data.local
 import android.content.Context
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.make.apk.data.security.SqlCipherPassphrase
 import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
@@ -22,6 +23,15 @@ import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
  */
 object AppDatabaseFactory {
 
+    /**
+     * 显式迁移链。**新增版本必须在此登记**，并让 [AppDatabase] 的 `version` 同步 +1。
+     *
+     * Room 会在打开时校验迁移后的 schema 与实体声明是否完全一致；
+     * 不一致会直接抛 `IllegalStateException`，所以这里的 SQL 必须与
+     * `app/schemas/.../N.json`（KSP 导出）逐字对齐。
+     */
+    val MIGRATIONS: Array<Migration> = arrayOf(MIGRATION_1_2)
+
     fun create(context: Context): AppDatabase {
         val appContext = context.applicationContext
         val passphrase = SqlCipherPassphrase.obtain(appContext)
@@ -36,9 +46,43 @@ object AppDatabaseFactory {
         )
             .openHelperFactory(openHelperFactory)
             .addCallback(PerformancePragmas)
-            // v1 尚无历史版本；发布真实版本前必须替换为显式 Migration。
-            .fallbackToDestructiveMigration()
+            .addMigrations(*MIGRATIONS)
             .build()
+    }
+}
+
+/**
+ * v1 → v2：新增日志表 `log_entries`（全类别日志，随库加密）。
+ *
+ * 索引命名遵循 Room 约定：`index_<表名>_<列1>_<列2>`。
+ */
+private val MIGRATION_1_2 = object : Migration(1, 2) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS `log_entries` (
+                `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                `timestampMs` INTEGER NOT NULL,
+                `level` TEXT NOT NULL,
+                `category` TEXT NOT NULL,
+                `event` TEXT NOT NULL,
+                `message` TEXT,
+                `fieldsJson` TEXT,
+                `stackTrace` TEXT,
+                `traceId` TEXT NOT NULL,
+                `sessionId` TEXT NOT NULL,
+                `sequence` INTEGER NOT NULL,
+                `threadName` TEXT NOT NULL,
+                `durationMs` INTEGER,
+                `success` INTEGER
+            )
+            """.trimIndent(),
+        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_log_entries_timestampMs` ON `log_entries` (`timestampMs`)")
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_log_entries_category_timestampMs` ON `log_entries` (`category`, `timestampMs`)",
+        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_log_entries_event` ON `log_entries` (`event`)")
     }
 }
 

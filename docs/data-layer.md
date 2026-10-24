@@ -198,6 +198,27 @@ indices = [
 
 ---
 
+### 5.1 日志表 `log_entries`（DB v2）
+
+日志层（见 [`logging.md`](logging.md)）的高价值类别也落在**同一个加密库**里，
+因此随库一同受 SQLCipher 保护，无需再为日志单独做加密。
+
+| 列 | 类型 | 说明 |
+|----|------|------|
+| `id` | INTEGER PK | — |
+| `timestampMs` | INTEGER | **索引**，所有查询与清理都按时间 |
+| `level` / `category` / `event` | TEXT | `category+timestampMs` 复合索引、`event` 索引 |
+| `message` / `fieldsJson` / `stackTrace` | TEXT NULL | 均已脱敏；`fieldsJson` 为结构化字段 JSON |
+| `traceId` / `sessionId` / `sequence` / `threadName` | TEXT/INTEGER | 关联与排序 |
+| `durationMs` / `success` | INTEGER NULL | **全量化维度提升为独立列**，便于 SQL 直接聚合 |
+
+> **迁移**：`AppDatabase` 已升至 `version = 2`，由
+> `AppDatabaseFactory.MIGRATION_1_2` 显式建表，**已移除**
+> `fallbackToDestructiveMigration()`。新增版本必须同时在
+> `AppDatabase.version` +1 并在 `MIGRATIONS` 数组登记。
+> Room 会校验迁移后的 schema 与实体声明是否逐字一致，不一致会在打开时直接抛异常，
+> 所以迁移 SQL 必须与 KSP 导出的 `app/schemas/.../N.json` 对齐。
+
 ## 6. 加密方案（密钥不落明文）
 
 ```

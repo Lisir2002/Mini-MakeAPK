@@ -23,6 +23,13 @@
 - **应用身份敲定**：应用名 **MMA**，包名 **`com.make.apk`**（`namespace` + `applicationId`），Gradle 项目名 `MMA`
 - **版本规范**：采用四段式 `MAJOR.MINOR.PATCH.BUILD` + 构建号 `+N`（当前 **`0.0.0.0+1`**），新增 `docs/VERSIONING.md` 定义各段递增规则与发布 tag 格式 `v0.0.0.0+1`
 - **发版约束：本地不做编译成品** —— APK 只在 GitHub 打 `v*` tag 时由 `.github/workflows/release.yml` 构建并发布 Release；本地**仅做验证**（`testDebugUnitTest` / `verifyPaparazziDebug`）
+- **日志层（全类别）**：自研 `MmaLogger` 门面（零第三方依赖）+ 结构化事件 + 字段全量化；九大类别覆盖崩溃 / 错误 / **操作审计** / 启动 / 性能 / 网络 / 生命周期 / 调试 / 安全审计
+- 日志脱敏：`Sanitizer` 在门面层**强制**执行（敏感键、个人信息键、完整 URL、邮箱、`key=value` 凭据、超长截断）
+- 日志载体分级：高价值结构化 → 加密 Room（随库受 SQLCipher 保护）；高频诊断 → 轮转文件（2MB×5，有界队列异步写）；调试 → 仅 Logcat
+- 崩溃与 ANR 自研捕获：`UncaughtExceptionHandler`（`attachBaseContext` 最早安装）+ 主线程看门狗，崩溃时同步刷盘
+- 启动监控：`StartupTracer` 冷/温/热分型 + 阶段耗时（用 `elapsedRealtime`，不受改时间影响）
+- 数据库 v2：新增 `log_entries` 表 + 显式 `Migration(1,2)`，**移除** `fallbackToDestructiveMigration()`
+- 日志层单元测试 38 例（脱敏 / 轮转策略 / 限流 / 追踪上下文 / 门面分发 / 落库映射）
 - CI 验证闸门：`.github/workflows/verify.yml`（PR / 推送 main 时跑测试 + 截图回归比对，与本地同套闸门）
 
 ### Changed
