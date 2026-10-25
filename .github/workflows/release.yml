@@ -2,6 +2,7 @@ name: Release
 
 # 成品（APK）**只在 GitHub 上产出**：推送 v* tag 时构建并发布 Release。
 # 本地不做编译成品（见 docs/VERSIONING.md §5）。
+# 日志规范见 docs/Version Log/README.md 与 docs/RELEASE_NOTES.md。
 
 on:
   push:
@@ -12,14 +13,17 @@ permissions:
   contents: write
 
 jobs:
-  # ① 强制校验：tag 必须与 app/build.gradle.kts 中的版本严格一致
+  # ① 强制校验：tag 与版本一致、CHANGELOG 有条目、versionCode 单调递增
   validate-version:
     name: 校验 tag 与版本一致
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # 需要历史 tag 校验 versionCode 单调递增
 
       - name: 提取版本并比对 tag
+        id: ver
         run: |
           set -euo pipefail
           # 版本号 = 纯四段式（可带 -rcN 后缀），tag = v<versionName>，不带 +N
@@ -37,6 +41,41 @@ jobs:
             exit 1
           fi
           echo "expected_tag=${EXPECTED}" >> "$GITHUB_OUTPUT"
+          echo "version=${VN}" >> "$GITHUB_OUTPUT"
+          echo "version_code=${VC}" >> "$GITHUB_OUTPUT"
+
+      - name: 校验 CHANGELOG 有条目
+        run: |
+          set -euo pipefail
+          # Release 正文唯一事实来源 = CHANGELOG 条目（docs/Version Log/README.md 命名规范）
+          VN="${{ steps.ver.outputs.version }}"
+          if ! grep -q "^## \[${VN}\]" "docs/Version Log/CHANGELOG.md"; then
+            echo "::error::CHANGELOG.md 缺少 [${VN}] 条目——Release 正文以 CHANGELOG 为唯一来源，缺条目即缺正文"
+            exit 1
+          fi
+          echo "CHANGELOG 已包含 [${VN}] 条目"
+
+      - name: 校验 versionCode 单调递增
+        run: |
+          set -euo pipefail
+          # versionCode 必须严格大于上一个已发布 tag 的值（docs/VERSIONING.md §2 顺延规则）
+          VC="${{ steps.ver.outputs.version_code }}"
+          PREV_TAG=$(git tag --list 'v*' | grep -vx "v${{ steps.ver.outputs.version }}" | sort -V | tail -1 || true)
+          if [ -z "${PREV_TAG}" ]; then
+            echo "首个版本，跳过单调性校验（versionCode=${VC}）"
+            exit 0
+          fi
+          PREV_VC=$(git show "${PREV_TAG}:app/build.gradle.kts" \
+              | grep -oE 'versionCode *= *[0-9]+' | grep -oE '[0-9]+' | head -1 || true)
+          if [ -z "${PREV_VC}" ]; then
+            echo "::warning::无法读取 ${PREV_TAG} 的 versionCode，跳过校验"
+            exit 0
+          fi
+          echo "上一 tag ${PREV_TAG} 的 versionCode=${PREV_VC}，本次=${VC}"
+          if [ "${VC}" -le "${PREV_VC}" ]; then
+            echo "::error::versionCode 未递增：${PREV_TAG}=${PREV_VC} → 本次=${VC}（必须严格大于）"
+            exit 1
+          fi
 
   # ② 构建成品并发布
   release:
@@ -80,7 +119,7 @@ jobs:
           {
             echo "MMA_KEYSTORE_FILE=${KS}"
             echo "MMA_KEYSTORE_PASSWORD=${{ secrets.MMA_KEYSTORE_PASSWORD }}"
-            echo "MMA_KEY_ALIAS=${{ secrets.MMA_KEY_ALIAS }}"
+            echo "MMA_KEYSTORE_ALIAS=${{ secrets.MMA_KEYSTORE_ALIAS }}"
             echo "MMA_KEY_PASSWORD=${{ secrets.MMA_KEY_PASSWORD }}"
           } >> "$GITHUB_ENV"
           echo "签名密钥已注入（路径与口令均不在日志中展示）"
@@ -88,14 +127,78 @@ jobs:
       - name: 构建 Release APK
         run: ./gradlew assembleRelease --no-daemon --stacktrace
 
-      - name: 整理产物（以 tag 命名）
+      # 官方证书指纹硬校验：防止密钥轮换/误配导致升级安装失败（用户侧表现为
+      # "应用未安装/签名冲突"）。指纹来自 docs/DEPLOYMENT.md 记载的官方签名证书。
+      - name: 校验 APK 签名（官方证书指纹）
+        env:
+          EXPECTED_SHA256: a7986a850e0c64b991aaa34587fd82975b0d3756e2685a85aada75ed71beb4e2
+        run: |
+          set -euo pipefail
+          APK=$(ls app/build/outputs/apk/release/*.apk | head -1)
+          BT="${ANDROID_HOME}/build-tools/34.0.0/apksigner"
+          [ -x "$BT" ] || BT=$(ls "${ANDROID_HOME}"/build-tools/*/apksigner | sort -V | tail -1)
+          if "$BT" verify --print-certs "$APK" > certs.txt 2>&1; then
+            ACTUAL=$(grep -oE 'SHA-256 digest: [0-9a-f]+' certs.txt | grep -oE '[0-9a-f]{64}' | head -1)
+            echo "证书 SHA-256 = ${ACTUAL}"
+            echo "期望 SHA-256 = ${EXPECTED_SHA256}"
+            if [ "${ACTUAL}" != "${EXPECTED_SHA256}" ]; then
+              echo "::error::签名证书与官方指纹不一致，拒绝发布（会导致用户无法覆盖安装）"
+              exit 1
+            fi
+          else
+            echo "::warning::APK 未签名或验签失败，跳过指纹校验（未签名产物仅限自分发/内测）"
+          fi
+          rm -f certs.txt
+
+      - name: 整理产物（规范命名 MMA-v{版本}-{变体}.apk）
         run: |
           set -euo pipefail
           mkdir -p out
+          # 命名规范（docs/Version Log/README.md）：MMA-v{版本}-{变体}.apk
+          # -rcN 后缀单独作为变体段：MMA-v0.0.0.1-rc1.apk（v0.0.0.1-rc1-release.apk 冗余）
+          BASE="${GITHUB_REF_NAME#v}"
+          VARIANT="release"
+          case "$BASE" in
+            *-rc*) VARIANT="${BASE##*-rc}"; VARIANT="rc${VARIANT}"; BASE="${BASE%-rc*}";;
+          esac
           for apk in app/build/outputs/apk/release/*.apk; do
-            cp "$apk" "out/MMA-${GITHUB_REF_NAME}.apk"
+            cp "$apk" "out/MMA-v${BASE}-${VARIANT}.apk"
           done
           ls -la out
+
+      # Release 正文唯一事实来源 = CHANGELOG 条目（docs/Version Log/README.md）。
+      # 提取 [版本] 条目正文（去掉标题行），硬校验无占位符、无 emoji。
+      - name: 生成 Release 正文（取自 CHANGELOG 条目）
+        run: |
+          set -euo pipefail
+          VN="${GITHUB_REF_NAME#v}"
+          awk -v ver="[${VN}]" '
+            index($0, "## " ver) == 1 { found=1; next }
+            found && /^## / { exit }
+            found { print }
+          ' "docs/Version Log/CHANGELOG.md" | sed '/^$/d' > release-notes.md
+          if [ ! -s release-notes.md ]; then
+            echo "::error::从 CHANGELOG 提取 [${VN}] 条目正文为空"
+            exit 1
+          fi
+          if grep -qE 'TODO|TBD|XXX|待填|占位|PLACEHOLDER' release-notes.md; then
+            echo "::error::Release 正文含占位符"
+            exit 1
+          fi
+          if grep -qP '[\x{1F300}-\x{1F9FF}]|[\x{2600}-\x{27BF}]' release-notes.md; then
+            echo "::error::Release 正文含 emoji（规约禁用，见 docs/RELEASE_NOTES.md）"
+            exit 1
+          fi
+          echo "===== Release 正文预览 ====="
+          cat release-notes.md
+
+      # R8 混淆映射：线上崩溃栈还原必需（internal 变体无此问题）
+      - name: 上传 R8 mapping
+        uses: actions/upload-artifact@v4
+        with:
+          name: mapping-${{ github.ref_name }}
+          path: app/build/outputs/mapping/release/mapping.txt
+          if-no-files-found: warn
 
       # tag 含 -rcN（RC 版）→ GitHub Release 标记为 prerelease；正式版不标记
       - name: 判断预发布标记
@@ -108,10 +211,19 @@ jobs:
             echo "prerelease=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: 创建 Release 并上传 APK
-        uses: softprops/action-gh-release@v2
-        with:
-          name: "MMA ${{ github.ref_name }}"
-          files: out/*.apk
-          prerelease: ${{ steps.pre.outputs.prerelease }}
-          generate_release_notes: true
+      # 已存在的 Release 只更新附件、保留人工标题/正文（避免覆盖人工修订）；
+      # 不存在则用 CHANGELOG 条目正文创建。
+      - name: 创建或更新 Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
+            echo "Release ${GITHUB_REF_NAME} 已存在：保留人工标题/正文，仅更新附件"
+            gh release upload "${GITHUB_REF_NAME}" out/*.apk --clobber
+          else
+            gh release create "${GITHUB_REF_NAME}" \
+              --title "MMA ${GITHUB_REF_NAME}" \
+              --notes-file release-notes.md \
+              --prerelease="${{ steps.pre.outputs.prerelease }}"
+          fi

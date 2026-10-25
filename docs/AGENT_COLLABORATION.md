@@ -14,7 +14,7 @@
 - **交接即契约**：传递的不是自由文本，而是结构化工作包。
 - **一个所有者**：每个工作流有唯一 Orchestrator（本仓为 Producer）。
 - **写清不做什么**：每个角色同时声明边界，避免重叠。
-- **共享状态外置**：跨会话事实写入宪法文档 / `CHANGELOG.md`，不沉淀在对话。
+- **共享状态外置**：跨会话事实写入宪法文档 / `docs/Version Log/CHANGELOG.md`，不沉淀在对话。
 - **失败可恢复**：每次产出带 `blockers` 与回滚说明。
 
 ## 2. 团队角色与 RACI
@@ -68,7 +68,7 @@
 |----------|--------|--------|
 | 产品/架构/角色 | `PROJECT_BRIEF.md` | Producer |
 | 设计令牌/风格 | `DESIGN_LANGUAGE.md` | 视觉总监 |
-| 版本变更 | `CHANGELOG.md` | QA |
+| 版本变更 | `docs/Version Log/CHANGELOG.md` | QA |
 | 文档规矩 | `docs/DOC_CHARTER.md` | Producer |
 | 迭代进度 | `docs/sprint-*/progress.md` | Producer |
 | 架构分歧 | `docs/brainstorm/` | 全员 |
@@ -91,5 +91,5 @@
 ## 7. 失败恢复
 
 - 交接失败：回退到发送方并标注具体缺口，不从头重来。
-- 上下文损坏：从 `PROJECT_BRIEF.md` / `CHANGELOG.md` 重建，而非依赖对话记忆。
+- 上下文损坏：从 `PROJECT_BRIEF.md` / `docs/Version Log/CHANGELOG.md` 重建，而非依赖对话记忆。
 - 沙箱网络中断：启用 `github-sandbox-dns-bypass` 经 codeload/DoH 通路恢复。

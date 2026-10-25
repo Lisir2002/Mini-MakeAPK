@@ -67,7 +67,6 @@ MMA/  （仓库 Mini-MakeAPK）
 ├── README.md                  # 你正在看的文件（入口）
 ├── PROJECT_BRIEF.md           # 团队宪法：产品/架构/角色
 ├── DESIGN_LANGUAGE.md         # 设计语言：令牌/风格/反模式
-├── CHANGELOG.md               # 版本日志（Keep a Changelog + 四段式版本号）
 ├── CONTRIBUTING.md            # 贡献指南
 ├── .github/workflows/         # release.yml（打 tag 出成品）/ verify.yml（PR 验证）
 ├── docs/
@@ -75,6 +74,8 @@ MMA/  （仓库 Mini-MakeAPK）
 │   ├── INDEX.md               # 文档地图
 │   ├── ARCHITECTURE.md        # 系统架构
 │   ├── VERSIONING.md          # 版本规范（纯四段式 0.0.0.1-rc1）
+│   ├── RELEASE_NOTES.md       # 发版日志格式规约（三处一致）
+│   ├── Version Log/           # 版本日志：CHANGELOG 总表 + 各版本独立文档
 │   ├── AGENT_COLLABORATION.md # AI Agent 协同协议
 │   ├── CODE_STYLE.md          # 代码与提交规范
 │   ├── SETUP.md               # 环境搭建
@@ -114,7 +115,7 @@ MMA/  （仓库 Mini-MakeAPK）
 ## 版本与许可
 
 - 版本规范：纯四段式 `MAJOR.MINOR.PATCH.BUILD[-rcN]`（当前 `0.0.0.1-rc1`；正式版需用户授权、否则发 RC；无 `+N` 后缀），见 [`docs/VERSIONING.md`](docs/VERSIONING.md)。
-- 版本日志：[`CHANGELOG.md`](CHANGELOG.md)（遵循 Keep a Changelog）。
+- 版本日志：[`docs/Version Log/CHANGELOG.md`](docs/Version%20Log/CHANGELOG.md)（遵循 Keep a Changelog，格式规约见 [`docs/RELEASE_NOTES.md`](docs/RELEASE_NOTES.md)）。
 - 许可：当前为**专有 / 内部项目**，开源许可待定。如需使用请先联系维护者。
 
 ---

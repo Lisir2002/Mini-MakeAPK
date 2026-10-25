@@ -72,7 +72,7 @@
 |---|--------|------|-------------|
 | 5.1 | 仓内 `.md` 相对链接 100% 有效（无失效 `../` 或漏写层级） | 🔴 | 运行链接校验脚本（见 §6） |
 | 5.2 | 每份文档顶部含 `> 状态:` 标记并声明遵循宪章条款 | 🟡 | 抽查根文档与 `docs/` 文档 |
-| 5.3 | 本次新增/变更已在 `../../CHANGELOG.md` 的 `[Unreleased]` 记录（遵循 Keep a Changelog + Conventional Commits） | 🔴 | 查 `CHANGELOG.md` |
+| 5.3 | 本次新增/变更已在 `../../docs/Version Log/CHANGELOG.md` 的 `[Unreleased]` 记录（条目格式遵循 `../RELEASE_NOTES.md` + Conventional Commits） | 🔴 | 查 `docs/Version Log/CHANGELOG.md` |
 | 5.4 | `../../PROJECT_BRIEF.md` §7 已同步记录 Sprint-1 进度与文档矩阵状态 | 🟡 | 查 §7 |
 | 5.5 | 代码注释/示例中无遗留 TODO 噪音；若有占位，统一标注「Phase 2」 | 🟢 | 搜 `TODO`/`FIXME` |
 

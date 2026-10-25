@@ -12,7 +12,6 @@
 | [`README.md`](../README.md) | Tutorial | 项目门面：是什么、快速开始、功能、结构 |
 | [`PROJECT_BRIEF.md`](../PROJECT_BRIEF.md) | Explanation | **团队宪法**：产品/架构/角色/工作流/质量闸门 |
 | [`DESIGN_LANGUAGE.md`](../DESIGN_LANGUAGE.md) | Reference | **设计语言**：OKLCH 令牌、风格、反模式 |
-| [`CHANGELOG.md`](../CHANGELOG.md) | Reference | 版本日志（Keep a Changelog + SemVer） |
 | [`CONTRIBUTING.md`](../CONTRIBUTING.md) | How-to | 贡献指南：人类 + Agent 协作流程 |
 
 ## docs/ 深度文档
@@ -29,6 +28,8 @@
 | [`build-api-contract.md`](build-api-contract.md) | Reference | 云端构建 API 契约（Phase 2 后端规格） |
 | [`data-layer.md`](data-layer.md) | Reference | **数据层设计**：Room + SQLCipher 加密 SQLite（选型实证 / 分层 / 加密 / 性能 / 迁移 / 排错） |
 | [`VERSIONING.md`](VERSIONING.md) | Reference | **版本规范**：纯四段式 `0.0.0.1-rc1`、顺延规则、RC 机制、tag 格式、本地只验证不出成品 |
+| [`RELEASE_NOTES.md`](RELEASE_NOTES.md) | Reference | **发版日志格式规约**：三处一致、条目铁律、写作铁律、Checklist（版本日志的唯一格式标准） |
+| [`Version Log/`](Version%20Log/) | Reference | **版本日志目录**：总表 `CHANGELOG.md` + 各版本独立文档（`MMA v-Logs/`，命名与结构见目录内 README） |
 | [`logging.md`](logging.md) | Reference | **日志层设计**：九大类别、结构化事件、强制脱敏、崩溃/ANR 自研捕获、保留期与合规 |
 
 ## QA / 质量闸门
@@ -56,7 +57,7 @@ flowchart TD
     E --> F[docs/CODE_STYLE.md]
     B --> G[docs/AGENT_COLLABORATION.md]
     G --> H[docs/DOC_CHARTER.md]
-    A --> I[CHANGELOG.md]
+    A --> I[docs/Version Log/CHANGELOG.md]
 ```
 
 - **新成员/新 Agent**：README → PROJECT_BRIEF → DESIGN_LANGUAGE → SETUP。

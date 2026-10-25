@@ -83,7 +83,7 @@ MAJOR.MINOR.PATCH.BUILD[-rcN]
       │
 ② 改版本 ── app/build.gradle.kts（versionCode +1，versionName 按①）
       │
-③ 更新 CHANGELOG.md ── [Unreleased] 晋级为 [<versionName>] - YYYY-MM-DD
+③ 更新 docs/Version Log/CHANGELOG.md ── [Unreleased] 晋级为 [<versionName>] - YYYY-MM-DD（条目格式见 docs/RELEASE_NOTES.md）
       │
 ④ 提交并推送到 main ── 本地仅运行验证（见 §5）
       │
@@ -130,8 +130,9 @@ git push origin "v$(versionName)"
   避免 PATCH 号在无 bug 修复时被无意义地抬高。
 - `-rcN` 后缀即 SemVer pre-release 标识的等效物；获批后去掉后缀成为正式版，
   与 SemVer「预发布版本晋升为正式版本」的语义一致。
-- `CHANGELOG.md` 仍遵循 Keep a Changelog：版本号写作 `[0.0.0.1-rc1] - YYYY-MM-DD`，
-  发版时 `[Unreleased]` 整体晋级并保留新的空 `[Unreleased]`。
+- `docs/Version Log/CHANGELOG.md` 仍遵循 Keep a Changelog：版本号写作 `[0.0.0.1-rc1] - YYYY-MM-DD`，
+  发版时 `[Unreleased]` 整体晋级并保留新的空 `[Unreleased]`；条目**格式**（用户面向分类与小标题体例）
+  以 `docs/RELEASE_NOTES.md` 为唯一事实来源。
 
 ---
 
@@ -140,7 +141,7 @@ git push origin "v$(versionName)"
 - [ ] **授权状态已确认**：正式版有用户授权记录（确认或提前通知）；未授权则 `versionName` 必须以 `-rcN` 结尾
 - [ ] BUILD 段较上一正式版 **+1**（前三段仅在用户明确指定的产品级节点才动，且后级归零）
 - [ ] `app/build.gradle.kts` 中 `versionCode` 已 +1（大于历史上任何一次，含 RC）
-- [ ] `CHANGELOG.md` 已把 `[Unreleased]` 晋级为 `[<versionName>] - 日期`
+- [ ] `docs/Version Log/CHANGELOG.md` 已把 `[Unreleased]` 晋级为 `[<versionName>] - 日期`，且条目符合 `docs/RELEASE_NOTES.md` 格式规约
 - [ ] 本地 `testDebugUnitTest` + `verifyPaparazziDebug` 全绿
 - [ ] tag 名 `v<versionName>` 与 `versionName` 完全一致（**不带 `+N`**）
 
@@ -151,6 +152,7 @@ git push origin "v$(versionName)"
 | 文档 | 说明 |
 |------|------|
 | [`DEPLOYMENT.md`](DEPLOYMENT.md) | 发版操作步骤与签名说明 |
-| [`../CHANGELOG.md`](../CHANGELOG.md) | 版本日志 |
+| [`RELEASE_NOTES.md`](RELEASE_NOTES.md) | 发版日志格式规约（CHANGELOG / 独立文档 / Release 正文三处一致） |
+| [`Version Log/CHANGELOG.md`](Version%20Log/CHANGELOG.md) | 版本日志总表 |
 | [`qa/screenshot-testing.md`](qa/screenshot-testing.md) | 截图基线的记录与比对 |
 | `.github/workflows/release.yml` | 打 tag 后产出成品的工作流 |

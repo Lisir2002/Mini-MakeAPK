@@ -38,7 +38,7 @@ docs(charter): 补充 Agent 协同写作规则
 
 ## 4. 变更日志
 
-每次 checkpoint 完成后，立即向 [`CHANGELOG.md`](CHANGELOG.md) 的 `[Unreleased]` 补一条（过去式、一行、具体结果）。发版时整体晋级。
+每次 checkpoint 完成后，立即向 [`docs/Version Log/CHANGELOG.md`](docs/Version%20Log/CHANGELOG.md) 的 `[Unreleased]` 补一条（条目格式见 [`docs/RELEASE_NOTES.md`](docs/RELEASE_NOTES.md)：用户可感知、过去式、具体结果）。发版时整体晋级。
 
 ```markdown
 ## [Unreleased]
@@ -50,7 +50,7 @@ docs(charter): 补充 Agent 协同写作规则
 
 1. 从 `main` 切分支，完成改动。
 2. 确保：命令可跑通、文档随代码同步更新、相对链接可达。
-3. 提交遵循 Conventional Commits，并补 `CHANGELOG.md`。
+3. 提交遵循 Conventional Commits，并补 `docs/Version Log/CHANGELOG.md`。
 4. 提 PR，描述「做了什么 / 为什么 / 风险」。
 5. 至少 1 名对应文档 Owner（见 `DOC_CHARTER.md` §3）评审通过后合并。
 
@@ -59,7 +59,7 @@ docs(charter): 补充 Agent 协同写作规则
 ## 6. AI Agent 贡献者须知
 
 - 开工前读 `PROJECT_BRIEF.md` + `DESIGN_LANGUAGE.md` + 对应文档，不得擅自发明颜色/风格/产品定位。
-- 跨会话事实写入上述宪法文档或 `CHANGELOG.md`，不沉淀在对话里。
+- 跨会话事实写入上述宪法文档或 `docs/Version Log/CHANGELOG.md`，不沉淀在对话里。
 - 多 Agent 交接用结构化工作包（见 [`docs/AGENT_COLLABORATION.md`](docs/AGENT_COLLABORATION.md)）。
 - 产出文档必须挂 `> 状态:` 标记并声明遵循的宪法条款。
 

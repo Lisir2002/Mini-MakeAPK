@@ -21,7 +21,7 @@
 1. **Docs-as-Code**：文档与代码同仓、同分支、同 PR 评审、同版本。禁止把文档丢在 Wiki/Notion/云盘里（会立刻漂移）。
 2. **单一事实来源**：设计令牌只在 `DESIGN_LANGUAGE.md` 定义；产品与架构决策只在 `PROJECT_BRIEF.md` 定义。其他文档**引用**而非**复制**这些事实。
 3. **对齐宪法**：所有文档顶部必须声明其遵循 `PROJECT_BRIEF.md` 与 `DESIGN_LANGUAGE.md`，不得自创颜色/风格/产品定位。
-4. **相对链接**：仓内引用一律用相对路径（如 `docs/ARCHITECTURE.md`、`CHANGELOG.md`），禁止绝对/裸 URL，保证 clone 后链接不断。
+4. **相对链接**：仓内引用一律用相对路径（如 `docs/ARCHITECTURE.md`、`docs/Version Log/CHANGELOG.md`），禁止绝对/裸 URL，保证 clone 后链接不断。
 5. **图用 Mermaid**：架构图、流程图、时序图优先用 Mermaid（可版本化、可被渲染），ASCII 仅在 Mermaid 不可用时兜底。
 6. **可校验**：每条命令、每段代码片段在并入前必须跑通；文档随代码变更同步更新，纳入 PR 评审。
 
@@ -38,7 +38,8 @@
 | 文档宪章 | `docs/DOC_CHARTER.md` | Reference | Producer | 全员/Agent | 文档规矩变更 |
 | 文档地图 | `docs/INDEX.md` | Reference | Producer | 全员/Agent | 新增/删除文档 |
 | 入口门面 | `README.md` | Tutorial | Producer | 外部用户/贡献者 | 功能/快速开始/状态变更 |
-| 版本日志 | `CHANGELOG.md` | Reference | QA | 全员/用户 | 每次发版、每个 checkpoint |
+| 版本日志 | `docs/Version Log/CHANGELOG.md` | Reference | QA | 全员/用户 | 每次发版、每个 checkpoint |
+| 发版日志规约 | `docs/RELEASE_NOTES.md` | Reference | Producer/QA | 全员/Agent | 日志格式规约变更 |
 | 贡献指南 | `CONTRIBUTING.md` | How-to | Producer | 人类/Agent 贡献者 | 协作流程/规范变更 |
 | 系统架构 | `docs/ARCHITECTURE.md` | Explanation | 安卓工程师 | 工程师/Agent | 模块/数据流/技术选型变更 |
 | Agent 协同 | `docs/AGENT_COLLABORATION.md` | How-to | Producer | AI Agent | 角色/交接契约/工作流变更 |
@@ -55,10 +56,11 @@
 
 ## 4. 文件命名与目录
 
-- **根目录**：`UPPERCASE.md`（`README.md`、`CHANGELOG.md`、`CONTRIBUTING.md`）。
+- **根目录**：`UPPERCASE.md`（`README.md`、`CONTRIBUTING.md`）。
 - **`docs/`**：`lowercase-kebab-case.md`（`agent-collaboration.md`、`code-style.md`）。
 - 子目录用名词单数：`docs/brainstorm/`、`docs/sprint-1/`、`docs/adr/`。
 - 禁止中文文件名、禁止空格、禁止特殊字符。
+- **受控例外**：`docs/Version Log/` 及其下 `MMA v-Logs/` 按发版日志规约（`docs/RELEASE_NOTES.md`）使用空格命名——版本日志目录结构自成一格（总表 + 每版本独立文档），是唯一例外；其他位置一律遵守上文。
 
 ---
 
@@ -88,12 +90,11 @@
 - `PATCH`：向后兼容的缺陷修复。
 - 预发布：`1.0.0-alpha`、`1.0.0-alpha.1`；构建元数据：`+exp.sha.xxxx`。
 
-### 6.2 版本日志（Keep a Changelog）
-- 文件根目录 `CHANGELOG.md`，首行声明"基于 Keep a Changelog，遵循 SemVer"。
-- 顶部 `[Unreleased]` 空区块；版本标题格式 `## [1.2.0] - 2026-03-07`（ISO 8601 日期，最新在上）。
-- 六分类（按顺序，空的分类不写、不写 N/A）：
-  `Added` / `Changed` / `Deprecated` / `Removed` / `Fixed` / `Security`。
-- 每条：一行、过去式、主语 + 具体结果（避免"优化了""修了一些 bug"）。
+### 6.2 版本日志（用户面向，规约见 `docs/RELEASE_NOTES.md`）
+- 文件位于 `docs/Version Log/CHANGELOG.md`（2026-10-25 由根目录迁入，目录结构与命名规范见 `docs/Version Log/README.md`）。
+- **格式规约的唯一事实来源是 `docs/RELEASE_NOTES.md`**（用户面向格式：100 字简介 → 新功能 → 改进 → 移除 → 修复 → 安全 → 已知问题；条目 `**4-9 字小标题**：20-40 字说明`；禁 emoji；仅记用户可感知变更）。
+- 顶部 `[Unreleased]` 暂存区；版本标题格式 `## [<versionName>] - YYYY-MM-DD`（四段式版本号，ISO 8601 日期，最新在上）。
+- **三处一致**：CHANGELOG 条目 = 独立版本文档（`docs/Version Log/MMA v-Logs/MMA {版本} Version Log.md`）= GitHub Release 正文，内容逐字相同。
 - **随时写**：每完成一个 checkpoint 立即补 `[Unreleased]`，发版时整体晋级为带日期的版本块。
 
 ---
@@ -129,7 +130,7 @@ AI Agent 也是本文档矩阵的创作者与读者，须遵守：
 2. **角色 RACI**：每个 Agent 明确 Responsible / Accountable / Consulted / Informed（见 `docs/AGENT_COLLABORATION.md`）。
 3. **写清"不做什么"**：角色职责文档同时记录该 Agent 的边界，避免职责重叠。
 4. **结构化输出模板**：收敛到少量可复用模板——`Plan` / `Decision` / `Checklist` / `Status` / `Postmortem`，保持可扫读。
-5. **共享状态**：跨会话的持久事实写入 `PROJECT_BRIEF.md` / `DESIGN_LANGUAGE.md` / `CHANGELOG.md`，而非散落在对话里。
+5. **共享状态**：跨会话的持久事实写入 `PROJECT_BRIEF.md` / `DESIGN_LANGUAGE.md` / `docs/Version Log/CHANGELOG.md`，而非散落在对话里。
 6. **失败可恢复**：每次产出带 `blockers` 与回滚说明；文档变更纳入 PR，可回退。
 
 ---
@@ -157,4 +158,4 @@ AI Agent 也是本文档矩阵的创作者与读者，须遵守：
 
 ---
 
-*本宪章随项目演进由 Producer 维护，任何修改须走 `docs(scope):` 提交并更新 `CHANGELOG.md`。*
+*本宪章随项目演进由 Producer 维护，任何修改须走 `docs(scope):` 提交并更新 `docs/Version Log/CHANGELOG.md`。*

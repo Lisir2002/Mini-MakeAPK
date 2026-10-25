@@ -107,7 +107,7 @@ sequenceDiagram
 
 1. **确认授权状态**：已授权 → 正式版（顺延 BUILD +1）；未授权 → RC（顺延下一版 + `-rcN`）。
 2. 在 `app/build.gradle.kts` 中递增版本（`versionCode` **必增**，`versionName` 按上一步）。
-3. 更新 [`CHANGELOG.md`](../CHANGELOG.md)：将 `[Unreleased]` 晋级为 `[<versionName>+M] - YYYY-MM-DD`。
+3. 更新 [`docs/Version Log/CHANGELOG.md`](Version%20Log/CHANGELOG.md)：将 `[Unreleased]` 晋级为 `[<versionName>] - YYYY-MM-DD`（条目格式见 [`RELEASE_NOTES.md`](RELEASE_NOTES.md)）。
 4. 本地验证：`./gradlew testDebugUnitTest verifyPaparazziDebug` 全绿。
 5. 提交并推送到 `main`。
 6. **打 tag 并推送**（tag 名必须与版本严格一致）：

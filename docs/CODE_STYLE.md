@@ -49,7 +49,7 @@ fun CuteButton(
 
 - **唯一来源**：`DESIGN_LANGUAGE.md` 定义 OKLCH 令牌；`ui/theme/Color.kt` 是其**派生**的 Compose 颜色。
 - 业务代码禁止自创颜色/圆角/字体；一律引用 `MaterialTheme.colorScheme` / `shapes` / `typography`。
-- 新增令牌：先改 `DESIGN_LANGUAGE.md`，再同步 `Color.kt` / `Theme.kt`，并补 `CHANGELOG.md`。
+- 新增令牌：先改 `DESIGN_LANGUAGE.md`，再同步 `Color.kt` / `Theme.kt`，并补 `docs/Version Log/CHANGELOG.md`。
 
 ## 5. 提交规范（Conventional Commits）
 
@@ -80,7 +80,7 @@ docs(charter): 补充 Agent 协同写作规则
 
 ## 6. 变更日志（Keep a Changelog）
 
-- 每次 checkpoint 立即补 [`CHANGELOG.md`](../CHANGELOG.md) 的 `[Unreleased]`。
+- 每次 checkpoint 立即补 [`docs/Version Log/CHANGELOG.md`](Version%20Log/CHANGELOG.md) 的 `[Unreleased]`。
 - 每条：一行、过去式、主语 + 具体结果（"新增 HTML 即时预览"而非"修了一些东西"）。
 - 六分类：Added / Changed / Deprecated / Removed / Fixed / Security，空分类不写。
 - 发版时整体晋级为 `[X.Y.Z] - YYYY-MM-DD`，顶部保留空 `[Unreleased]`。
