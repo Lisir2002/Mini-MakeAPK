@@ -98,27 +98,32 @@ sequenceDiagram
 
 ## 6. 发版流程（Release）
 
-> 版本格式与递增规则见 [`VERSIONING.md`](VERSIONING.md)。
+> 版本格式、递增规则与 RC 机制见 [`VERSIONING.md`](VERSIONING.md)。
 > 当前：`versionName = "0.0.0.0"`、`versionCode = 1` → tag `v0.0.0.0+1`。
 
-1. 在 `app/build.gradle.kts` 中递增版本（`versionCode` **必增**，四段式按规则递增）。
-2. 更新 [`CHANGELOG.md`](../CHANGELOG.md)：将 `[Unreleased]` 晋级为 `[0.0.0.0+N] - YYYY-MM-DD`。
-3. 本地验证：`./gradlew testDebugUnitTest verifyPaparazziDebug` 全绿。
-4. 提交并推送到 `main`。
-5. **打 tag 并推送**（tag 名必须与版本严格一致）：
+> **授权闸门**：正式版发版**必须取得用户授权**（明确确认或提前通知）。未授权时按
+> 顺延下一版本发 RC（`0.0.0.1-rc1` → `0.0.0.1-rc2` …），流程与本表完全相同，
+> 只是 `versionName` 带 `-rcN` 后缀；RC 获批后去掉后缀即为正式版。
+
+1. **确认授权状态**：已授权 → 正式版（顺延 BUILD +1）；未授权 → RC（顺延下一版 + `-rcN`）。
+2. 在 `app/build.gradle.kts` 中递增版本（`versionCode` **必增**，`versionName` 按上一步）。
+3. 更新 [`CHANGELOG.md`](../CHANGELOG.md)：将 `[Unreleased]` 晋级为 `[<versionName>+M] - YYYY-MM-DD`。
+4. 本地验证：`./gradlew testDebugUnitTest verifyPaparazziDebug` 全绿。
+5. 提交并推送到 `main`。
+6. **打 tag 并推送**（tag 名必须与版本严格一致）：
 
    ```bash
    git tag v0.0.0.0+1
    git push origin v0.0.0.0+1
    ```
 
-6. GitHub Actions 自动执行：校验 tag 与版本一致 → `assembleRelease` → 创建 Release 上传 APK。
-7. 从 GitHub Release 下载成品并分发。
+7. GitHub Actions 自动执行：校验 tag 与版本一致 → `assembleRelease` → 创建 Release 上传 APK。
+8. 从 GitHub Release 下载成品并分发。
 
 ## 7. 回滚（Rollback）
 
 - 保留上一稳定版本的 tag 与其 Release 成品。
-- **不可回退 `versionCode`**：即便回滚功能，也要通过递增 BUILD/PATCH 发新版本，
+- **不可回退 `versionCode`**：即便回滚功能，也要顺延 BUILD 段发新版本，
   否则用户无法升级（见 [`VERSIONING.md`](VERSIONING.md) §2 硬性约束）。
 - 异常时从上一 tag 的 Release 重新取包分发；客户端若存在热更新通道，先降级配置再修包。
 

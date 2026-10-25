@@ -13,6 +13,7 @@
 - **官方发布签名已启用**：生成正式密钥库（PKCS12 / RSA 4096 / 别名 `mma` / 证书 DN `CN=MMA, OU=Release, O=Mini-MakeAPK, C=CN` / 有效期至 2054-03-12），四个 GitHub Secret 已注入；密钥库与口令本地备份于工作区 `keystore/`（`.gitignore` 排除，绝密），`v0.0.0.0+1` 起 Release 产物为签名 APK
 
 ### Changed
+- **版本规范修订（用户纠正，2026-10-25）**：`docs/VERSIONING.md` 重写——① 正式版默认**顺延 BUILD 段 +1**（`0.0.0.3` → `0.0.0.4`），MAJOR/MINOR/PATCH 仅在用户明确指定的产品级节点才动，日常修复/优化/UI 调整一律顺延、禁止语义化跳段；② **正式版发版必须取得用户授权**（明确确认或提前通知），未授权时按顺延下一版本发 RC（`0.0.0.8-rc1` → `0.0.0.8-rc2`，rcN 递增、基版本不变），RC 获批去掉 `-rcN` 后缀即为正式版；③ RC 与正式版遵循同一 tag 规则（`v0.0.0.1-rc1+2`）与 CI 校验；`docs/DEPLOYMENT.md` §6 同步补「授权闸门」步骤
 - **Release 构建启用 R8 full mode + 资源压缩**：`isMinifyEnabled = true` + `isShrinkResources = true`；`proguard-rules.pro` 重写为「库方 consumer rules 为主 + 自有边界兜底」——保留崩溃栈文件名/行号、Room 实体/DAO/`AppDatabase`、SQLCipher JNI 类、ViewModel 手工工厂、kotlinx.serialization 序列化器；对 Tink（SQLCipher 加密栈传递依赖）引用的编译期注解类 `com.google.errorprone.annotations.**` / `javax.annotation.concurrent.**` 补 `-dontwarn`（R8 full 模式 missing class）
 - **图标全面矢量化**：移除 `androidx-material-icons-extended` 整库依赖（该库以代码态进 dex、本应用零使用）；新增 `res/drawable/` 六个 SVG 矢量（`ic_arrow_back` / `ic_history` / `ic_check_circle` / `ic_sentiment_dissatisfied` / `ic_launcher_foreground` / `ic_launcher_background`）与自适应启动图标（`mipmap-anydpi-v26` 三层 adaptive-icon + `mipmap-anydpi` 全幅矢量回退，覆盖 API 24/25）；UI 经 `ui/icons/MmaIcons.kt` 的 `MmaIcon` 统一接入（首屏历史按钮、三屏返回按钮、结果页状态图标——emoji 替换为带 `contentDescription` 的矢量，屏幕阅读器可读）；Paparazzi 基线已按新 UI 重录
 
