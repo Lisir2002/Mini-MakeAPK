@@ -36,3 +36,7 @@ Thumbs.db
 
 # 发布签名密钥库（绝密，绝不入库；本地备份见 keystore/README.md）
 keystore/
+
+# Python 缓存
+__pycache__/
+*.pyc
