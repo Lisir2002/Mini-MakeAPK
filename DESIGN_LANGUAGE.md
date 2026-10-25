@@ -156,6 +156,7 @@
 | **BottomNav** | 圆润图标、选中态 `--primary` 高亮 + 轻微放大、底部柔和 `elevation` |
 | **FAB** | `primary` 圆、轻柔阴影、按压回弹 |
 | **Chip/标签** | `primary-container` 底 + `on-primary-container` 字、`radius-pill` |
+| **权限二次确认弹窗** | `surface` 底 + `radius-lg`；图标先包 64dp `primary-container` 圆底再 32dp 图（`on-primary-container`）；主按钮胶囊 Filled、次级「以后再说」TextButton；文案 `title-large` + `body-medium`，**全程用人话不出现权限名** |
 
 ---
 

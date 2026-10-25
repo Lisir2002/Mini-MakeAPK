@@ -45,6 +45,28 @@ fun CuteButton(
 }
 ```
 
+### 3.1 权限请求模式（强制）
+
+- **场景触发才申请**：禁止进页面/启动即申请；每次操作前 `checkSelfPermission` 自查。
+- **两段式**：先 `MmaPermissionDialog`（应用内二次确认，文案见 `PermissionSpecs.kt`），
+  用户确认后才 `state.requestPermission()` 唤起系统弹窗。
+- **接线**：`rememberLauncherForActivityResult(RequestPermission())`；
+  `shouldShowRequestPermissionRationale` **必须**在 launcher 回调内读（需 `context as? ComponentActivity`），
+  返回值决定 Denied（可再解释）还是 PermanentlyDenied（引导去设置）。
+- **拒绝是正常结果**：不得 Toast 轰炸或阻断主流程；状态迁移由纯函数
+  `resolveStatusAfterResult` 统一裁定，便于 JVM 单测。
+- 特殊权限（如安装未知应用）走系统设置页 Intent，返回后用
+  `LifecycleResumeEffect` 复查，不假设用户一定去开了。
+
+```kotlin
+// 典型接线（仅示意，当前版本尚无接入点）
+val state = rememberMmaPermissionState(Manifest.permission.POST_NOTIFICATIONS) { onGranted() }
+if (state.status == RuntimePermissionStatus.PermanentlyDenied) {
+    MmaPermissionDialog(state.spec, PermissionDialogStage.GoToSettings,
+        onConfirm = state::openSettings, onDismiss = state::dismissPrompt)
+}
+```
+
 ## 4. 设计令牌使用（强制）
 
 - **唯一来源**：`DESIGN_LANGUAGE.md` 定义 OKLCH 令牌；`ui/theme/Color.kt` 是其**派生**的 Compose 颜色。

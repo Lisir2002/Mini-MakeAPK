@@ -22,6 +22,8 @@ object MmaIcons {
     val History: Int = R.drawable.ic_history
     val CheckCircle: Int = R.drawable.ic_check_circle
     val SentimentDissatisfied: Int = R.drawable.ic_sentiment_dissatisfied
+    val Notifications: Int = R.drawable.ic_notifications
+    val InstallMobile: Int = R.drawable.ic_install_mobile
 }
 
 /**

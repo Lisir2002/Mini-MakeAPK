@@ -31,6 +31,7 @@ flowchart LR
 | `ui/theme` | `app/.../ui/theme/` | 设计令牌（OKLCH→Compose）、主题、动效 |
 | `ui/components` | `app/.../ui/components/` | 可爱组件：胶囊按钮、柔卡、打包脉冲 |
 | `ui/screens` | `app/.../ui/screens/` | HomeScreen（输入）、BuildingScreen（进度）、ResultScreen（成功/失败）、HistoryScreen（历史）、PreviewScreen（预览） |
+| `ui/permission` | `app/.../ui/permission/` | 权限基础设施：三层权限状态机 + 应用内二次确认弹窗（**尚无接入点**，Phase 2 随功能同 commit 补齐 Manifest） |
 | `ui/navigation` | `app/.../ui/navigation/` | 页面骨架：路由清单 `MmaRoute` + 导航宿主 `MmaNavHost` |
 | `ui/viewmodel` | `app/.../ui/viewmodel/` | `BuildViewModel`（构建流程）、`HistoryViewModel`（历史）；手工 DI 工厂 |
 | `MainActivity` | `app/.../MainActivity.kt` | 唯一载体 Activity：`setContent` + `reportFullyDrawn()`（启动终点） |
@@ -87,6 +88,33 @@ innerPadding**，否则被栏遮挡）+ `bottomBar`（MmaBottomBar，仅主页�
 **构建终态守卫**：`BuildStatus` 终态为 SUCCESS/FAILED/CANCELLED；
 仓储层 `markSucceeded/markFailed/markCancelled` 均带终态检查——
 取消后迟到的协程无法把记录改写为成功或失败（用户点取消即真取消）。
+
+## 3.2 权限层（三层策略）
+
+**系统权限弹窗不可定制**（官方定论：应用无法配置或更改该对话框），
+因此走「应用内二次确认 → 系统弹窗」两段式：先用自家语气解释为什么需要，
+用户点头后再唤起系统弹窗，拒绝与永久拒绝均有对应路径。
+
+| 层级 | 代表权限 | 授予方式 | 本项目策略 |
+|------|---------|---------|-----------|
+| 普通权限 | `INTERNET` | 安装时自动授予 | 正常声明，无交互 |
+| 运行时权限 | `POST_NOTIFICATIONS`（API 33+） | 系统弹窗，可拒绝 | 场景触发时先弹 `MmaPermissionDialog` 二次确认，再 `RequestPermission` 启动器申请 |
+| 特殊权限 | `REQUEST_INSTALL_PACKAGES` | 跳系统设置页手动开 | `ACTION_MANAGE_UNKNOWN_APP_SOURCES` 引导；`LifecycleResumeEffect` 在设置页返回后复查 |
+
+组件清单（`ui/permission/`，**均未接入业务**）：
+
+| 文件 | 职责 |
+|------|------|
+| `PermissionStatus.kt` | 状态机（Idle/Requesting/Granted/Denied/PermanentlyDenied）+ 纯函数 `resolveStatusAfterResult`（JVM 可测） |
+| `MmaPermissionState.kt` | `rememberMmaPermissionState`：`rememberLauncherForActivityResult(RequestPermission())` 接线，`shouldShowRequestPermissionRationale` 在回调内读（区分 Denied / PermanentlyDenied）；特殊权限 `rememberInstallPackagesPermissionState` |
+| `MmaPermissionSpec.kt` / `PermissionSpecs.kt` | 文案规格与预置文案（通知、安装），**全程不出现权限名**，用人话讲用途 |
+| `MmaPermissionDialog.kt` | 二次确认弹窗三形态（FirstTime / Rationale / GoToSettings），视觉规格见 `DESIGN_LANGUAGE.md` §8 |
+
+**Phase 2 接入清单**（与对应功能同 commit 补齐，禁止提前声明）：
+
+- 通知：`POST_NOTIFICATIONS`（`maxSdkVersion` 无关，33+ 运行时申请）+ 建 `NotificationChannel`
+- 安装 APK：`REQUEST_INSTALL_PACKAGES` + `FileProvider` + `res/xml/file_paths.xml`
+- 导出 APK 到外部存储：`WRITE_EXTERNAL_STORAGE` 限 `maxSdkVersion=28`；29+ 走 MediaStore / SAF，无需权限
 
 ## 4. 数据流
 
