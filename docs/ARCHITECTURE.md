@@ -31,7 +31,9 @@ flowchart LR
 | `ui/theme` | `app/.../ui/theme/` | 设计令牌（OKLCH→Compose）、主题、动效 |
 | `ui/components` | `app/.../ui/components/` | 可爱组件：胶囊按钮、柔卡、打包脉冲 |
 | `ui/screens` | `app/.../ui/screens/` | HomeScreen（输入）、BuildingScreen（进度）、ResultScreen（成功/失败）、HistoryScreen（历史）、PreviewScreen（预览） |
-| `ui/permission` | `app/.../ui/permission/` | 权限基础设施：三层权限状态机 + 应用内二次确认弹窗（**尚无接入点**，Phase 2 随功能同 commit 补齐 Manifest） |
+| `ui/permission` | `app/.../ui/permission/` | 权限基础设施：三层权限状态机 + 应用内二次确认弹窗（存储权限已接入，通知/安装待 Phase-2） |
+| `ui/storage` | `app/.../ui/storage/` | 启动存储门 `StoragePermissionGate`：MMAFile 目录的授权引导与静默就绪 |
+| `storage` | `app/.../storage/` | MMAFile 外部存储唯一事实来源：目录清单 `MmaDir`、授权判断、幂等创建、日志目录决策 |
 | `ui/navigation` | `app/.../ui/navigation/` | 页面骨架：路由清单 `MmaRoute` + 导航宿主 `MmaNavHost` |
 | `ui/viewmodel` | `app/.../ui/viewmodel/` | `BuildViewModel`（构建流程）、`HistoryViewModel`（历史）；手工 DI 工厂 |
 | `MainActivity` | `app/.../MainActivity.kt` | 唯一载体 Activity：`setContent` + `reportFullyDrawn()`（启动终点） |
@@ -100,21 +102,57 @@ innerPadding**，否则被栏遮挡）+ `bottomBar`（MmaBottomBar，仅主页�
 | 普通权限 | `INTERNET` | 安装时自动授予 | 正常声明，无交互 |
 | 运行时权限 | `POST_NOTIFICATIONS`（API 33+） | 系统弹窗，可拒绝 | 场景触发时先弹 `MmaPermissionDialog` 二次确认，再 `RequestPermission` 启动器申请 |
 | 特殊权限 | `REQUEST_INSTALL_PACKAGES` | 跳系统设置页手动开 | `ACTION_MANAGE_UNKNOWN_APP_SOURCES` 引导；`LifecycleResumeEffect` 在设置页返回后复查 |
+| 特殊权限 | `MANAGE_EXTERNAL_STORAGE`（API 30+）/ `WRITE_EXTERNAL_STORAGE`（≤28） | 前者跳设置页；后者系统弹窗 | MMAFile 公共目录写入；`rememberAllFilesAccessPermissionState`（判断委托 `MmaStorage.isAuthorized`），启动门引导，见 §3.3 |
 
-组件清单（`ui/permission/`，**均未接入业务**）：
+组件清单（`ui/permission/`）：通知与安装 spec 已就绪待 Phase-2 接入点；
+**存储权限已接入**（`StoragePermissionGate`，见 §3.3）：
 
 | 文件 | 职责 |
 |------|------|
 | `PermissionStatus.kt` | 状态机（Idle/Requesting/Granted/Denied/PermanentlyDenied）+ 纯函数 `resolveStatusAfterResult`（JVM 可测） |
-| `MmaPermissionState.kt` | `rememberMmaPermissionState`：`rememberLauncherForActivityResult(RequestPermission())` 接线，`shouldShowRequestPermissionRationale` 在回调内读（区分 Denied / PermanentlyDenied）；特殊权限 `rememberInstallPackagesPermissionState` |
-| `MmaPermissionSpec.kt` / `PermissionSpecs.kt` | 文案规格与预置文案（通知、安装），**全程不出现权限名**，用人话讲用途 |
+| `MmaPermissionState.kt` | `rememberMmaPermissionState`：`rememberLauncherForActivityResult(RequestPermission())` 接线，`shouldShowRequestPermissionRationale` 在回调内读（区分 Denied / PermanentlyDenied）；特殊权限 `rememberInstallPackagesPermissionState` / `rememberAllFilesAccessPermissionState` |
+| `MmaPermissionSpec.kt` / `PermissionSpecs.kt` | 文案规格与预置文案（通知、安装、所有文件访问、API-29 说明），**全程不出现权限名**，用人话讲用途 |
 | `MmaPermissionDialog.kt` | 二次确认弹窗三形态（FirstTime / Rationale / GoToSettings），视觉规格见 `DESIGN_LANGUAGE.md` §8 |
 
 **Phase 2 接入清单**（与对应功能同 commit 补齐，禁止提前声明）：
 
-- 通知：`POST_NOTIFICATIONS`（`maxSdkVersion` 无关，33+ 运行时申请）+ 建 `NotificationChannel`
+- 通知：`POST_NOTIFICATIONS`（33+ 运行时申请）+ 建 `NotificationChannel`
 - 安装 APK：`REQUEST_INSTALL_PACKAGES` + `FileProvider` + `res/xml/file_paths.xml`
-- 导出 APK 到外部存储：`WRITE_EXTERNAL_STORAGE` 限 `maxSdkVersion=28`；29+ 走 MediaStore / SAF，无需权限
+- 导出 APK 到外部存储：≤28 `WRITE_EXTERNAL_STORAGE`；30+ 复用已授权的 `MANAGE_EXTERNAL_STORAGE`（目标即 `MMAFile/APK`）。写入公共媒体集合（Download 等）才可免权限走 MediaStore/SAF——**写任意根目录不适用**
+
+## 3.3 存储初始化（MMAFile 目录）
+
+首次启动在 `/storage/emulated/0/` 建 `MMAFile` 及五个子目录；结构**幂等创建**，
+`Setting` 等内容被用户删除后，下次启动自动重建（数据根本在数据库，目录只是用户向展示）。
+
+```
+/storage/emulated/0/MMAFile/
+├── APK/       安装包（Phase-2 安装链路）
+├── Log/       运行日志（授权后 FileSink 主目录）
+├── Items/     项目数据（Phase-2）
+├── Setting/   设置的用户向展示（内容镜像钩子 SettingMirror，Phase-2）
+└── Backup/    本地备份与备份导入检测（Phase-2）
+```
+
+**API 分级**（targetSdk 34 实测结论，`MmaStorage.isAuthorized` 为唯一事实来源）：
+
+| API | 写公共根的途径 | 本项目行为 |
+|-----|--------------|-----------|
+| ≤ 28 | `WRITE_EXTERNAL_STORAGE` 运行时权限 | 启动门走系统弹窗，granted 后 ensure + 日志迁移 |
+| 29 | **死区**：`requestLegacyExternalStorage` 被 targetSdk≥30 忽略、`MANAGE_EXTERNAL_STORAGE` 不可授予 | 一次性说明弹窗（标记文件防复弹），静默降级私有目录 |
+| ≥ 30 | 仅 `MANAGE_EXTERNAL_STORAGE`（跳设置页） | 启动门跳设置，返回 `LifecycleResumeEffect` 复查；国产 ROM 无该设置页时 `runCatching` 兜底跳应用详情页 |
+
+**降级路径**：未授权/外部存储不可写 → 日志留 `filesDir/logs`（免权限、卸载即清理），
+应用功能不中断；授权成功后 `MmaLogger.redirectFileSink` 把历史日志合并进 `MMAFile/Log`
+（先摘 sink → drain → 合并 → 换新 sink；同目录短路，防误删活跃日志）。
+
+**扩展方式**：新增子目录 = `MmaDir` 加一个枚举值，`ensureDirs` 遍历 `entries` 自动创建；
+路径必须经 `MmaStorage` 获取，禁止散落 `File(...)`（CODE_STYLE §3.1 已立规约）。
+
+**已知限制**：卸载后 MMAFile 残留于外部存储（系统行为，无清理钩子）；
+`getExternalStorageDirectory()` API 29 弃用但仍是 targetSdk 34 下唯一权威外部根
+（持 MANAGE 后 File API 可用，有已知轻微性能惩罚）；未来若上架 Google Play
+需申报 `MANAGE_EXTERNAL_STORAGE` 用途（当前只发 GitHub release，不涉及）。
 
 ## 4. 数据流
 

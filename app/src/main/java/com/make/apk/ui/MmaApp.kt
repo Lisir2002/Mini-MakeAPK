@@ -8,6 +8,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.navigation.compose.rememberNavController
 import com.make.apk.ui.navigation.MmaNavHost
+import com.make.apk.ui.storage.StoragePermissionGate
 
 /**
  * 应用根：页面骨架导航。
@@ -33,5 +34,8 @@ fun MmaApp(
         color = MaterialTheme.colorScheme.background,
     ) {
         MmaNavHost(navController = navController)
+        // 启动存储门：与 NavHost 同级叠加；无弹窗时零布局，不拦截页面交互。
+        // 已授权则静默确保 MMAFile 目录；未授权弹引导弹窗（可「以后再说」降级）。
+        StoragePermissionGate()
     }
 }

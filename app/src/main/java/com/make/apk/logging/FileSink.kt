@@ -17,7 +17,7 @@ import java.util.concurrent.atomic.AtomicLong
  * 目录应选 App 私有目录（`Context.getExternalFilesDir`）：免存储权限、卸载即清理。
  */
 internal class FileSink(
-    private val directory: File,
+    internal val directory: File,
     private val maxFileSizeBytes: Long = DEFAULT_MAX_FILE_SIZE_BYTES,
     private val maxFiles: Int = DEFAULT_MAX_FILES,
     private val minLevel: LogLevel = LogLevel.INFO,

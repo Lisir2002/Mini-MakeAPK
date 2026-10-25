@@ -58,6 +58,9 @@ object MmaLogger {
     @Volatile
     private var fileSink: FileSink? = null
 
+    /** FileSink 构造参数快照：redirectFileSink 迁移目录后按原配置重建，不改轮转策略。 */
+    private var fileSinkSettings: FileSinkSettings? = null
+
     @Volatile
     private var crashHandler: CrashHandler? = null
 
@@ -88,6 +91,11 @@ object MmaLogger {
             )
             fileSink = sink
             sinks.add(sink)
+            fileSinkSettings = FileSinkSettings(
+                maxFileSizeBytes = config.maxFileSizeBytes,
+                maxFiles = config.maxFiles,
+                minLevel = config.fileMinLevel,
+            )
         }
 
         val dbSink = DatabaseSink(config.minLevel)
@@ -116,6 +124,83 @@ object MmaLogger {
     /** 数据库就绪后接入，回灌启动期缓冲的日志。 */
     fun attachDao(dao: LogEntryDao) {
         databaseSink?.attach(dao)
+    }
+
+    /**
+     * 把文件日志出口迁移到新目录（典型场景：用户刚授予「所有文件访问」，
+     * 从私有兜底目录切到 `MMAFile/Log`）。
+     *
+     * 顺序是正确性关键：`FileSink.write` 提交给 AsyncLogDispatcher 的闭包
+     * **捕获的是旧 sink 实例**，若先复制再换，在途事件仍写旧目录、迁移后即丢。故：
+     * 1. 摘除旧 sink（此后新事件不再流向旧目录）；
+     * 2. drain 排空在途事件；
+     * 3. 旧日志文件合并进新目录，成功后删旧；
+     * 4. 装新 sink 按原配置接管。
+     *
+     * 复制窗口（≤ 日志总量，通常 <1s）内新增事件只进 DB/Logcat、不进文件——
+     * 可接受的损耗（崩溃类走 [flushBlocking] 不受影响）。
+     *
+     * @return 是否迁移成功；未安装文件出口或迁移失败返回 false（旧 sink 复位，不丢日志）。
+     */
+    fun redirectFileSink(newDirectory: File): Boolean {
+        val old = fileSink ?: return false
+        val settings = fileSinkSettings ?: return false
+
+        // 同目录重定向是空操作（启动时已授权的典型场景：install 时就选了 MMAFile/Log）。
+        // 必须短路：否则会走「合并 → rename 覆盖 → 删旧」把当前活跃日志误删。
+        if (old.directory.canonicalPath == newDirectory.canonicalPath) return true
+
+        sinks.remove(old)
+        AsyncLogDispatcher.drain(1_000L)
+
+        val migrated = runCatching { migrateLogFiles(old, newDirectory) }
+            .onFailure { error("file_sink_redirect_failed", it) }
+            .getOrDefault(false)
+        if (!migrated) {
+            // 迁移失败：旧 sink 复位保持原状（旧目录数据完整，应用继续用私有日志）
+            sinks.add(old)
+            return false
+        }
+
+        val newSink = FileSink(
+            directory = newDirectory,
+            maxFileSizeBytes = settings.maxFileSizeBytes,
+            maxFiles = settings.maxFiles,
+            minLevel = settings.minLevel,
+        )
+        sinks.add(newSink)
+        fileSink = newSink
+        return true
+    }
+
+    /**
+     * 旧目录日志合并进新目录：先写暂存文件、全部成功后 rename 为活跃文件，
+     * 任何一步失败即清理暂存并返回 false（**不删旧文件**——失败可安全重试）。
+     */
+    private fun migrateLogFiles(old: FileSink, newDirectory: File): Boolean {
+        if (!newDirectory.mkdirs() && !(newDirectory.isDirectory && newDirectory.canWrite())) return false
+        val staged = File(newDirectory, "${FileSink.ACTIVE_FILE_NAME}.migrating")
+        val allCopied = old.logFiles().all { file ->
+            !file.exists() || runCatching {
+                file.inputStream().use { input ->
+                    staged.outputStream().use { output -> input.copyTo(output) }
+                }
+            }.isSuccess
+        }
+        if (!allCopied) {
+            runCatching { staged.delete() }
+            return false
+        }
+        if (staged.exists()) {
+            val target = File(newDirectory, FileSink.ACTIVE_FILE_NAME)
+            if (!staged.renameTo(target)) {
+                runCatching { staged.delete() }
+                return false
+            }
+        }
+        // 全部落定后才清旧目录
+        old.logFiles().forEach { runCatching { it.delete() } }
+        return true
     }
 
     fun addSink(sink: LogSink) {
@@ -298,5 +383,14 @@ object MmaLogger {
         sinks.clear()
         AsyncLogDispatcher.stop()
         installed = false
+        fileSink = null
+        fileSinkSettings = null
     }
 }
+
+/** FileSink 构造参数快照（仅供 [MmaLogger.redirectFileSink] 按原配置重建出口）。 */
+private data class FileSinkSettings(
+    val maxFileSizeBytes: Long,
+    val maxFiles: Int,
+    val minLevel: LogLevel,
+)

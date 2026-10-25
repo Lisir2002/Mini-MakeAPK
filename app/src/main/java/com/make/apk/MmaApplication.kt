@@ -14,7 +14,7 @@ import com.make.apk.logging.LogFields
 import com.make.apk.logging.LogLevel
 import com.make.apk.logging.MmaLogger
 import com.make.apk.logging.StartupTracer
-import java.io.File
+import com.make.apk.storage.MmaStorage
 import kotlin.concurrent.thread
 
 /**
@@ -49,6 +49,7 @@ class MmaApplication : Application() {
         StartupTracer.mark("application_oncreate")
         registerLifecycleLogging()
         attachLogDatabaseInBackground()
+        initStorageIfAuthorized()
 
         // 启动终点**不在这里**：onCreate 结束早于用户真正看到内容。
         // 真正的终点是首帧绘制完成，由 MainActivity 通过
@@ -63,8 +64,9 @@ class MmaApplication : Application() {
             LogConfig(
                 minLevel = if (debuggable) LogLevel.DEBUG else LogLevel.INFO,
                 logcatMinLevel = if (debuggable) LogLevel.DEBUG else null,
-                // App 私有目录：免存储权限、卸载即清理
-                fileDirectory = File(filesDir, LOG_DIR_NAME),
+                // 已授权 → MMAFile/Log；未授权/不可写 → 私有兜底（免存储权限、卸载即清理）。
+                // 此处必须同步决策：attachBaseContext 阶段无 UI，绝不能等授权。
+                fileDirectory = MmaStorage.resolveLogDirectory(this),
                 fileMinLevel = LogLevel.INFO,
             ),
         )
@@ -73,6 +75,31 @@ class MmaApplication : Application() {
             message = "日志系统就绪",
             fields = mapOf(LogFields.SUCCESS to true, "debuggable" to debuggable),
         )
+    }
+
+    // ── MMAFile 外部存储 ──────────────────────────────────────────────
+
+    /**
+     * 存储初始化：**仅已授权时**确保目录结构（幂等）。
+     *
+     * Setting 等目录被用户删除后，下次启动经此自动重建（用户需求）。
+     * 未授权时保持私有兜底不降级功能——授权申请由 UI 层启动门
+     * （`StoragePermissionGate`）负责，本类绝不弹 UI。
+     */
+    private fun initStorageIfAuthorized() {
+        if (!MmaStorage.isAuthorized(this)) return
+        if (MmaStorage.ensureAll()) {
+            MmaLogger.startup(
+                event = "storage_ready",
+                message = "MMAFile 目录就绪",
+                fields = mapOf("root" to MmaStorage.ROOT_NAME),
+            )
+        } else {
+            MmaLogger.error(
+                event = "storage_init_failed",
+                message = "MMAFile 目录创建失败，本轮继续用私有目录",
+            )
+        }
     }
 
     /**
@@ -111,7 +138,7 @@ class MmaApplication : Application() {
     }
 
     companion object {
-        private const val LOG_DIR_NAME = "logs"
+        // 私有日志目录名已移交 MmaStorage.privateFallback 统一管理
     }
 }
 

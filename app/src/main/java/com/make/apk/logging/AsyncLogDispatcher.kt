@@ -1,6 +1,7 @@
 package com.make.apk.logging
 
 import java.util.concurrent.ArrayBlockingQueue
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.concurrent.thread
 
@@ -21,6 +22,9 @@ internal object AsyncLogDispatcher {
 
     private val queue = ArrayBlockingQueue<() -> Unit>(CAPACITY)
     private val droppedCount = AtomicLong(0)
+
+    /** 已被 worker 取出但尚未执行完的任务数——drain 必须等它归零，否则在途事件会漏刷。 */
+    private val inFlight = AtomicInteger(0)
     private val lock = Any()
 
     @Volatile
@@ -55,7 +59,14 @@ internal object AsyncLogDispatcher {
      */
     fun submit(task: () -> Unit): Boolean {
         if (!running) start()
-        return queue.offer(task)
+        return queue.offer {
+            inFlight.incrementAndGet()
+            try {
+                runCatching { task() }
+            } finally {
+                inFlight.decrementAndGet()
+            }
+        }
     }
 
     fun dropped(): Long = droppedCount.get()
@@ -64,10 +75,15 @@ internal object AsyncLogDispatcher {
         droppedCount.incrementAndGet()
     }
 
-    /** 尽力把已入队的任务跑完（最多等待 [timeoutMs]）。 */
+    /**
+     * 尽力把已入队**且已执行完**的任务跑完（最多等待 [timeoutMs]）。
+     *
+     * 必须同时等 queue 空与 inFlight 归零：仅等队列空时，worker 可能刚 poll 出
+     * 任务尚未执行（写盘/落库未完成），调用方（崩溃刷盘、目录迁移）会读到旧状态。
+     */
     fun drain(timeoutMs: Long = 1_000L) {
         val deadline = System.currentTimeMillis() + timeoutMs
-        while (queue.isNotEmpty() && System.currentTimeMillis() < deadline) {
+        while ((queue.isNotEmpty() || inFlight.get() > 0) && System.currentTimeMillis() < deadline) {
             Thread.sleep(20)
         }
     }

@@ -24,6 +24,7 @@ object MmaIcons {
     val SentimentDissatisfied: Int = R.drawable.ic_sentiment_dissatisfied
     val Notifications: Int = R.drawable.ic_notifications
     val InstallMobile: Int = R.drawable.ic_install_mobile
+    val Folder: Int = R.drawable.ic_folder
 }
 
 /**

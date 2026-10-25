@@ -10,7 +10,7 @@
 ## 1. 包结构与命名
 
 - 根包：`com.make.apk`
-- 分层：`ui/theme`、`ui/components`、`ui/screens`、`ui/MmaApp.kt`
+- 分层：`ui/theme`、`ui/components`、`ui/screens`、`ui/permission`、`ui/storage`、`storage`、`ui/MmaApp.kt`
 - 类/对象：PascalCase（`HomeScreen`、`CuteButton`）
 - 函数/变量：camelCase（`loadInput`、`primaryColor`）
 - 常量：SCREAMING_SNAKE_CASE（`MAX_INPUT_LENGTH`）
@@ -57,6 +57,14 @@ fun CuteButton(
   `resolveStatusAfterResult` 统一裁定，便于 JVM 单测。
 - 特殊权限（如安装未知应用）走系统设置页 Intent，返回后用
   `LifecycleResumeEffect` 复查，不假设用户一定去开了。
+
+**例外条款（启动存储门）**：MMAFile 公共目录是应用基础能力，`StoragePermissionGate`
+允许在启动时**静默自查** + 引导弹窗；仍须满足：两段式（应用内说明先行）、拒绝即降级
+不阻断（「以后再说」后应用照常可用）、下次启动重新评估。除此之外不得扩展开启动即申请。
+
+**MMAFile 路径规约（强制）**：所有 MMAFile 路径必须经 `MmaStorage` 获取
+（`rootFile` / `dir(MmaDir)` / `resolveLogDirectory`），禁止散落 `File(...)` 拼路径；
+新增子目录在 `MmaDir` 加枚举值即可，`ensureDirs` 自动创建（扩展步骤见其 KDoc）。
 
 ```kotlin
 // 典型接线（仅示意，当前版本尚无接入点）

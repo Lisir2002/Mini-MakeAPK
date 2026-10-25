@@ -1,12 +1,15 @@
 package com.make.apk.logging
 
 import com.make.apk.data.local.entity.LogEntryEntity
+import java.io.File
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TemporaryFolder
 
 /**
  * 门面与落库映射测试。
@@ -15,6 +18,9 @@ import org.junit.Test
  * 通过自定义记录型 Sink 断言分发、级别过滤、类别过滤与限流行为。
  */
 class MmaLoggerTest {
+
+    @get:Rule
+    val temporaryFolder: TemporaryFolder = TemporaryFolder()
 
     private class RecordingSink : LogSink {
         val events = mutableListOf<LogEvent>()
@@ -150,5 +156,53 @@ class MmaLoggerTest {
         assertNull(entity.durationMs)
         assertNull(entity.success)
         assertNull(entity.stackTrace)
+    }
+
+    @Test
+    fun redirectFileSink_migratesHistoryAndTakesOver() {
+        val dirA = temporaryFolder.newFolder("private")
+        val dirB = temporaryFolder.newFolder("mmafile_log")
+        installWithFileSink(dirA)
+
+        // 用 STARTUP 类事件（persistToFile=true；OPERATION 类不落盘，见 LogCategory）
+        assertTrue(MmaLogger.startup("first_launch"))
+        MmaLogger.flushBlocking()
+        assertTrue(
+            "A 目录应已有日志",
+            File(dirA, "mma.log").readText().contains("first_launch"),
+        )
+
+        assertTrue("重定向应成功", MmaLogger.redirectFileSink(dirB))
+
+        val migrated = File(dirB, "mma.log").readText()
+        assertTrue("B 目录应含迁移的历史日志", migrated.contains("first_launch"))
+        assertFalse("A 目录旧日志应已清空", File(dirA, "mma.log").exists())
+
+        assertTrue(MmaLogger.startup("after_redirect"))
+        MmaLogger.flushBlocking()
+        val after = File(dirB, "mma.log").readText()
+        assertTrue("后续事件应落入 B 目录", after.contains("after_redirect"))
+        assertFalse("A 目录不再接收新日志", File(dirA, "mma.log").exists())
+    }
+
+    @Test
+    fun redirectFileSink_returnsFalseWhenNoFileSink() {
+        installForTest() // fileDirectory = null，未装文件出口
+        assertFalse(MmaLogger.redirectFileSink(temporaryFolder.newFolder("nowhere")))
+    }
+
+    /** 安装带真实文件出口的日志器（startup/error 类事件会落盘）。 */
+    private fun installWithFileSink(directory: File) {
+        MmaLogger.install(
+            LogConfig(
+                minLevel = LogLevel.DEBUG,
+                logcatMinLevel = null,
+                fileDirectory = directory,
+                fileMinLevel = LogLevel.DEBUG,
+                enableCrashHandler = false,
+                enableAnrWatchdog = false,
+                rateLimitMaxPerWindow = 1_000,
+            ),
+        )
     }
 }

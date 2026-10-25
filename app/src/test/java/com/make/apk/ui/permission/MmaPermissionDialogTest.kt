@@ -78,6 +78,34 @@ class MmaPermissionDialogTest {
         }
     }
 
+    /**
+     * 所有文件访问权限 spec（MMAFile 公共目录，启动门使用）：
+     * 验证 ic_folder 图标渲染与授权文案；亮暗各一张，其余形态复用通知 spec 的布局锁定。
+     */
+    @Test
+    fun lightAllFilesFirstTime() = paparazzi.snapshot {
+        MmaTheme(darkTheme = false) {
+            MmaPermissionDialogContent(
+                spec = AllFilesAccessPermissionSpec,
+                stage = PermissionDialogStage.FirstTime,
+                onConfirm = {},
+                onDismiss = {},
+            )
+        }
+    }
+
+    @Test
+    fun darkAllFilesFirstTime() = paparazzi.snapshot {
+        MmaTheme(darkTheme = true) {
+            MmaPermissionDialogContent(
+                spec = AllFilesAccessPermissionSpec,
+                stage = PermissionDialogStage.FirstTime,
+                onConfirm = {},
+                onDismiss = {},
+            )
+        }
+    }
+
     /** 通知权限 spec 覆盖三态文案（安装 spec 的文案由单测校验，不重复入图）。 */
     @Composable
     private fun dialog(stage: PermissionDialogStage) {

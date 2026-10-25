@@ -45,7 +45,12 @@ class PermissionStatusTest {
 
     @Test
     fun presetSpecs_areUserFacingAndComplete() {
-        val specs = listOf(NotificationPermissionSpec, InstallPackagesPermissionSpec)
+        val specs = listOf(
+            NotificationPermissionSpec,
+            InstallPackagesPermissionSpec,
+            AllFilesAccessPermissionSpec,
+            Api29StorageLimitSpec,
+        )
         for (spec in specs) {
             assertTrue("标题为空：$spec", spec.title.isNotBlank())
             for (msg in listOf(
@@ -57,6 +62,8 @@ class PermissionStatusTest {
                 // 规约：说人话，不甩权限名（见 MmaPermissionSpec KDoc）
                 assertFalse("文案含权限名：$msg", "POST_NOTIFICATIONS" in msg)
                 assertFalse("文案含权限名：$msg", "REQUEST_INSTALL_PACKAGES" in msg)
+                assertFalse("文案含权限名：$msg", "MANAGE_EXTERNAL_STORAGE" in msg)
+                assertFalse("文案含权限名：$msg", "WRITE_EXTERNAL_STORAGE" in msg)
             }
         }
     }

@@ -103,7 +103,7 @@ MmaLogger.error("build_failed", throwable, fields = mapOf(LogFields.REASON to "T
 | Sink | 关键设计 |
 |------|---------|
 | `LogcatSink` | 仅 debug 启用；标签 `MMA-<类别>`；异常栈单独一行避免被截断 |
-| `FileSink` | 单线程顺序追加；按大小滚动 + 按数量裁剪（默认 2MB×5）；目录用 `filesDir/logs`（免权限、卸载即清） |
+| `FileSink` | 单线程顺序追加；按大小滚动 + 按数量裁剪（默认 2MB×5）；目录由 `MmaStorage.resolveLogDirectory` 决策：已授权且可写 → `MMAFile/Log`，否则私有兜底 `filesDir/logs`（免权限、卸载即清）；运行中授权成功经 `MmaLogger.redirectFileSink` 迁移（历史日志合并、同目录短路） |
 | `DatabaseSink` | **解决"日志早于数据库就绪"**：DB 需 Keystore+SQLCipher 打开必然迟到，故 attach 前先入有界缓冲，attach 后回灌 |
 | `CrashHandler` / `AnrWatchdog` | 见 §7 |
 

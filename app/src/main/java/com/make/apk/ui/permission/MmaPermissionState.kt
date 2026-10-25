@@ -21,6 +21,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.make.apk.logging.LogFields
 import com.make.apk.logging.MmaLogger
+import com.make.apk.storage.MmaStorage
 
 /**
  * 运行时权限的状态持有者（由 [rememberMmaPermissionState] 创建）。
@@ -269,8 +270,34 @@ fun rememberInstallPackagesPermissionState(): SpecialPermissionState {
     )
 }
 
+/**
+ * 便捷工厂：「所有文件访问」特殊权限（MMAFile 公共目录写入，API 30+ 跳设置页授权）。
+ *
+ * 授权判断委托 `MmaStorage.isAuthorized`——单一事实来源（含 API ≤28 的
+ * WRITE_EXTERNAL_STORAGE 分支与 API 29 死区），Application 启动链与 UI 门共用。
+ *
+ * 注意：设置页 Intent（`ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION`）在部分
+ * 国产 ROM 上可能没有对应 Activity，调用方跳转前须 `runCatching` 兜底到
+ * [openAppSettings]（不要用 `resolveActivity` 预检：包可见性过滤会误判为 null）。
+ * API ≤28 走运行时权限路径（见 StoragePermissionGate），不使用本工厂。
+ */
+@Composable
+fun rememberAllFilesAccessPermissionState(): SpecialPermissionState {
+    val context = LocalContext.current
+    return rememberSpecialPermissionState(
+        tag = "MANAGE_EXTERNAL_STORAGE",
+        isGranted = { MmaStorage.isAuthorized(context) },
+        settingsIntent = {
+            Intent(
+                Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+                Uri.fromParts("package", context.packageName, null),
+            )
+        },
+    )
+}
+
 /** 打开本应用的系统设置详情页。 */
-private fun Context.openAppSettings() {
+internal fun Context.openAppSettings() {
     startActivity(
         Intent(
             Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
