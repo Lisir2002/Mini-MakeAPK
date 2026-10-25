@@ -97,9 +97,21 @@ jobs:
           done
           ls -la out
 
+      # tag 含 -rcN（RC 版）→ GitHub Release 标记为 prerelease；正式版不标记
+      - name: 判断预发布标记
+        id: pre
+        run: |
+          if [[ "${GITHUB_REF_NAME}" == *-rc* ]]; then
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+            echo "tag ${GITHUB_REF_NAME} 含 -rcN → 标记为 prerelease"
+          else
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: 创建 Release 并上传 APK
         uses: softprops/action-gh-release@v2
         with:
           name: "MMA ${{ github.ref_name }}"
           files: out/*.apk
+          prerelease: ${{ steps.pre.outputs.prerelease }}
           generate_release_notes: true
