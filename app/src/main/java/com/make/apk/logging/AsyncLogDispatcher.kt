@@ -59,14 +59,20 @@ internal object AsyncLogDispatcher {
      */
     fun submit(task: () -> Unit): Boolean {
         if (!running) start()
-        return queue.offer {
-            inFlight.incrementAndGet()
+        // 必须先增再入队：若把 increment 写进入队的 lambda，worker 从 poll 出任务
+        // 到执行 lambda 第一行之间存在窗口，drain 会看到「队列空且 inFlight=0」
+        // 而提前退出——在途事件漏刷（redirectFileSink 迁移窗口即丢日志）。
+        // 先增可保证「入队成功 ⇒ inFlight ≥ 1」对 drain 可见。
+        inFlight.incrementAndGet()
+        val accepted = queue.offer {
             try {
                 runCatching { task() }
             } finally {
                 inFlight.decrementAndGet()
             }
         }
+        if (!accepted) inFlight.decrementAndGet() // 未入队即无执行者，撤销计数
+        return accepted
     }
 
     fun dropped(): Long = droppedCount.get()
