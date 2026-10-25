@@ -4,31 +4,28 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import com.make.apk.data.model.BuildRecord
 import com.make.apk.data.model.BuildStatus
 import com.make.apk.ui.components.CuteCard
-import com.make.apk.ui.icons.MmaIcon
-import com.make.apk.ui.icons.MmaIcons
+import com.make.apk.ui.components.MmaScreen
+import com.make.apk.ui.theme.Spacing
 
 /**
  * 构建历史页（**无状态**：列表由调用方观察数据层后传入）。
  *
+ * 主页级页面：顶栏仅标题（无返回），底栏为共享的顶级导航（见 MmaNavHost）。
  * 数据来自加密 SQLite（Room + SQLCipher），表变更自动推送。
  * 删除按钮保留文字而非纯图标，确保可访问性（WCAG 2.2 AA：可读标签 + 48dp 触控区）。
  */
@@ -37,34 +34,21 @@ fun HistoryScreen(
     records: List<BuildRecord>,
     onOpen: (Long) -> Unit,
     onDelete: (Long) -> Unit,
-    onBack: () -> Unit,
+    bottomBar: @Composable () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-    Surface(color = MaterialTheme.colorScheme.background, modifier = modifier) {
+    MmaScreen(
+        title = "构建历史",
+        bottomBar = bottomBar,
+        modifier = modifier,
+    ) { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+                .padding(innerPadding)
+                .padding(horizontal = Spacing.space5),
+            verticalArrangement = Arrangement.spacedBy(Spacing.space4),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                TextButton(onClick = onBack) {
-                    MmaIcon(
-                        iconRes = MmaIcons.ArrowBack,
-                        contentDescription = null,
-                        size = 18.dp,
-                        tint = MaterialTheme.colorScheme.primary,
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("返回")
-                }
-                Text(
-                    "构建历史",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-            }
-
             if (records.isEmpty()) {
                 Box(
                     modifier = Modifier
@@ -81,7 +65,7 @@ fun HistoryScreen(
             } else {
                 LazyColumn(
                     modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.space3),
                 ) {
                     items(items = records, key = { it.id }) { record ->
                         HistoryRow(
@@ -105,8 +89,8 @@ private fun HistoryRow(
 ) {
     CuteCard(modifier = modifier.fillMaxWidth()) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(Spacing.space4),
+            verticalArrangement = Arrangement.spacedBy(Spacing.space2),
         ) {
             Text(
                 record.sourceLabel,
@@ -125,7 +109,7 @@ private fun HistoryRow(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.space1)) {
                     TextButton(onClick = onOpen) { Text("预览") }
                     TextButton(onClick = onDelete) { Text("删除") }
                 }
@@ -139,4 +123,5 @@ private fun statusLabel(status: BuildStatus): String = when (status) {
     BuildStatus.RUNNING -> "构建中"
     BuildStatus.SUCCESS -> "成功"
     BuildStatus.FAILED -> "失败"
+    BuildStatus.CANCELLED -> "已取消"
 }

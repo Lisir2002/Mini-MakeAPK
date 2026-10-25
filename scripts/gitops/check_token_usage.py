@@ -1,0 +1,135 @@
+#!/usr/bin/env python3
+"""MMA 设计令牌门禁（规约见 docs/ARCHITECTURE.md 设计令牌链路）。
+
+用法：
+    python3 scripts/gitops/check_token_usage.py            # 报告模式（CI 默认，不拦构建）
+    python3 scripts/gitops/check_token_usage.py --strict   # 严格模式（有违规即失败）
+
+令牌链路（唯一事实来源）：
+    DESIGN_LANGUAGE.md → ui/theme/{Color,Spacing,Motion,Theme}.kt → MaterialTheme 引用
+
+检查项（范围：app/src/main/java/com/make/apk/ui/，排除 theme/ 包）：
+    1. 颜色字面量     Color(0x…) / Material 命名色直用      → 应走 colorScheme 令牌
+    2. 圆角字面量     RoundedCornerShape(…)                  → 应走 shapes 令牌
+    3. 间距字面量     N.dp ∉ 允许集                          → 应走 Spacing 阶梯
+    4. 字号字面量     N.sp                                    → 应走 typography 令牌
+
+豁免机制：
+    - theme/ 包为令牌定义处，天然豁免；
+    - 行内注释 `// token-gate: allow` 逐行豁免（须写理由，见 CODE_STYLE.md）；
+    - 允许集之外的 dp 值新增，须先评估入阶梯 or 加白名单并注明来源。
+
+退出码：0 = 通过（或无违规的报告模式）；1 = --strict 且存在违规；2 = 环境错误。
+"""
+
+import argparse
+import re
+import sys
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+UI_ROOT = REPO_ROOT / "app" / "src" / "main" / "java" / "com" / "make" / "apk" / "ui"
+THEME_DIRNAME = "theme"
+EXEMPT_MARK = "token-gate: allow"
+
+# ── 允许集（带来源审批记录；新增值必须注明理由） ──────────────────────────
+# Spacing 阶梯（theme/Spacing.kt，DESIGN_LANGUAGE §4 8pt 网格）
+SPACING_LADDER = {4, 8, 12, 16, 24, 32, 48}
+# 组件规范尺寸（非间距语义，均为 M3 / 图标规范值）
+COMPONENT_SIZES = {
+    0,    # 无间距
+    24,   # 图标默认尺寸（M3 Icon / MmaIcons.size 默认）
+    56,   # 顶栏规范高度（M3 TopAppBar，MmaTopBar.heightIn 下限）
+    64,   # 结果页图标容器（ResultScreen）
+    72,   # 构建脉冲图标容器（BuildingPulse）
+}
+ALLOWED_DP = SPACING_LADDER | COMPONENT_SIZES
+
+# Material 命名颜色常量直用（androidx.compose.ui.graphics.Color 伴生对象）
+COLOR_NAMED_RE = re.compile(
+    r"\bColor\.(?:Red|Blue|Green|Yellow|Black|White|Gray|Cyan|Magenta|"
+    r"LightGray|DarkGray|Transparent)\b"
+)
+COLOR_HEX_RE = re.compile(r"\bColor\s*\(\s*0x")
+ROUNDED_RE = re.compile(r"\bRoundedCornerShape\s*\(")
+DP_RE = re.compile(r"(?<![\w.])(\d+(?:\.\d+)?)\s*\.dp\b")
+SP_RE = re.compile(r"(?<![\w.])(\d+(?:\.\d+)?)\s*\.sp\b")
+LINE_COMMENT_RE = re.compile(r"//.*$")
+
+
+def iter_kotlin_files():
+    """ui/ 下全部 Kotlin 文件，跳过 theme/ 包（令牌定义处）。"""
+    for path in sorted(UI_ROOT.rglob("*.kt")):
+        if THEME_DIRNAME not in path.relative_to(UI_ROOT).parts:
+            yield path
+
+
+def strip_comment(line: str) -> str:
+    """剥离行注释，避免注释里的示例值误报（字符串内 // 极端罕见，可接受）。"""
+    return LINE_COMMENT_RE.sub("", line)
+
+
+def check_file(path: Path) -> list[tuple[int, str, str]]:
+    """返回 [(行号, 规则, 原文)] 违规列表。"""
+    violations = []
+    for lineno, raw in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+        if EXEMPT_MARK in raw:
+            continue
+        code = strip_comment(raw)
+        rel = path.relative_to(REPO_ROOT)
+
+        if COLOR_HEX_RE.search(code) or COLOR_NAMED_RE.search(code):
+            violations.append((lineno, "颜色字面量", raw.strip()))
+        if ROUNDED_RE.search(code):
+            violations.append((lineno, "圆角字面量", raw.strip()))
+        # 圆角参数内的 dp（如 RoundedCornerShape(16.dp)）已由圆角规则覆盖，不重复报间距
+        rounded_spans = [m.span() for m in ROUNDED_RE.finditer(code)]
+        for m in DP_RE.finditer(code):
+            if any(s <= m.start() < e for s, e in rounded_spans):
+                continue
+            value = float(m.group(1))
+            if value not in ALLOWED_DP:
+                violations.append((lineno, f"间距字面量 {m.group(1)}.dp", raw.strip()))
+        if SP_RE.search(code):
+            violations.append((lineno, "字号字面量", raw.strip()))
+    return violations
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="MMA 设计令牌门禁")
+    parser.add_argument("--strict", action="store_true", help="有违规即失败（默认报告模式）")
+    args = parser.parse_args()
+
+    if not UI_ROOT.is_dir():
+        print(f"::error::扫描目录不存在：{UI_ROOT}")
+        return 2
+
+    print("=== 设计令牌门禁 ===")
+    print(f"范围: {UI_ROOT.relative_to(REPO_ROOT)}（排除 {THEME_DIRNAME}/ 包）")
+    print(f"模式: {'严格（违规即失败）' if args.strict else '报告（仅打印，不拦构建）'}")
+    print(f"间距允许集: {sorted(ALLOWED_DP)}")
+    print()
+
+    total = 0
+    for path in iter_kotlin_files():
+        for lineno, rule, snippet in check_file(path):
+            total += 1
+            rel = path.relative_to(REPO_ROOT)
+            print(f"  x {rel}:{lineno} [{rule}] {snippet}")
+            print(f"    ::error file={rel},line={lineno}::{rule}，应改用设计令牌"
+                  f"（见 docs/ARCHITECTURE.md 令牌链路）")
+
+    print()
+    if total == 0:
+        print("=== 校验通过：无令牌违规 ===")
+        return 0
+    print(f"=== 发现 {total} 处违规 ===")
+    if args.strict:
+        print("严格模式：修复违规，或加行内豁免 `// token-gate: allow <理由>`。")
+        return 1
+    print("报告模式：不拦构建。请按令牌链路修复（DESIGN_LANGUAGE → theme → 页面）。")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

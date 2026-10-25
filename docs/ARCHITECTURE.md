@@ -50,6 +50,7 @@ flowchart LR
 3. **Material 3 改造而非自定义体系**：复用 M3 的 `ColorScheme`/`Typography`/`Shape`，仅替换令牌值，兼顾无障碍与一致性。
 4. **设计令牌单一来源**：色值只在 `DESIGN_LANGUAGE.md` 定义，Compose 侧是**派生**而非**复制**。
 5. **SQLite 采用 Room + SQLCipher**：SQLCipher 自带 `SupportOpenHelperFactory`（实现 `androidx.sqlite.db` 接口）可**直连** Room 2.x，无需手写桥接；数据库全程加密，口令存于 Keystore。（对比评估过的 WCDB：其官方适配层仅实现旧版 `android.arch.persistence` 接口，与 AndroidX Room 不兼容，已否决。）
+6. **令牌门禁 CI 化**：`scripts/gitops/check_token_usage.py` 扫描 `ui/`（排除 `theme/`）的颜色/圆角/间距/字号字面量，Verify 与 Release 工作流均以 `--strict` 拦截；渐进策略为「先报告后 blocking」，确有必要的例外用行内 `// token-gate: allow <理由>` 豁免（规约见 `docs/CODE_STYLE.md` §4）。
 
 > 完整决策记录见 [`brainstorm/`](brainstorm/)。
 
@@ -62,13 +63,19 @@ MainActivity ─ setContent ─▶ MmaApp（主题 + NavController）
                      └──▶ building/{id} ──▶ result/{id} ──▶ preview/{id}
 ```
 
-| 路由 | 页面 | 取数来源 |
-|------|------|---------|
-| `home` | HomeScreen | —（用户输入） |
-| `building/{recordId}` | BuildingScreen | `BuildHistoryRepository.observeById` |
-| `result/{recordId}` | ResultScreen | `BuildHistoryRepository.observeById` |
-| `history` | HistoryScreen | `BuildHistoryRepository.observeAll`（Flow） |
-| `preview/{recordId}` | PreviewScreen | `BuildHistoryRepository.observeById` |
+| 路由 | 页面 | 取数来源 | 骨架模板 |
+|------|------|---------|---------|
+| `home` | HomeScreen | —（用户输入） | 主页（顶栏 + 底栏） |
+| `building/{recordId}` | BuildingScreen | `BuildHistoryRepository.observeById` | 详情（仅顶栏） |
+| `result/{recordId}` | ResultScreen | `BuildHistoryRepository.observeById` | 详情（仅顶栏） |
+| `history` | HistoryScreen | `BuildHistoryRepository.observeAll`（Flow） | 主页（顶栏 + 底栏） |
+| `preview/{recordId}` | PreviewScreen | `BuildHistoryRepository.observeById` | 详情（仅顶栏） |
+
+**三段式槽位嵌入布局**：所有页面经 `ui/components/MmaScreen.kt` 组装——
+`topBar`（MmaTopBar，顶级页仅标题、子页带返回箭头）+ `content`（页面内容，**必须消费
+innerPadding**，否则被栏遮挡）+ `bottomBar`（MmaBottomBar，仅主页级页面传入，
+首页/历史共享同一底栏，tab 清单 `DefaultMmaTabs` 可配置）。骨架管结构与系统栏避让，
+页面只管内容；一屏一 MmaScreen，不再自建顶栏。
 
 **分层约定：路由负责取数，页面负责渲染。**
 所有页面都是**无状态** Composable（参数进、事件出），
@@ -76,6 +83,10 @@ MainActivity ─ setContent ─▶ MmaApp（主题 + NavController）
 
 **单一数据源是数据库而非内存**：构建一经登记即落加密库，
 "构建中"页面被杀后重建仍能读到真实状态，不会出现假进度或转圈卡死。
+
+**构建终态守卫**：`BuildStatus` 终态为 SUCCESS/FAILED/CANCELLED；
+仓储层 `markSucceeded/markFailed/markCancelled` 均带终态检查——
+取消后迟到的协程无法把记录改写为成功或失败（用户点取消即真取消）。
 
 ## 4. 数据流
 

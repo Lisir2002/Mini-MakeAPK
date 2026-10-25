@@ -92,8 +92,12 @@ class BuildHistoryRepository(
         )
     }
 
+    /**
+     * 标记成功。**终态守卫**：若记录已到终态（如已被取消），迟到的工作协程不得覆盖。
+     */
     suspend fun markSucceeded(id: Long, outputApkPath: String, apkSizeBytes: Long? = null) {
         val entity = dao.getById(id) ?: return
+        if (entity.status.isTerminal) return
         val now = clock()
         dao.update(
             entity.copy(
@@ -107,8 +111,13 @@ class BuildHistoryRepository(
         )
     }
 
+    /**
+     * 标记失败。同样带 [markSucceeded] 同款终态守卫——
+     * 取消后协程的收尾逻辑不得把记录刷成失败。
+     */
     suspend fun markFailed(id: Long, errorMessage: String) {
         val entity = dao.getById(id) ?: return
+        if (entity.status.isTerminal) return
         val now = clock()
         dao.update(
             entity.copy(
@@ -116,6 +125,24 @@ class BuildHistoryRepository(
                 updatedAt = now,
                 durationMs = now - entity.createdAt,
                 errorMessage = errorMessage,
+            ),
+        )
+    }
+
+    /**
+     * 标记取消。自身幂等：已是终态则忽略，
+     * 保证"取消 + 迟到协程"的任意交错下记录不出现假成功/假失败。
+     */
+    suspend fun markCancelled(id: Long) {
+        val entity = dao.getById(id) ?: return
+        if (entity.status.isTerminal) return
+        val now = clock()
+        dao.update(
+            entity.copy(
+                status = BuildStatus.CANCELLED,
+                updatedAt = now,
+                durationMs = now - entity.createdAt,
+                errorMessage = null,
             ),
         )
     }

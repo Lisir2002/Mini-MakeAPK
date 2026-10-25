@@ -55,6 +55,10 @@
 | `--primary` | `OKLCH(0.82 0.10 25)` | 暗色下提高明度保可爱 |
 | `--on-primary` | `OKLCH(0.22 0.02 30)` | 主色上的文字 |
 | `--primary-container` | `OKLCH(0.38 0.06 30)` | 主色容器 |
+| `--on-primary-container` | `OKLCH(0.85 0.06 30)` | 深色主色容器上的文字（浅珊瑚） |
+| `--error` | `OKLCH(0.72 0.16 25)` | 错误（比亮色提明度保对比） |
+| `--success` | `OKLCH(0.75 0.12 155)` | 成功 |
+| `--warning` | `OKLCH(0.78 0.12 85)` | 警告 |
 
 ### 2.3 色彩使用规则
 - **主界面色调单调**：列表、卡片、底栏只用 `--bg / --surface / --on-surface / --primary` 四族，不引入额外色相。
@@ -76,6 +80,18 @@
 - 卡片默认 `--radius-md` 或 `--radius-lg`（柔和包裹感）。
 - 按钮优先 `--radius-pill`（最可爱）；次级按钮可用 `--radius-md`。
 - 禁止尖角（radius=0）与极小圆角（<4dp）。
+
+**Compose M3 映射**（`AppShapes`，唯一圆角来源）：
+
+| M3 档位 | 值 | 对应令牌 |
+|---------|-----|---------|
+| `extraSmall` | 8dp | `--radius-sm` |
+| `small` | 16dp | `--radius-md`（卡片/输入框默认） |
+| `medium` | 16dp | `--radius-md`（M3 Card 默认档） |
+| `large` | 24dp | `--radius-lg` |
+| `extraLarge` | 999dp | `--radius-pill`（胶囊） |
+
+页面禁止直写 `RoundedCornerShape(...)`，一律 `MaterialTheme.shapes.*`；需要 24dp 圆角时显式用 `shapes.large`，`extraLarge` 是胶囊档，勿用于普通卡片。
 
 ---
 
@@ -110,7 +126,7 @@
 ## 6. 动效与微交互（柔和弹性）
 
 - **过渡曲线**：弹簧 `spring(stiffness≈300, damping≈30)`，带**轻微回弹**（bounce），拒绝生硬线性。
-- **时长**：快 `200ms` / 标准 `300ms` / 入场 `400ms`。
+- **时长**：快 `200ms` / 标准 `300ms` / 入场 `400ms` / 循环呼吸 `1100ms`（`--motion-breath`，无限脉冲如打包中动效，ease-in-out 往返）。
 - **微交互**：
   - 按钮按压：`scale 1 → 0.96`，释放回弹。
   - 卡片入场：`translateY(8dp) + alpha 0→1`，列表项 **stagger 40ms** 依次浮现。

@@ -14,7 +14,8 @@ import org.junit.Test
  * 预览页「外壳」截图回归。
  *
  * 与 `WebViewScreenTest` 同理：真实 WebView 无法在 JVM 渲染网页，
- * 故注入 FrameLayout 桩，只锁定**外壳构图**（返回栏 + 内容区占比）不漂移。
+ * 故注入 FrameLayout 桩，只锁定**外壳构图**（顶栏返回 + 内容区占比）不漂移。
+ * 预览是流程子页：顶栏带返回箭头、无底栏，亮/暗两态均入基线。
  */
 class PreviewScreenTest {
 
@@ -38,6 +39,17 @@ class PreviewScreenTest {
     @Test
     fun shellLight() = paparazzi.snapshot {
         MmaTheme(darkTheme = false) {
+            PreviewScreen(
+                record = record,
+                onBack = {},
+                webViewFactory = { FrameLayout(it) },
+            )
+        }
+    }
+
+    @Test
+    fun shellDark() = paparazzi.snapshot {
+        MmaTheme(darkTheme = true) {
             PreviewScreen(
                 record = record,
                 onBack = {},

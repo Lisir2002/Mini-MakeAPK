@@ -36,15 +36,24 @@ Sprint-1 已锁定「可爱简约·iOS 风」设计语言（单主色珊瑚粉�
 
 ## 4. 测试源码位置与现状
 
-`app/src/test/java/com/web2apk/app/ui/`：
+`app/src/test/java/com/make/apk/ui/`：
 
 | 测试类 | 覆盖 | 基线张数 |
 |--------|------|----------|
-| `screens/HomeScreenTest.kt` | 首屏：亮色空态 / 暗色空态 / 亮色已填 URL | 3 |
-| `components/CuteComponentsTest.kt` | 胶囊按钮（亮/暗）、柔和卡片、打包脉冲 | 4 |
+| `components/MmaScreenTest.kt` | 三段式骨架：亮/暗 × 仅标题/带返回/带底栏 | 6 |
+| `screens/HomeScreenTest.kt` | 首屏：亮/暗空态、亮色已填 URL、亮/暗带底栏 | 5 |
+| `screens/HistoryScreenTest.kt` | 历史：有记录/空态/暗色、亮/暗带底栏 | 5 |
+| `screens/BuildingScreenTest.kt` | 构建中：亮/暗（动效冻结初始帧，锁构图） | 2 |
+| `screens/ResultScreenTest.kt` | 结果：亮成功、亮失败、暗失败 | 3 |
+| `screens/PreviewScreenTest.kt` | 预览外壳：亮/暗（返回栏 + 内容区占比） | 2 |
 | `screens/WebViewScreenTest.kt` | WebView 封装屏外壳（FrameLayout 桩） | 1 |
+| `components/CuteComponentsTest.kt` | 胶囊按钮（亮/暗）、柔和卡片、打包脉冲 | 4 |
 
-> `WebViewScreen` 通过 `webViewFactory: (Context) -> View` 注入轻量桩（默认 `WebView`），使 JVM 可渲染外壳；`HomeScreen` 通过 `initialInput` 参数支持预填态快照——二者均为最小可测性重构，未改变用户态行为。
+合计 28 张基线（`app/src/test/snapshots/images/`）。
+
+> `WebViewScreen` / `PreviewScreen` 通过 `webViewFactory: (Context) -> View` 注入轻量桩（默认 `WebView`），使 JVM 可渲染外壳；`HomeScreen` 通过 `initialInput` 参数支持预填态快照——二者均为最小可测性重构，未改变用户态行为。
+>
+> **同值替换不重录**：把字面量换成等值令牌（如 `16.dp` → `shapes.small`、`tween(1100)` → `Motion.DurationBreath`）渲染结果不变，`verifyPaparazziDebug` 直接通过；只有**结构变化**（如新增顶栏/底栏）才需要 `recordPaparazziDebug` 重录并目视确认。
 
 ## 5. 运行命令
 
@@ -98,5 +107,10 @@ export ANDROID_SDK_ROOT=/root/Android/Sdk
 - §1 设计一致性（令牌/圆角/字体）← 截图直接取证
 - §2 安卓实现（主题绑定、单一输入流）← 首屏快照取证
 - §3 可访问性 ← 截图可复核对比度/触控目标，辅以 `accessibility` skill
+
+CI 闸门（`.github/workflows/verify.yml`）三道并联：
+1. `testDebugUnitTest`（含数据层逻辑）
+2. `verifyPaparazziDebug`（截图回归，本指南主题）
+3. `check_token_usage.py --strict`（设计令牌门禁，规约见 `docs/CODE_STYLE.md` §4.1）
 
 > 反模式：只写业务码不补截图测试 = 视觉回归缺口；故意改 UI 却不更新 baseline = 闸门失效。二者均禁止。

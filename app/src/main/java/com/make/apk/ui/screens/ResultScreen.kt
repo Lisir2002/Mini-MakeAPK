@@ -6,25 +6,26 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.make.apk.data.model.BuildRecord
 import com.make.apk.data.model.BuildStatus
 import com.make.apk.ui.components.CuteButton
+import com.make.apk.ui.components.MmaScreen
 import com.make.apk.ui.icons.MmaIcon
 import com.make.apk.ui.icons.MmaIcons
+import com.make.apk.ui.theme.Spacing
 
 /**
  * 构建结果页（**无状态**）：成功庆祝 / 失败错误态。
  *
  * 两种终态共用一页，靠 `record.status` 分支——避免"成功页"与"失败页"
  * 两套骨架各自漂移。失败时必须给出**人话原因**与明确出口（重试 / 返回）。
+ * 子页面：顶栏仅标题，无底栏。
  */
 @Composable
 fun ResultScreen(
@@ -37,13 +38,14 @@ fun ResultScreen(
 ) {
     val succeeded = record?.status == BuildStatus.SUCCESS
 
-    Surface(color = MaterialTheme.colorScheme.background, modifier = modifier) {
+    MmaScreen(title = "构建结果", modifier = modifier) { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(24.dp),
+                .padding(innerPadding)
+                .padding(Spacing.space5),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
+            verticalArrangement = Arrangement.spacedBy(Spacing.space4, Alignment.CenterVertically),
         ) {
             MmaIcon(
                 iconRes = if (succeeded) MmaIcons.CheckCircle else MmaIcons.SentimentDissatisfied,
@@ -77,7 +79,7 @@ fun ResultScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.space3)) {
                     CuteButton(text = "预览", onClick = onPreview)
                     TextButton(onClick = onAgain) { Text("再来一个") }
                 }
@@ -87,7 +89,7 @@ fun ResultScreen(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.space3)) {
                     CuteButton(text = "重试", onClick = onRetry)
                     TextButton(onClick = onBackHome) { Text("返回首页") }
                 }

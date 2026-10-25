@@ -15,14 +15,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 // 形状：iOS 风大圆角（DESIGN_LANGUAGE §3）。禁止尖角（<4dp）。
+// M3 五档 ↔ 规范四值的映射（DESIGN_LANGUAGE §3「Compose M3 映射」）：
+//   extraSmall=8(sm) small=16(md) medium=16(md) large=24(lg) extraLarge=999(pill 胶囊)。
+//   注意：需要 24dp 圆角时显式用 shapes.large；extraLarge 是胶囊档，勿用于普通卡片。
 val AppShapes = Shapes(
     extraSmall = RoundedCornerShape(8.dp),   // --radius-sm  小组件/标签
     small      = RoundedCornerShape(16.dp),  // --radius-md  卡片/输入框（默认）
-    medium     = RoundedCornerShape(16.dp),
+    medium     = RoundedCornerShape(16.dp),  // --radius-md  M3 Card 默认档
     large      = RoundedCornerShape(24.dp),  // --radius-lg  大卡片/sheet
-    extraLarge = RoundedCornerShape(28.dp),
+    extraLarge = RoundedCornerShape(999.dp), // --radius-pill 胶囊按钮/底栏指示
 )
-// 胶囊按钮单独用 RoundedCornerShape(999.dp)
 
 // 字体：圆体优先（DESIGN_LANGUAGE §5）。
 // 接入方式：将 Nunito/Quicksand/Baloo2 放入 res/font，用 Font(R.font.nunito) 构造 FontFamily；
@@ -36,6 +38,7 @@ val AppTypography = Typography(
     bodyLarge    = TextStyle(fontFamily = AppFontFamily, fontWeight = FontWeight.Normal,   fontSize = 16.sp, lineHeight = 24.sp),
     bodyMedium   = TextStyle(fontFamily = AppFontFamily, fontWeight = FontWeight.Normal,   fontSize = 14.sp, lineHeight = 21.sp),
     labelLarge   = TextStyle(fontFamily = AppFontFamily, fontWeight = FontWeight.Medium,   fontSize = 14.sp, lineHeight = 20.sp),
+    labelMedium  = TextStyle(fontFamily = AppFontFamily, fontWeight = FontWeight.Medium,   fontSize = 12.sp, lineHeight = 16.sp), // 底栏 tab 标签（补齐 §5 阶梯既有档位，防掉 Roboto）
 )
 
 private val LightColorScheme = lightColorScheme(
@@ -62,7 +65,8 @@ private val DarkColorScheme = darkColorScheme(
     primary            = md_primary_dark,
     onPrimary          = md_onPrimary_dark,
     primaryContainer   = md_primaryContainer_dark,
-    error              = md_error_light,
+    onPrimaryContainer = md_onPrimaryContainer_dark,
+    error              = md_error_dark,
 )
 
 @Composable

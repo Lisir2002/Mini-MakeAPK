@@ -77,6 +77,10 @@ jobs:
             exit 1
           fi
 
+      # 设计令牌门禁（严格模式，与 Verify 工作流同一套闸门）：出成品前页面必须全部走令牌
+      - name: 设计令牌门禁（严格）
+        run: python3 scripts/gitops/check_token_usage.py --strict
+
   # ② 构建成品并发布
   release:
     name: 构建并发布 APK

@@ -1,6 +1,9 @@
 package com.make.apk.ui.screens
 
 import app.cash.paparazzi.Paparazzi
+import com.make.apk.ui.components.MmaBottomBar
+import com.make.apk.ui.navigation.DefaultMmaTabs
+import com.make.apk.ui.navigation.MmaRoute
 import com.make.apk.ui.theme.MmaTheme
 import org.junit.Rule
 import org.junit.Test
@@ -8,6 +11,7 @@ import org.junit.Test
 /**
  * 首屏截图回归测试（Paparazzi，纯 JVM）。
  * 覆盖：亮色空态 / 暗色空态 / 亮色已填入 URL 三种关键视觉，锁定「可爱简约·iOS 风」首屏布局不漂移。
+ * 另覆盖亮/暗 × 带共享底栏两态：首页是底栏 tab 的主页，底栏槽位必须入基线。
  */
 class HomeScreenTest {
 
@@ -34,6 +38,38 @@ class HomeScreenTest {
     fun lightFilled() = paparazzi.snapshot {
         MmaTheme(darkTheme = false) {
             HomeScreen(onBuild = {}, initialInput = "https://example.com")
+        }
+    }
+
+    @Test
+    fun lightWithBottomBar() = paparazzi.snapshot {
+        MmaTheme(darkTheme = false) {
+            HomeScreen(
+                onBuild = {},
+                bottomBar = {
+                    MmaBottomBar(
+                        tabs = DefaultMmaTabs,
+                        currentRoute = MmaRoute.Home.route,
+                        onTabSelected = {},
+                    )
+                },
+            )
+        }
+    }
+
+    @Test
+    fun darkWithBottomBar() = paparazzi.snapshot {
+        MmaTheme(darkTheme = true) {
+            HomeScreen(
+                onBuild = {},
+                bottomBar = {
+                    MmaBottomBar(
+                        tabs = DefaultMmaTabs,
+                        currentRoute = MmaRoute.Home.route,
+                        onTabSelected = {},
+                    )
+                },
+            )
         }
     }
 }

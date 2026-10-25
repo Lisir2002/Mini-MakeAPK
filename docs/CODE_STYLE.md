@@ -49,7 +49,23 @@ fun CuteButton(
 
 - **唯一来源**：`DESIGN_LANGUAGE.md` 定义 OKLCH 令牌；`ui/theme/Color.kt` 是其**派生**的 Compose 颜色。
 - 业务代码禁止自创颜色/圆角/字体；一律引用 `MaterialTheme.colorScheme` / `shapes` / `typography`。
+- 间距走 `Spacing.space1..7`（8pt 阶梯）；动效参数走 `Motion`（`SoftSpring` / `PressScaleTarget` / `DurationBreath` 等）。
 - 新增令牌：先改 `DESIGN_LANGUAGE.md`，再同步 `Color.kt` / `Theme.kt`，并补 `docs/Version Log/CHANGELOG.md`。
+
+### 4.1 门禁与豁免
+
+`scripts/gitops/check_token_usage.py` 扫描 `app/.../ui/`（排除 `theme/` 包）：
+
+| 检查 | 违规形态 | 正解 |
+|------|---------|------|
+| 颜色字面量 | `Color(0x…)` / `Color.Red` 等命名色直用 | `colorScheme.*` 令牌 |
+| 圆角字面量 | `RoundedCornerShape(N.dp)` | `MaterialTheme.shapes.*` |
+| 间距字面量 | `N.dp` 不在允许集（8pt 阶梯 + 已登记的组件规范尺寸） | `Spacing.space*` |
+| 字号字面量 | `N.sp` | `typography.*` 档位 |
+
+- **CI 强制**：Verify 与 Release 工作流均以 `--strict` 运行，有违规即失败；本地可 `python3 scripts/gitops/check_token_usage.py` 先自查。
+- **行内豁免**：确有必要的例外（如第三方 API 要求的精确像素），在**该行**加 `// token-gate: allow: <理由>`，理由须可评审；禁止整文件关闭检查。
+- **新增允许值**：`check_token_usage.py` 顶部 `ALLOWED_DP` 集中登记，附来源注释；新间距概念应先评估进 `Spacing` 阶梯，而非直接加白名单。
 
 ## 5. 提交规范（Conventional Commits）
 

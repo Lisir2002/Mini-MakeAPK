@@ -112,6 +112,7 @@ class BuildRecordMapperTest {
     fun status_terminalFlagsAreCorrect() {
         assertTrue(BuildStatus.SUCCESS.isTerminal)
         assertTrue(BuildStatus.FAILED.isTerminal)
+        assertTrue(BuildStatus.CANCELLED.isTerminal)
         assertFalse(BuildStatus.RUNNING.isTerminal)
         assertFalse(BuildStatus.QUEUED.isTerminal)
 

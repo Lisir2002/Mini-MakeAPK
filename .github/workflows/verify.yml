@@ -29,6 +29,12 @@ jobs:
           ls "${ANDROID_HOME}/platforms" 2>/dev/null || true
           ls "${ANDROID_HOME}/build-tools" 2>/dev/null || true
 
+      # 设计令牌门禁（严格模式：ui/ 下出现色值/圆角/间距/字号字面量即失败）。
+      # 规约见 scripts/gitops/check_token_usage.py 文档串与 docs/ARCHITECTURE.md 令牌链路；
+      # 确有必要的例外用行内豁免 `// token-gate: allow <理由>`（见 docs/CODE_STYLE.md）。
+      - name: 设计令牌门禁（严格）
+        run: python3 scripts/gitops/check_token_usage.py --strict
+
       - name: 运行单元测试（含数据层逻辑）
         run: ./gradlew testDebugUnitTest --no-daemon
 

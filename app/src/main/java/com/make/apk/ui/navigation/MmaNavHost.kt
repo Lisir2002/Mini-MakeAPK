@@ -11,10 +11,12 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.navArgument
 import com.make.apk.data.model.BuildRecord
 import com.make.apk.logging.MmaLogger
 import com.make.apk.requireMmaApplication
+import com.make.apk.ui.components.MmaBottomBar
 import com.make.apk.ui.screens.BuildingScreen
 import com.make.apk.ui.screens.HistoryScreen
 import com.make.apk.ui.screens.HomeScreen
@@ -34,6 +36,9 @@ import com.make.apk.ui.viewmodel.HistoryViewModelFactory
  *
  * 单一数据源是加密数据库：构建记录在登记时即落库，
  * 因此"构建中"页面被杀后重建仍能读到真实状态，不会出现假进度。
+ *
+ * 三段式槽位布局：顶栏由各页面的 `MmaScreen` 恒显示；底栏是主页级页面
+ * （首页/历史）共享的顶级导航，流程子页（构建中/结果/预览）不显示。
  */
 @Composable
 fun MmaNavHost(
@@ -42,6 +47,25 @@ fun MmaNavHost(
 ) {
     val app = LocalContext.current.requireMmaApplication()
     val repository = app.buildHistoryRepository
+
+    // 当前路由：驱动底栏选中态
+    val backStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = backStackEntry?.destination?.route
+
+    // 主页级页面共享的底栏（tab 清单见 DefaultMmaTabs，支持自定义过滤/重排后注入）
+    val mainBottomBar: @Composable () -> Unit = {
+        MmaBottomBar(
+            tabs = DefaultMmaTabs,
+            currentRoute = currentRoute,
+            onTabSelected = { tab ->
+                navController.navigate(tab.route) {
+                    launchSingleTop = true
+                    popUpTo(MmaRoute.Home.route) { saveState = true }
+                    restoreState = true
+                }
+            },
+        )
+    }
 
     NavHost(
         navController = navController,
@@ -66,11 +90,11 @@ fun MmaNavHost(
 
             HomeScreen(
                 onBuild = { input -> vm.startBuild(input) },
-                onOpenHistory = { navController.navigate(MmaRoute.History.route) },
+                bottomBar = mainBottomBar,
             )
         }
 
-        // ── 历史 ────────────────────────────────────────────────────
+        // ── 历史（主页级：共享底栏，无返回箭头） ─────────────────────
         composable(MmaRoute.History.route) {
             val vm: HistoryViewModel = viewModel(
                 factory = remember(app) { HistoryViewModelFactory(repository) },
@@ -81,7 +105,7 @@ fun MmaNavHost(
                 records = records,
                 onOpen = { id -> navController.navigate(MmaRoute.Preview.create(id)) },
                 onDelete = vm::delete,
-                onBack = { navController.popBackStack() },
+                bottomBar = mainBottomBar,
             )
         }
 
@@ -92,6 +116,9 @@ fun MmaNavHost(
         ) { entry ->
             val id = entry.recordIdOrNull() ?: return@composable
             val record = entry.observeRecord(repository)
+            val vm: BuildViewModel = viewModel(
+                factory = remember(app) { BuildViewModelFactory(repository) },
+            )
 
             LaunchedEffect(record?.status) {
                 if (record?.status?.isTerminal == true) {
@@ -104,7 +131,11 @@ fun MmaNavHost(
 
             BuildingScreen(
                 record = record,
-                onCancel = { navController.popBackStack() },
+                // 取消 = 停掉后台协程 + 落库「已取消」 + 返回；迟到写入被终态守卫拦截
+                onCancel = {
+                    vm.cancelBuild(id)
+                    navController.popBackStack()
+                },
             )
         }
 

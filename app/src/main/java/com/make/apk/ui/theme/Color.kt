@@ -31,3 +31,7 @@ val md_outline_dark            = Color(0xFF4A4744) // OKLCH(0.40 0.006 60)
 val md_primary_dark            = Color(0xFFFFABA3) // OKLCH(0.82 0.10 25)
 val md_onPrimary_dark          = Color(0xFF231715) // OKLCH(0.22 0.02 30)
 val md_primaryContainer_dark   = Color(0xFF5E362F) // OKLCH(0.38 0.06 30)
+val md_onPrimaryContainer_dark = Color(0xFFF3C0B7) // OKLCH(0.85 0.06 30) 深色主色容器上的浅珊瑚字
+val md_success_dark            = Color(0xFF6AC48C) // OKLCH(0.75 0.12 155)
+val md_warning_dark            = Color(0xFFDBB155) // OKLCH(0.78 0.12 85)
+val md_error_dark              = Color(0xFFF97770) // OKLCH(0.72 0.16 25) 比亮色提明度保对比

@@ -5,15 +5,19 @@ import com.make.apk.data.model.BuildEngine
 import com.make.apk.data.model.BuildInputType
 import com.make.apk.data.model.BuildRecord
 import com.make.apk.data.model.BuildStatus
+import com.make.apk.ui.components.MmaBottomBar
+import com.make.apk.ui.navigation.DefaultMmaTabs
+import com.make.apk.ui.navigation.MmaRoute
 import com.make.apk.ui.theme.MmaTheme
 import org.junit.Rule
 import org.junit.Test
 
 /**
- * 构建历史页截图回归：有记录 / 空态。
+ * 构建历史页截图回归：有记录 / 空态 / 暗色 / 亮暗带共享底栏。
  *
  * 空态是新用户看到的第一个"历史"界面，同样需要基线，
  * 否则很容易在迭代中退化成一片空白或错误占位。
+ * 历史页是底栏 tab 的主页：顶栏仅标题（无返回箭头），底栏为共享顶级导航。
  */
 class HistoryScreenTest {
 
@@ -56,7 +60,6 @@ class HistoryScreenTest {
                 records = records,
                 onOpen = {},
                 onDelete = {},
-                onBack = {},
             )
         }
     }
@@ -68,7 +71,6 @@ class HistoryScreenTest {
                 records = emptyList(),
                 onOpen = {},
                 onDelete = {},
-                onBack = {},
             )
         }
     }
@@ -80,7 +82,42 @@ class HistoryScreenTest {
                 records = records,
                 onOpen = {},
                 onDelete = {},
-                onBack = {},
+            )
+        }
+    }
+
+    @Test
+    fun lightWithBottomBar() = paparazzi.snapshot {
+        MmaTheme(darkTheme = false) {
+            HistoryScreen(
+                records = records,
+                onOpen = {},
+                onDelete = {},
+                bottomBar = {
+                    MmaBottomBar(
+                        tabs = DefaultMmaTabs,
+                        currentRoute = MmaRoute.History.route,
+                        onTabSelected = {},
+                    )
+                },
+            )
+        }
+    }
+
+    @Test
+    fun darkWithBottomBar() = paparazzi.snapshot {
+        MmaTheme(darkTheme = true) {
+            HistoryScreen(
+                records = records,
+                onOpen = {},
+                onDelete = {},
+                bottomBar = {
+                    MmaBottomBar(
+                        tabs = DefaultMmaTabs,
+                        currentRoute = MmaRoute.History.route,
+                        onTabSelected = {},
+                    )
+                },
             )
         }
     }

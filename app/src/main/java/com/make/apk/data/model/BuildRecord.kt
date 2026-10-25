@@ -26,18 +26,21 @@ enum class BuildEngine {
 }
 
 /**
- * 构建状态。终态为 [SUCCESS] / [FAILED]，UI 据此停止进度动效。
+ * 构建状态。终态为 [SUCCESS] / [FAILED] / [CANCELLED]，UI 据此停止进度动效。
  */
 enum class BuildStatus {
     QUEUED,
     RUNNING,
     SUCCESS,
     FAILED,
+
+    /** 用户主动取消：终态，迟到的工作协程不得再改写它。 */
+    CANCELLED,
     ;
 
     /** 是否为终态（不再变化）。 */
     val isTerminal: Boolean
-        get() = this == SUCCESS || this == FAILED
+        get() = this == SUCCESS || this == FAILED || this == CANCELLED
 }
 
 /**

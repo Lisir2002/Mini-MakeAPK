@@ -13,5 +13,6 @@ object Motion {
     val DurationFast     = 200     // ms 快
     val DurationStandard= 300      // ms 标准
     val DurationEnter   = 400      // ms 入场
+    val DurationBreath  = 1100     // ms 循环呼吸（--motion-breath，无限脉冲 ease-in-out 往返）
     val StaggerMs       = 40L      // 列表项依次浮现间隔
 }
