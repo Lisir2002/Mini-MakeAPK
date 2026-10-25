@@ -1,7 +1,7 @@
 name: Release
 
 # 成品（APK）**只在 GitHub 上产出**：推送 v* tag 时构建并发布 Release。
-# 本地不做编译成品（见 docs/VERSIONING.md §4）。
+# 本地不做编译成品（见 docs/VERSIONING.md §5）。
 
 on:
   push:
@@ -22,12 +22,14 @@ jobs:
       - name: 提取版本并比对 tag
         run: |
           set -euo pipefail
-          VN=$(grep -oE 'versionName *= *"[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+"' app/build.gradle.kts \
-              | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+')
+          # 版本号 = 纯四段式（可带 -rcN 后缀），tag = v<versionName>，不带 +N
+          # versionCode 仅 build.gradle.kts 内部单增，不参与 tag（2026-10-25 起，见 docs/VERSIONING.md）
+          VN=$(grep -oE 'versionName *= *"[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+(-rc[0-9]+)?"' app/build.gradle.kts \
+              | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+(-rc[0-9]+)?')
           VC=$(grep -oE 'versionCode *= *[0-9]+' app/build.gradle.kts \
               | grep -oE '[0-9]+' | head -1)
-          EXPECTED="v${VN}+${VC}"
-          echo "versionName=${VN}  versionCode=${VC}"
+          EXPECTED="v${VN}"
+          echo "versionName=${VN}  versionCode=${VC}（versionCode 仅内部单增，不进 tag）"
           echo "期望 tag = ${EXPECTED}"
           echo "实际 tag = ${GITHUB_REF_NAME}"
           if [ "${GITHUB_REF_NAME}" != "${EXPECTED}" ]; then

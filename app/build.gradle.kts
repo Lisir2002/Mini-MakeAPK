@@ -33,11 +33,13 @@ android {
         minSdk = 24
         targetSdk = 34
         // ── 版本约束（唯一改动点）────────────────────────────────────
-        // versionName：四段式 MAJOR.MINOR.PATCH.BUILD（如 0.0.0.0）
-        // versionCode：构建号，单调递增、永不重置；发布 tag = v<versionName>+<versionCode>
-        // 递增规则与发版流程见 docs/VERSIONING.md
-        versionCode = 1
-        versionName = "0.0.0.0"
+        // versionName：纯四段式 MAJOR.MINOR.PATCH.BUILD，可带 -rcN 后缀（如 0.0.0.1-rc1）。
+        //   正式版需用户授权，未授权按顺延下一版发 RC（docs/VERSIONING.md §3）。
+        //   版本号不带 +N 后缀（2026-10-25 起，用户确认）。
+        // versionCode：Android 安装唯一性要求的内部整数，单调递增，但不进版本串/tag；
+        //   发布 tag = v<versionName>。递增规则与发版流程见 docs/VERSIONING.md。
+        versionCode = 2
+        versionName = "0.0.0.1-rc1"
     }
 
     signingConfigs {

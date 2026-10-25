@@ -2,7 +2,7 @@
 
 > 状态：评审中（2026-10-25，Phase 2 云端构建待落地）
 > 遵循：[`docs/DOC_CHARTER.md`](DOC_CHARTER.md) · 对齐：[`PROJECT_BRIEF.md`](../PROJECT_BRIEF.md) §2
-> **版本规范见 [`VERSIONING.md`](VERSIONING.md)（四段式 `0.0.0.0+1`，本文件不重复定义）。**
+> **版本规范见 [`VERSIONING.md`](VERSIONING.md)（纯四段式版本号，如 `0.0.0.1-rc1`，本文件不重复定义）。**
 
 本文件说明 **MMA**（包名 `com.make.apk`）的构建、签名与发版流程。sprint-1 仅设备端 WebView 即时封装；真编译/正式签名走 Phase 2 云端构建（契约见 [`build-api-contract.md`](build-api-contract.md)）。
 
@@ -99,7 +99,7 @@ sequenceDiagram
 ## 6. 发版流程（Release）
 
 > 版本格式、递增规则与 RC 机制见 [`VERSIONING.md`](VERSIONING.md)。
-> 当前：`versionName = "0.0.0.0"`、`versionCode = 1` → tag `v0.0.0.0+1`。
+> 当前（即将发布）：`versionName = "0.0.0.1-rc1"`、`versionCode = 2` → tag `v0.0.0.1-rc1`。
 
 > **授权闸门**：正式版发版**必须取得用户授权**（明确确认或提前通知）。未授权时按
 > 顺延下一版本发 RC（`0.0.0.1-rc1` → `0.0.0.1-rc2` …），流程与本表完全相同，
@@ -113,8 +113,8 @@ sequenceDiagram
 6. **打 tag 并推送**（tag 名必须与版本严格一致）：
 
    ```bash
-   git tag v0.0.0.0+1
-   git push origin v0.0.0.0+1
+   git tag v0.0.0.1-rc1
+   git push origin v0.0.0.1-rc1
    ```
 
 7. GitHub Actions 自动执行：校验 tag 与版本一致 → `assembleRelease` → 创建 Release 上传 APK。

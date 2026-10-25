@@ -8,13 +8,13 @@
 |----|-----|
 | **应用名称** | `MMA` |
 | **应用包名** | `com.make.apk` |
-| **当前版本** | `0.0.0.0+1`（四段式 + 构建号，规范见 [`docs/VERSIONING.md`](docs/VERSIONING.md)） |
+| **当前版本** | `0.0.0.1-rc1`（纯四段式，规范见 [`docs/VERSIONING.md`](docs/VERSIONING.md)） |
 | **成品产出** | **只在 GitHub 打 tag 时产出**；本地仅做验证（见 [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md)） |
 
 ![platform](https://img.shields.io/badge/platform-Android-3DDC84)
 ![ui](https://img.shields.io/badge/UI-Jetpack%20Compose%20%2B%20M3-FF6F61)
 ![package](https://img.shields.io/badge/package-com.make.apk-blueviolet)
-![version](https://img.shields.io/badge/version-0.0.0.0%2B1-blue)
+![version](https://img.shields.io/badge/version-0.0.0.1--rc1-orange)
 ![license](https://img.shields.io/badge/license-专有/内部-orange)
 
 ---
@@ -35,7 +35,7 @@
 
 ## 快速开始（Quick Start）
 
-> 当前为 **0.0.0.0+1 原型阶段**。本地**只做验证**，成品 APK 从 GitHub Release 获取
+> 当前为 **0.0.0.1-rc1 阶段**。本地**只做验证**，成品 APK 从 GitHub Release 获取
 > （见 [`docs/VERSIONING.md`](docs/VERSIONING.md)、[`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md)）。
 
 ```bash
@@ -74,7 +74,7 @@ MMA/  （仓库 Mini-MakeAPK）
 │   ├── DOC_CHARTER.md         # 文档规矩（本仓所有文档的总纲）
 │   ├── INDEX.md               # 文档地图
 │   ├── ARCHITECTURE.md        # 系统架构
-│   ├── VERSIONING.md          # 版本规范（四段式 0.0.0.0+1）
+│   ├── VERSIONING.md          # 版本规范（纯四段式 0.0.0.1-rc1）
 │   ├── AGENT_COLLABORATION.md # AI Agent 协同协议
 │   ├── CODE_STYLE.md          # 代码与提交规范
 │   ├── SETUP.md               # 环境搭建
@@ -113,7 +113,7 @@ MMA/  （仓库 Mini-MakeAPK）
 
 ## 版本与许可
 
-- 版本规范：四段式 `MAJOR.MINOR.PATCH.BUILD+构建号`（当前 `0.0.0.0+1`），见 [`docs/VERSIONING.md`](docs/VERSIONING.md)。
+- 版本规范：纯四段式 `MAJOR.MINOR.PATCH.BUILD[-rcN]`（当前 `0.0.0.1-rc1`；正式版需用户授权、否则发 RC；无 `+N` 后缀），见 [`docs/VERSIONING.md`](docs/VERSIONING.md)。
 - 版本日志：[`CHANGELOG.md`](CHANGELOG.md)（遵循 Keep a Changelog）。
 - 许可：当前为**专有 / 内部项目**，开源许可待定。如需使用请先联系维护者。
 

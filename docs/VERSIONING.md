@@ -8,18 +8,22 @@
 ## 1. 版本格式
 
 ```
-MAJOR.MINOR.PATCH.BUILD[-rcN] + M
-└──────── versionName ────────┘   └ versionCode
-      （四段式，字符串）              （构建号，整数）
+MAJOR.MINOR.PATCH.BUILD[-rcN]
+└──── versionName ────┘
+      （四段式，字符串）
 ```
 
-- **完整版本串**：`0.0.0.0+1`；RC 形态：`0.0.0.1-rc1+2`
-- **`versionName`**（`app/build.gradle.kts`）：四段式 `MAJOR.MINOR.PATCH.BUILD`，
-  未获正式版授权时可带预发布后缀 `-rcN`（N 从 1 起）
-- **`versionCode`**（同文件）：构建号 `M`，**单调递增、永不重置**（Android 强制要求）
-- **发布 tag**：`v<versionName>+<versionCode>`，如 `v0.0.0.0+1`、`v0.0.0.1-rc1+2`
+- **版本号 = 纯四段式**，如 `0.0.0.1`；未获正式版授权时可带预发布后缀 `-rcN`，如 `0.0.0.1-rc1`。
+- **`versionName`**（`app/build.gradle.kts`）：即上述版本号，是版本的唯一对外身份。
+- **`versionCode`**（同文件）：Android 安装唯一性要求的内部整数，**单调递增、永不重置**，
+  但**不进入版本串、tag、CHANGELOG**——它只是构建文件里的一个计数器。
+- **发布 tag**：`v<versionName>`，如 **`v0.0.0.1-rc1`**、`v0.0.0.1`。
 
-当前：`versionName = "0.0.0.0"`，`versionCode = 1` → tag `v0.0.0.0+1`。
+> **2026-10-25 起永久去除 `+N` 后缀**（用户确认：「后续都不要 +N 这个格式」）。
+> 历史版本 `v0.0.0.0+1` 中的 `+1` 即当时的 versionCode 展示方式，该 tag 与其
+> Release/CHANGELOG 记录保持原样作为史实，新版本一律不带。
+
+当前（即将发布）：`versionName = "0.0.0.1-rc1"`，`versionCode = 2` → tag `v0.0.0.1-rc1`。
 
 ---
 
@@ -31,12 +35,12 @@ MAJOR.MINOR.PATCH.BUILD[-rcN] + M
 |------|------|------|
 | **正式版顺延（默认）** | BUILD 段 **+1**，前三段不动 | `0.0.0.3` → `0.0.0.4` |
 | 前三段递增（特殊情况） | 仅限产品级节点，且**必须由用户明确指定**；递增时后级段归零 | 首个产品版 `1.0.0.0` |
-| **`+M`（versionCode）** | **每次发版必 +1**（RC 也算一次发版） | `+1` → `+2` → `+3` |
+| **`versionCode`（内部）** | **每次发版必 +1**（RC 也算一次发版），仅存在于 `build.gradle.kts` | `1` → `2` → `3` |
 
 - **无特殊情况一律顺延 BUILD 段**。缺陷修复、依赖升级、性能优化、UI 调整**不**升
   PATCH/MINOR——那些只是普通顺延。MAJOR/MINOR/PATCH 的语义化跳段在本项目**默认禁用**。
-- **硬性约束**：`versionCode` 只能增大。Android 与各大商店以它判定新旧，
-  回退会导致用户无法升级。即便回滚功能，也要顺延 BUILD 段发新版本，而非回退 M。
+- **硬性约束**：`versionCode` 只能增大。Android 以它判定新旧，回退会导致用户无法升级。
+  即便回滚功能，也要顺延 BUILD 段发新版本，而非回退 versionCode。
 
 ---
 
@@ -48,7 +52,7 @@ MAJOR.MINOR.PATCH.BUILD[-rcN] + M
 
 ### 3.1 授权闸门
 
-- **正式版（去掉 `-rcN` 的版本）必须取得用户授权**——用户明确确认，或已提前通知并获认可。
+- **正式版（不带 `-rcN` 的版本）必须取得用户授权**——用户明确确认，或已提前通知并获认可。
 - 未获授权时**不得**发正式版，唯一合规动作是发 **RC**。
 
 ### 3.2 RC（Release Candidate）
@@ -62,10 +66,10 @@ MAJOR.MINOR.PATCH.BUILD[-rcN] + M
 ### 3.3 版本时间线示例
 
 ```
-0.0.0.7+7        ← 上一正式版
-0.0.0.8-rc1+8    ← 未授权，发 RC（BUILD 顺延 + rc1）
-0.0.0.8-rc2+9    ← RC 顺延
-0.0.0.8+10       ← 用户授权：去掉 -rc，成为正式版
+0.0.0.7        ← 上一正式版（tag v0.0.0.7）
+0.0.0.8-rc1    ← 未授权，发 RC（BUILD 顺延 + rc1）
+0.0.0.8-rc2    ← RC 顺延
+0.0.0.8        ← 用户授权：去掉 -rc，成为正式版
 ```
 
 ---
@@ -79,24 +83,24 @@ MAJOR.MINOR.PATCH.BUILD[-rcN] + M
       │
 ② 改版本 ── app/build.gradle.kts（versionCode +1，versionName 按①）
       │
-③ 更新 CHANGELOG.md ── [Unreleased] 晋级为 [<versionName>+M] - YYYY-MM-DD
+③ 更新 CHANGELOG.md ── [Unreleased] 晋级为 [<versionName>] - YYYY-MM-DD
       │
 ④ 提交并推送到 main ── 本地仅运行验证（见 §5）
       │
-⑤ 打 tag 并推送 ── git tag v<versionName>+M && git push origin v<versionName>+M
+⑤ 打 tag 并推送 ── git tag v<versionName> && git push origin v<versionName>
       │
 ⑥ GitHub Actions 产出成品 ── .github/workflows/release.yml
-   └─ 校验 tag 与版本一致 → 构建签名 APK → 创建 Release 并上传
+   └─ 校验 tag 与 versionName 一致 → 构建签名 APK → 创建 Release 并上传
 ```
 
-**tag 名必须与版本严格一致**，由 CI 强制校验（不一致直接失败）：
+**tag 名必须与 versionName 严格一致**，由 CI 强制校验（不一致直接失败）：
 
 ```bash
-git tag "v$(versionName)+$(versionCode)"     # 例：v0.0.0.1-rc1+2
-git push origin "v$(versionName)+$(versionCode)"
+git tag "v$(versionName)"     # 例：v0.0.0.1-rc1
+git push origin "v$(versionName)"
 ```
 
-> 注：`+` 与 `-` 在 Git tag 名中均为合法字符，GitHub Release 亦支持。
+> 注：`-` 在 Git tag 名中是合法字符，GitHub Release 亦支持。
 
 ---
 
@@ -126,7 +130,7 @@ git push origin "v$(versionName)+$(versionCode)"
   避免 PATCH 号在无 bug 修复时被无意义地抬高。
 - `-rcN` 后缀即 SemVer pre-release 标识的等效物；获批后去掉后缀成为正式版，
   与 SemVer「预发布版本晋升为正式版本」的语义一致。
-- `CHANGELOG.md` 仍遵循 Keep a Changelog：版本号写作 `[0.0.0.1-rc1+2] - YYYY-MM-DD`，
+- `CHANGELOG.md` 仍遵循 Keep a Changelog：版本号写作 `[0.0.0.1-rc1] - YYYY-MM-DD`，
   发版时 `[Unreleased]` 整体晋级并保留新的空 `[Unreleased]`。
 
 ---
@@ -135,10 +139,10 @@ git push origin "v$(versionName)+$(versionCode)"
 
 - [ ] **授权状态已确认**：正式版有用户授权记录（确认或提前通知）；未授权则 `versionName` 必须以 `-rcN` 结尾
 - [ ] BUILD 段较上一正式版 **+1**（前三段仅在用户明确指定的产品级节点才动，且后级归零）
-- [ ] `app/build.gradle.kts` 中 `versionCode` 已 +1（且大于历史上任何一次，含 RC）
-- [ ] `CHANGELOG.md` 已把 `[Unreleased]` 晋级为 `[<versionName>+M] - 日期`
+- [ ] `app/build.gradle.kts` 中 `versionCode` 已 +1（大于历史上任何一次，含 RC）
+- [ ] `CHANGELOG.md` 已把 `[Unreleased]` 晋级为 `[<versionName>] - 日期`
 - [ ] 本地 `testDebugUnitTest` + `verifyPaparazziDebug` 全绿
-- [ ] tag 名 `v<versionName>+<M>` 与 `versionName`/`versionCode` 完全一致
+- [ ] tag 名 `v<versionName>` 与 `versionName` 完全一致（**不带 `+N`**）
 
 ---
 
