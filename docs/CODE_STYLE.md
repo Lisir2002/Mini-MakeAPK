@@ -11,10 +11,10 @@
 
 - 根包：`com.make.apk`
 - 分层：`ui/theme`、`ui/components`、`ui/screens`、`ui/permission`、`ui/storage`、`storage`、`ui/MmaApp.kt`
-- 类/对象：PascalCase（`HomeScreen`、`CuteButton`）
+- 类/对象：PascalCase（`ProjectsScreen`、`CuteButton`）
 - 函数/变量：camelCase（`loadInput`、`primaryColor`）
 - 常量：SCREAMING_SNAKE_CASE（`MAX_INPUT_LENGTH`）
-- 文件：与主要公开声明同名（`HomeScreen.kt`）
+- 文件：与主要公开声明同名（`ProjectsScreen.kt`）
 
 ## 2. Kotlin 约定
 
@@ -79,18 +79,25 @@ if (state.status == RuntimePermissionStatus.PermanentlyDenied) {
 
 - **唯一来源**：`DESIGN_LANGUAGE.md` 定义 OKLCH 令牌；`ui/theme/Color.kt` 是其**派生**的 Compose 颜色。
 - 业务代码禁止自创颜色/圆角/字体；一律引用 `MaterialTheme.colorScheme` / `shapes` / `typography`。
-- 间距走 `Spacing.space1..7`（8pt 阶梯）；动效参数走 `Motion`（`SoftSpring` / `PressScaleTarget` / `DurationBreath` 等）。
-- 新增令牌：先改 `DESIGN_LANGUAGE.md`，再同步 `Color.kt` / `Theme.kt`，并补 `docs/Version Log/CHANGELOG.md`。
+- 间距走 `Spacing.space1..7`（紧凑阶梯 3/6/9/12/18/24/36）；动效参数走 `Motion`（`SoftSpring` / `PressScaleTarget` / `DurationBreath` 等）。
+- 新增令牌：先改 `DESIGN_LANGUAGE.md`，再同步 `ui/theme/MmaDesign.kt`（令牌聚合体）/ `Theme.kt`，并补 `docs/Version Log/CHANGELOG.md`。
 
-### 4.1 门禁与豁免
+### 4.1 令牌可覆盖架构（MmaDesign + LocalMmaDesign）
+
+- **令牌聚合**：`MmaDesign` data class 持有 `SpacingScale` / `AlphaScale` / `MaterialTier` / `TranslucentSpec` / `ScaffoldStyle`；`MmaTheme(design = …)` 装配，`LocalMmaDesign` 承载。
+- **业务代码零迁移**：`Spacing` 等为 @Composable getter 读 `LocalMmaDesign.current`，默认值即现状；Phase-2 自定义主题只需换 `MmaDesign` 实例，**页面零改动**。
+- **参数优先、令牌兜底**：可覆盖行为（如 chrome 磨砂 `translucent: Boolean? = null`）传值即显式决策，null 跟随 `ScaffoldStyle`；截图测试不提供 HazeState，天然落降级态。
+- **磨砂链路**：源挂 `MmaScreen` content（`Modifier.haze`），消费方是顶栏/底栏（`Modifier.hazeChild`），二者必须是 Scaffold 内**兄弟**关系——消费方不能是源的后代（自引用循环）；状态经 `LocalHazeState` 下发。
+
+### 4.2 门禁与豁免
 
 `scripts/gitops/check_token_usage.py` 扫描 `app/.../ui/`（排除 `theme/` 包）：
 
 | 检查 | 违规形态 | 正解 |
 |------|---------|------|
-| 颜色字面量 | `Color(0x…)` / `Color.Red` 等命名色直用 | `colorScheme.*` 令牌 |
+| 颜色字面量 | `Color(0x…)` / `Color.Red` 等命名色直用（`Color.Transparent` 豁免：通用工具色） | `colorScheme.*` 令牌 |
 | 圆角字面量 | `RoundedCornerShape(N.dp)` | `MaterialTheme.shapes.*` |
-| 间距字面量 | `N.dp` 不在允许集（8pt 阶梯 + 已登记的组件规范尺寸） | `Spacing.space*` |
+| 间距字面量 | `N.dp` 不在允许集（紧凑阶梯 + 已登记的组件规范尺寸） | `Spacing.space*` |
 | 字号字面量 | `N.sp` | `typography.*` 档位 |
 
 - **CI 强制**：Verify 与 Release 工作流均以 `--strict` 运行，有违规即失败；本地可 `python3 scripts/gitops/check_token_usage.py` 先自查。

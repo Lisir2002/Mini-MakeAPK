@@ -111,7 +111,7 @@ internal fun MmaPermissionDialogContent(
                 MmaIcon(
                     iconRes = spec.iconRes,
                     contentDescription = null, // 标题已表意，装饰性图标免重复朗读
-                    size = 32.dp,
+                    size = 32.dp, // 圆底内图标规范尺寸（已登记门禁允许集）
                     tint = MaterialTheme.colorScheme.onPrimaryContainer,
                 )
             }

@@ -95,20 +95,23 @@
 
 ---
 
-## 4. 间距与栅格（8pt 基准）
+## 4. 间距与栅格（紧凑基准）
+
+> 2025-09 全局温和收紧（-25%）：布局偏紧凑是产品明确需求；圆角/字号/图标不受影响。
 
 | 令牌 | 值 | 用途 |
 |------|----|------|
-| `--space-1` | `4dp` | 极紧凑 |
-| `--space-2` | `8dp` | 组内 |
-| `--space-3` | `12dp` | 相关元素 |
-| `--space-4` | `16dp` | 卡片内边距（默认） |
-| `--space-5` | `24dp` | 区块间距 |
-| `--space-6` | `32dp` | 大区块/页面边距 |
-| `--space-7` | `48dp` | 页面级留白 |
+| `--space-1` | `3dp` | 极紧凑 |
+| `--space-2` | `6dp` | 组内 |
+| `--space-3` | `9dp` | 相关元素 |
+| `--space-4` | `12dp` | 卡片内边距（默认） |
+| `--space-5` | `18dp` | 区块间距 |
+| `--space-6` | `24dp` | 大区块/页面边距 |
+| `--space-7` | `36dp` | 页面级留白 |
 
-- 所有间距取 4 的倍数；区块间优先 16/24/32。
-- 内容左右边距 `--space-6` (32dp) 起步，窄屏可降为 24dp。
+- 所有间距为 3 的倍数（紧凑档）；区块间优先 12/18/24。
+- 内容左右边距 `--space-5` (18dp) 起步。
+- 间距令牌经 `LocalMmaDesign` 可整体覆盖（ARCHITECTURE §3.4），业务代码零迁移。
 
 ---
 
@@ -144,6 +147,24 @@
 - **描边**：低对比 1dp `--outline`，用于分隔而非硬阴影。
 - **可加极轻渐变/玻璃质感**，但保持单调克制（如卡片顶部 2% 白渐变高光）。
 
+### 7.1 材质档位与磨砂（glassmorphism）
+
+材质三档（`MmaDesign.defaultMaterial`，骨架 chrome 消费）：
+
+| 档位 | 视觉 | 场景 |
+|------|------|------|
+| `Flat` | 纯色平面 | **默认**：最省电，磨砂关闭时 |
+| `Elevated` | 纯色 + 阴影抬升 | 层次感来自 elevation 而非透明 |
+| `Translucent` | 半透明磨砂 | 顶栏/底栏 chrome；API 31+ 真模糊（Haze RenderNode），< 31 降级近似 |
+
+磨砂参数（`TranslucentSpec`，可整体覆盖）：容器不透明度 `0.88`、模糊半径 `20dp`、
+噪点 `0.05`（抵消低端机色带）、内描边 `0.12` × 1dp `--outline`（玻璃边缘提亮，iOS 风关键细节）。
+
+**降级链**（`MmaTranslucentSurface` 三态）：
+1. `translucent=false` → 实色 Surface（零开销，截图测试落此态）；
+2. `translucent=true` + HazeState → `hazeChild` 真磨砂；
+3. `translucent=true` 无 HazeState（独立预览/截图）→ 半透明纯色 + 1dp 细描边近似。
+
 ---
 
 ## 8. 核心组件示例（Compose 落地）
@@ -157,6 +178,10 @@
 | **FAB** | `primary` 圆、轻柔阴影、按压回弹 |
 | **Chip/标签** | `primary-container` 底 + `on-primary-container` 字、`radius-pill` |
 | **权限二次确认弹窗** | `surface` 底 + `radius-lg`；图标先包 64dp `primary-container` 圆底再 32dp 图（`on-primary-container`）；主按钮胶囊 Filled、次级「以后再说」TextButton；文案 `title-large` + `body-medium`，**全程用人话不出现权限名** |
+| **项目页（封装工作台）** | 上半固定输入区（`title-large` 标题 + `radius-md` 多行 TextField + 通栏胶囊主按钮），`--outline` 细分隔线，下半滚动项目列表；空态 = Folder 图标 36dp + 引导文案（`on-surface-variant`） |
+| **项目卡片** | `Card` + `radius-md`；首行来源名 `body-large`（单行省略），次行状态文案 + 「预览/删除」TextButton（文字保留，保可访问性） |
+| **开发中页（占位）** | 居中 Developing 图标 64dp `primary` + `headline-medium` 标题 + 一句现状；路线图预告卡 `radius-md`，条目列「在建」事项（预告不承诺） |
+| **我的页（个人中心）** | 顶部信息卡：Folder 图标 48dp `primary` + 应用名 `title-large` + 版本号 + MMAFile 存储状态（真实读，未授权时明示降级）；条目列表数据驱动：图标 24dp `primary` + 标题 `body-large` + 副标题 `body-medium`（`on-surface-variant`） |
 
 ---
 

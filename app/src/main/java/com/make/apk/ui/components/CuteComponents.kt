@@ -58,17 +58,31 @@ fun CuteButton(
 }
 
 // 柔和卡片：圆角 shapes.small（--radius-md）+ 表面色（M3 提供柔光 elevation）。禁止尖角硬阴影。
+// onClick 非空时走 M3 可点击 Card 重载（按压有水波；设置页条目卡用）。
 @Composable
 fun CuteCard(
     modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    Card(
-        shape = MaterialTheme.shapes.small,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        modifier = modifier,
-        content = content,
-    )
+    val shape = MaterialTheme.shapes.small
+    val colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    if (onClick != null) {
+        Card(
+            onClick = onClick,
+            shape = shape,
+            colors = colors,
+            modifier = modifier,
+            content = content,
+        )
+    } else {
+        Card(
+            shape = shape,
+            colors = colors,
+            modifier = modifier,
+            content = content,
+        )
+    }
 }
 
 // 打包中可爱脉冲：替代生硬转圈。主色容器轻柔呼吸（shapes.large 圆角 + Motion.DurationBreath 循环）。

@@ -10,11 +10,14 @@ package com.make.apk.ui.navigation
  */
 sealed class MmaRoute(val route: String) {
 
-    /** 首页：单一输入流（URL / HTML）。 */
-    data object Home : MmaRoute("home")
+    /** 项目（startDestination）：封装工作台——输入新建 + 项目列表合一。 */
+    data object Projects : MmaRoute("projects")
 
-    /** 构建历史：对接数据层（加密 SQLite）。 */
-    data object History : MmaRoute("history")
+    /** 开发中：优雅占位页（预告在建功能）。 */
+    data object Developing : MmaRoute("developing")
+
+    /** 我的：个人中心（设置/关于/仓库/升级入口）。 */
+    data object Profile : MmaRoute("profile")
 
     /** 构建中：进度与可爱脉冲。 */
     data object Building : MmaRoute("building/{$ARG_RECORD_ID}") {

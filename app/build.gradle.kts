@@ -76,6 +76,8 @@ android {
 
     buildFeatures {
         compose = true
+        // AGP 8 默认关闭 BuildConfig 生成；ProfileScreen 版本展示与发版校验需要 VERSION_NAME
+        buildConfig = true
     }
 
     composeOptions {
@@ -130,6 +132,10 @@ dependencies {
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
+
+    // ── 磨砂玻璃：Haze（顶栏/底栏跨子树真模糊；API<31 自动降级近似）─────
+    implementation(libs.haze)
+    implementation(libs.haze.materials)
 
     // 截图回归测试（Paparazzi，纯 JVM，无需模拟器）
     testImplementation(libs.junit)

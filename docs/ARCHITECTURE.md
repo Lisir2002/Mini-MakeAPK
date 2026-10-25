@@ -15,7 +15,7 @@ Web2APK 是一款**纯原生安卓应用**（Jetpack Compose + Material 3），�
 
 ```mermaid
 flowchart LR
-    U[用户输入\nURL/HTML/文件] --> H[HomeScreen\n单一输入流]
+    U[用户输入\nURL/HTML/文件] --> H[ProjectsScreen\n封装工作台]
     H --> V[WebViewScreen\n本地预览/封装]
     V -->|设备端即时封装| APK1[(WebView 封装 APK)]
     V -->|需真编译| C[云端构建服务\nPOST /build]
@@ -30,7 +30,7 @@ flowchart LR
 |------|------|------|
 | `ui/theme` | `app/.../ui/theme/` | 设计令牌（OKLCH→Compose）、主题、动效 |
 | `ui/components` | `app/.../ui/components/` | 可爱组件：胶囊按钮、柔卡、打包脉冲 |
-| `ui/screens` | `app/.../ui/screens/` | HomeScreen（输入）、BuildingScreen（进度）、ResultScreen（成功/失败）、HistoryScreen（历史）、PreviewScreen（预览） |
+| `ui/screens` | `app/.../ui/screens/` | ProjectsScreen（封装工作台：输入+列表）、BuildingScreen（进度）、ResultScreen（成功/失败）、DevelopingScreen（占位）、ProfileScreen（个人中心）、PreviewScreen（预览） |
 | `ui/permission` | `app/.../ui/permission/` | 权限基础设施：三层权限状态机 + 应用内二次确认弹窗（存储权限已接入，通知/安装待 Phase-2） |
 | `ui/storage` | `app/.../ui/storage/` | 启动存储门 `StoragePermissionGate`：MMAFile 目录的授权引导与静默就绪 |
 | `storage` | `app/.../storage/` | MMAFile 外部存储唯一事实来源：目录清单 `MmaDir`、授权判断、幂等创建、日志目录决策 |
@@ -60,24 +60,27 @@ flowchart LR
 ## 3.1 页面骨架与导航
 
 ```
-MainActivity ─ setContent ─▶ MmaApp（主题 + NavController）
+MainActivity ─ setContent ─▶ MmaApp（主题 + NavController + HazeState）
                                 └─▶ MmaNavHost
-        home ────────┬──▶ history ──▶ preview
-                     └──▶ building/{id} ──▶ result/{id} ──▶ preview/{id}
+        projects ────┬──▶ building/{id} ──▶ result/{id} ──▶ preview/{id}
+                      ├──▶ developing（占位）
+                      └──▶ profile（个人中心）
 ```
 
 | 路由 | 页面 | 取数来源 | 骨架模板 |
 |------|------|---------|---------|
-| `home` | HomeScreen | —（用户输入） | 主页（顶栏 + 底栏） |
+| `projects` | ProjectsScreen | `BuildViewModel`（输入登记）+ `HistoryViewModel`（列表 Flow） | 主页（顶栏 + 底栏） |
+| `developing` | DevelopingScreen | —（占位） | 主页（顶栏 + 底栏） |
+| `profile` | ProfileScreen | `BuildConfig.VERSION_NAME` + `MmaStorage.isAuthorized` | 主页（顶栏 + 底栏） |
 | `building/{recordId}` | BuildingScreen | `BuildHistoryRepository.observeById` | 详情（仅顶栏） |
 | `result/{recordId}` | ResultScreen | `BuildHistoryRepository.observeById` | 详情（仅顶栏） |
-| `history` | HistoryScreen | `BuildHistoryRepository.observeAll`（Flow） | 主页（顶栏 + 底栏） |
 | `preview/{recordId}` | PreviewScreen | `BuildHistoryRepository.observeById` | 详情（仅顶栏） |
 
 **三段式槽位嵌入布局**：所有页面经 `ui/components/MmaScreen.kt` 组装——
-`topBar`（MmaTopBar，顶级页仅标题、子页带返回箭头）+ `content`（页面内容，**必须消费
-innerPadding**，否则被栏遮挡）+ `bottomBar`（MmaBottomBar，仅主页级页面传入，
-首页/历史共享同一底栏，tab 清单 `DefaultMmaTabs` 可配置）。骨架管结构与系统栏避让，
+`topBar`（MmaTopBar，顶级页仅标题、子页带返回箭头；**槽位可插拔**，传自定义 composable 即替换，
+title/onBack 随之失效）+ `content`（页面内容，**必须消费 innerPadding**，否则被栏遮挡；
+该层同时是 Haze 磨砂源，见 §3.4）+ `bottomBar`（MmaBottomBar，仅主页级页面传入，
+项目/开发中/我的共享同一底栏，tab 清单 `DefaultMmaTabs` 可配置）。骨架管结构与系统栏避让，
 页面只管内容；一屏一 MmaScreen，不再自建顶栏。
 
 **分层约定：路由负责取数，页面负责渲染。**
@@ -154,12 +157,48 @@ innerPadding**，否则被栏遮挡）+ `bottomBar`（MmaBottomBar，仅主页�
 （持 MANAGE 后 File API 可用，有已知轻微性能惩罚）；未来若上架 Google Play
 需申报 `MANAGE_EXTERNAL_STORAGE` 用途（当前只发 GitHub release，不涉及）。
 
+## 3.4 设计令牌可定制架构（MmaDesign + Haze）
+
+**目标：令牌高可定制、业务代码零迁移。** 为 Phase-2 自定义主题（配色 / 圆角 / 透明度 /
+磨砂 / 骨架插拔）铺路，已落地的部分本期交付。
+
+**令牌可覆盖（零迁移模式）**：
+
+| 组件 | 职责 |
+|------|------|
+| `ui/theme/MmaDesign.kt` | 令牌聚合体：`SpacingScale`（间距 7 档）/ `AlphaScale`（透明度 7 档，预留）/ `MaterialTier`（Flat/Elevated/Translucent，预留）/ `TranslucentSpec`（磨砂参数）/ `ScaffoldStyle`（顶栏/底栏变体 + 磨砂总开关） |
+| `LocalMmaDesign` | CompositionLocal 承载点；`MmaTheme(design = …)` 装配默认实例 |
+| `Spacing` 代理对象 | 全部为 @Composable getter 读 `LocalMmaDesign.current`——**调用点写法不变**，换主题只需换 MmaDesign 实例 |
+
+Phase-2 自定义主题入口：
+```kotlin
+MmaTheme(design = MmaDesign(spacing = SpacingScale(space1 = 2.dp, …))) { … }
+```
+
+**磨砂（Haze 0.7.3，版本红线见下）**：
+
+| 组件 | 职责 |
+|------|------|
+| `ui/LocalHazeState.kt` | App 壳层创建一次并下发的 Haze 源状态 |
+| `MmaScreen` content slot | `Modifier.haze(state)`——**源**挂页面内容层 |
+| `MmaTopBar` / `MmaBottomBar` | `Modifier.hazeChild(state)`——**消费方**与源是 Scaffold 内兄弟 slot（**消费方不能是源的后代**，否则自引用循环，这是 LocalHazeState 存在的理由） |
+| `MmaTranslucentSurface` | 磨砂容器三态降级：false=实色 / true+state=hazeChild 真磨砂（Haze 内部按 API 分级，31+ RenderNode 真模糊）/ true 无 state=半透明+1dp 描边近似 |
+
+「参数优先、令牌兜底」：`translucent: Boolean? = null`——传值即显式决策，null 跟随
+`ScaffoldStyle.translucentChrome && variant == Translucent`。截图测试不提供 LocalHazeState
+→ null → 近似降级，golden 零风险。
+
+**Haze 版本红线**：0.7.3 是最后一个用 Kotlin 1.9.24 编译的稳定版（CMP 1.6.11）；
+1.0.0+ 起 Kotlin 2.x 元数据，本项目 Kotlin 1.9.24 编译器读不了；升级须随 Kotlin 整体演进。
+注意旧坐标 `haze-jetpack-compose` 止于 0.7.0 已废弃，现行坐标为 `dev.chrisbanes.haze:haze`。
+CMP 传递的 androidx compose 1.6.8 由 BOM 2024.09.00 仲裁抬至 1.7.2（API 兼容）。
+
 ## 4. 数据流
 
 ```mermaid
 sequenceDiagram
     participant U as 用户
-    participant H as HomeScreen
+    participant H as ProjectsScreen
     participant V as WebViewScreen
     participant W as WebView 引擎
     participant C as 云端构建(Phase2)

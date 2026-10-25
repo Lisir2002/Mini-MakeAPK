@@ -40,18 +40,20 @@ Sprint-1 已锁定「可爱简约·iOS 风」设计语言（单主色珊瑚粉�
 
 | 测试类 | 覆盖 | 基线张数 |
 |--------|------|----------|
-| `components/MmaScreenTest.kt` | 三段式骨架：亮/暗 × 仅标题/带返回/带底栏 | 6 |
-| `screens/HomeScreenTest.kt` | 首屏：亮/暗空态、亮色已填 URL、亮/暗带底栏 | 5 |
-| `screens/HistoryScreenTest.kt` | 历史：有记录/空态/暗色、亮/暗带底栏 | 5 |
+| `components/MmaScreenTest.kt` | 三段式骨架：亮/暗 × 仅标题/带返回/带底栏 + 亮/暗磨砂 chrome（半透明近似态） | 8 |
+| `screens/ProjectsScreenTest.kt` | 项目页（封装工作台）：亮/暗 × 空态/有记录 | 4 |
+| `screens/DevelopingScreenTest.kt` | 开发中占位：亮/暗 | 2 |
+| `screens/ProfileScreenTest.kt` | 我的页：亮/暗（存储状态走未授权降级分支） | 2 |
 | `screens/BuildingScreenTest.kt` | 构建中：亮/暗（动效冻结初始帧，锁构图） | 2 |
 | `screens/ResultScreenTest.kt` | 结果：亮成功、亮失败、暗失败 | 3 |
 | `screens/PreviewScreenTest.kt` | 预览外壳：亮/暗（返回栏 + 内容区占比） | 2 |
 | `screens/WebViewScreenTest.kt` | WebView 封装屏外壳（FrameLayout 桩） | 1 |
 | `components/CuteComponentsTest.kt` | 胶囊按钮（亮/暗）、柔和卡片、打包脉冲 | 4 |
+| `permission/MmaPermissionDialogTest.kt` | 权限二次确认弹窗：三形态 × 亮/暗 + 安装首次 + 所有文件访问亮/暗 | 9 |
 
-合计 28 张基线（`app/src/test/snapshots/images/`）。
+合计 37 张基线（`app/src/test/snapshots/images/`）。
 
-> `WebViewScreen` / `PreviewScreen` 通过 `webViewFactory: (Context) -> View` 注入轻量桩（默认 `WebView`），使 JVM 可渲染外壳；`HomeScreen` 通过 `initialInput` 参数支持预填态快照——二者均为最小可测性重构，未改变用户态行为。
+> `WebViewScreen` / `PreviewScreen` 通过 `webViewFactory: (Context) -> View` 注入轻量桩（默认 `WebView`），使 JVM 可渲染外壳；`ProjectsScreen` 通过 `initialInput` 参数支持预填态快照——二者均为最小可测性重构，未改变用户态行为。
 >
 > **同值替换不重录**：把字面量换成等值令牌（如 `16.dp` → `shapes.small`、`tween(1100)` → `Motion.DurationBreath`）渲染结果不变，`verifyPaparazziDebug` 直接通过；只有**结构变化**（如新增顶栏/底栏）才需要 `recordPaparazziDebug` 重录并目视确认。
 

@@ -62,7 +62,7 @@ class MmaScreenTest {
                 bottomBar = {
                     MmaBottomBar(
                         tabs = DefaultMmaTabs,
-                        currentRoute = MmaRoute.Home.route,
+                        currentRoute = MmaRoute.Projects.route,
                         onTabSelected = {},
                     )
                 },
@@ -78,8 +78,44 @@ class MmaScreenTest {
                 bottomBar = {
                     MmaBottomBar(
                         tabs = DefaultMmaTabs,
-                        currentRoute = MmaRoute.Home.route,
+                        currentRoute = MmaRoute.Projects.route,
                         onTabSelected = {},
+                    )
+                },
+            )
+        }
+    }
+
+    @Test
+    fun lightTranslucentChrome() = paparazzi.snapshot {
+        MmaTheme(darkTheme = false) {
+            demoBody(
+                title = "MMA",
+                translucent = true,
+                bottomBar = {
+                    MmaBottomBar(
+                        tabs = DefaultMmaTabs,
+                        currentRoute = MmaRoute.Projects.route,
+                        onTabSelected = {},
+                        translucent = true,
+                    )
+                },
+            )
+        }
+    }
+
+    @Test
+    fun darkTranslucentChrome() = paparazzi.snapshot {
+        MmaTheme(darkTheme = true) {
+            demoBody(
+                title = "MMA",
+                translucent = true,
+                bottomBar = {
+                    MmaBottomBar(
+                        tabs = DefaultMmaTabs,
+                        currentRoute = MmaRoute.Projects.route,
+                        onTabSelected = {},
+                        translucent = true,
                     )
                 },
             )
@@ -91,11 +127,13 @@ class MmaScreenTest {
     private fun demoBody(
         title: String,
         onBack: (() -> Unit)? = null,
+        translucent: Boolean = false,
         bottomBar: @Composable () -> Unit = {},
     ) {
         MmaScreen(
             title = title,
             onBack = onBack,
+            translucent = translucent,
             bottomBar = bottomBar,
         ) { innerPadding ->
             Box(

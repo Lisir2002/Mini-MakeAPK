@@ -14,13 +14,14 @@ data class MmaTab(
 )
 
 /**
- * 默认主页级 tab 清单——底栏槽位内容。
+ * 默认主页级 tab 清单——底栏槽位内容（三栏目：项目 / 开发中 / 我的）。
  *
  * 可配置性：增删/重排本清单即改底栏，[com.make.apk.ui.components.MmaBottomBar] 不感知来源；
  * 后续用户级自定义（哪些 tab 作主页、何种顺序）可经 SharedPreferences 过滤/重排后
  * 注入同一列表，接口已解耦。
  */
 val DefaultMmaTabs: List<MmaTab> = listOf(
-    MmaTab(route = MmaRoute.Home.route, label = "首页", iconRes = R.drawable.ic_home),
-    MmaTab(route = MmaRoute.History.route, label = "历史", iconRes = R.drawable.ic_history),
+    MmaTab(route = MmaRoute.Projects.route, label = "项目", iconRes = R.drawable.ic_projects),
+    MmaTab(route = MmaRoute.Developing.route, label = "开发中", iconRes = R.drawable.ic_developing),
+    MmaTab(route = MmaRoute.Profile.route, label = "我的", iconRes = R.drawable.ic_person),
 )

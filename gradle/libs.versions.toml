@@ -33,6 +33,11 @@ lifecycleCompose = "2.8.4"
 coroutines = "1.7.3"
 # KSP：必须与 kotlin 版本严格匹配（1.9.24 → 1.9.24-1.0.20）
 ksp = "1.9.24-1.0.20"
+# 磨砂玻璃：跨子树真模糊（Modifier.blur 只能模糊自身子树，跨节点需 Haze 的
+# hazeSource/hazeChild 捕获）。版本红线：0.7.3 是最后一个用 Kotlin 1.9.24
+# 编译的稳定版（CMP 1.6.11）；1.0.0+ 起 Kotlin 2.x 元数据，本项目 Kotlin
+# 1.9.24 编译器读不了，升级须随 Kotlin 整体演进。
+haze = "0.7.3"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -59,6 +64,13 @@ androidx-lifecycle-runtime-compose = { group = "androidx.lifecycle", name = "lif
 sqlcipher-android = { group = "net.zetetic", name = "sqlcipher-android", version.ref = "sqlcipher" }
 androidx-security-crypto = { group = "androidx.security", name = "security-crypto", version.ref = "securityCrypto" }
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
+
+# ── 磨砂玻璃（Haze）────────────────────────────────────────────────
+# haze：核心 hazeSource/hazeChild；haze-materials：预置材质（thin/regular/thick）
+# 注意：旧坐标 haze-jetpack-compose 止于 0.7.0，已废弃；CMP 传递的 androidx
+# compose 1.6.8 由 BOM 2024.09.00 抬至 1.7.x（版本仲裁选高，API 兼容）。
+haze = { group = "dev.chrisbanes.haze", name = "haze", version.ref = "haze" }
+haze-materials = { group = "dev.chrisbanes.haze", name = "haze-materials", version.ref = "haze" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

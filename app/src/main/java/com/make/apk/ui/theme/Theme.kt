@@ -8,6 +8,7 @@ import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -69,16 +70,25 @@ private val DarkColorScheme = darkColorScheme(
     error              = md_error_dark,
 )
 
+/**
+ * 应用主题——装配颜色/形状/字体 + 设计令牌（[LocalMmaDesign]）。
+ *
+ * @param darkTheme 暗色开关（默认跟随系统）。
+ * @param design 设计令牌实例；Phase-2 自定义主题入口，缺省为紧凑默认档。
+ */
 @Composable
 fun MmaTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
+    design: MmaDesign = MmaDesign(),
     content: @Composable () -> Unit,
 ) {
     val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
-    MaterialTheme(
-        colorScheme = colorScheme,
-        shapes = AppShapes,
-        typography = AppTypography,
-        content = content,
-    )
+    CompositionLocalProvider(LocalMmaDesign provides design) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            shapes = AppShapes,
+            typography = AppTypography,
+            content = content,
+        )
+    }
 }

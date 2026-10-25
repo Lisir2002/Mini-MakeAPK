@@ -6,7 +6,7 @@
     python3 scripts/gitops/check_token_usage.py --strict   # 严格模式（有违规即失败）
 
 令牌链路（唯一事实来源）：
-    DESIGN_LANGUAGE.md → ui/theme/{Color,Spacing,Motion,Theme}.kt → MaterialTheme 引用
+    DESIGN_LANGUAGE.md → ui/theme/{Color,MmaDesign,Motion,Theme}.kt → MaterialTheme 引用
 
 检查项（范围：app/src/main/java/com/make/apk/ui/，排除 theme/ 包）：
     1. 颜色字面量     Color(0x…) / Material 命名色直用      → 应走 colorScheme 令牌
@@ -33,22 +33,28 @@ THEME_DIRNAME = "theme"
 EXEMPT_MARK = "token-gate: allow"
 
 # ── 允许集（带来源审批记录；新增值必须注明理由） ──────────────────────────
-# Spacing 阶梯（theme/Spacing.kt，DESIGN_LANGUAGE §4 8pt 网格）
-SPACING_LADDER = {4, 8, 12, 16, 24, 32, 48}
+# Spacing 阶梯（theme/MmaDesign.kt SpacingScale，DESIGN_LANGUAGE §4 紧凑档）
+SPACING_LADDER = {3, 6, 9, 12, 18, 24, 36}
 # 组件规范尺寸（非间距语义，均为 M3 / 图标规范值）
 COMPONENT_SIZES = {
     0,    # 无间距
+    1,    # 磨砂容器描边宽度（MmaTranslucentSurface / DESIGN_LANGUAGE §7）
     24,   # 图标默认尺寸（M3 Icon / MmaIcons.size 默认）
+    32,   # 权限弹窗圆底（64dp）内图标（PermissionSpec 视觉规格）
+    36,   # 项目页空态图标（ProjectsScreen）
+    48,   # 「我的」页信息卡图标（ProfileScreen）
     56,   # 顶栏规范高度（M3 TopAppBar，MmaTopBar.heightIn 下限）
-    64,   # 结果页图标容器（ResultScreen）
+    64,   # 结果页图标容器（ResultScreen）/ 权限弹窗图标底 / 开发中页图标
     72,   # 构建脉冲图标容器（BuildingPulse）
 }
 ALLOWED_DP = SPACING_LADDER | COMPONENT_SIZES
 
 # Material 命名颜色常量直用（androidx.compose.ui.graphics.Color 伴生对象）
+# 注意：Color.Transparent 不在拦截名单——「完全透明」是通用工具色（磨砂容器
+# 交还视觉给 hazeChild tint 等场景必需），不属于设计令牌管辖的表面色决策。
 COLOR_NAMED_RE = re.compile(
     r"\bColor\.(?:Red|Blue|Green|Yellow|Black|White|Gray|Cyan|Magenta|"
-    r"LightGray|DarkGray|Transparent)\b"
+    r"LightGray|DarkGray)\b"
 )
 COLOR_HEX_RE = re.compile(r"\bColor\s*\(\s*0x")
 ROUNDED_RE = re.compile(r"\bRoundedCornerShape\s*\(")

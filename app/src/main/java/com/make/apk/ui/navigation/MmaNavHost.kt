@@ -1,5 +1,6 @@
 package com.make.apk.ui.navigation
 
+import android.widget.Toast
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -18,9 +19,10 @@ import com.make.apk.logging.MmaLogger
 import com.make.apk.requireMmaApplication
 import com.make.apk.ui.components.MmaBottomBar
 import com.make.apk.ui.screens.BuildingScreen
-import com.make.apk.ui.screens.HistoryScreen
-import com.make.apk.ui.screens.HomeScreen
+import com.make.apk.ui.screens.DevelopingScreen
 import com.make.apk.ui.screens.PreviewScreen
+import com.make.apk.ui.screens.ProfileScreen
+import com.make.apk.ui.screens.ProjectsScreen
 import com.make.apk.ui.screens.ResultScreen
 import com.make.apk.ui.viewmodel.BuildViewModel
 import com.make.apk.ui.viewmodel.BuildViewModelFactory
@@ -38,7 +40,7 @@ import com.make.apk.ui.viewmodel.HistoryViewModelFactory
  * 因此"构建中"页面被杀后重建仍能读到真实状态，不会出现假进度。
  *
  * 三段式槽位布局：顶栏由各页面的 `MmaScreen` 恒显示；底栏是主页级页面
- * （首页/历史）共享的顶级导航，流程子页（构建中/结果/预览）不显示。
+ * （项目/开发中/我的）共享的顶级导航，流程子页（构建中/结果/预览）不显示。
  */
 @Composable
 fun MmaNavHost(
@@ -47,12 +49,14 @@ fun MmaNavHost(
 ) {
     val app = LocalContext.current.requireMmaApplication()
     val repository = app.buildHistoryRepository
+    val context = LocalContext.current
 
     // 当前路由：驱动底栏选中态
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
 
-    // 主页级页面共享的底栏（tab 清单见 DefaultMmaTabs，支持自定义过滤/重排后注入）
+    // 主页级页面共享的底栏（tab 清单见 DefaultMmaTabs，支持自定义过滤/重排后注入）。
+    // translucent 留 null 跟随 MmaDesign.scaffold 令牌（默认关，截图零影响）。
     val mainBottomBar: @Composable () -> Unit = {
         MmaBottomBar(
             tabs = DefaultMmaTabs,
@@ -60,7 +64,7 @@ fun MmaNavHost(
             onTabSelected = { tab ->
                 navController.navigate(tab.route) {
                     launchSingleTop = true
-                    popUpTo(MmaRoute.Home.route) { saveState = true }
+                    popUpTo(MmaRoute.Projects.route) { saveState = true }
                     restoreState = true
                 }
             },
@@ -69,43 +73,56 @@ fun MmaNavHost(
 
     NavHost(
         navController = navController,
-        startDestination = MmaRoute.Home.route,
+        startDestination = MmaRoute.Projects.route,
         modifier = modifier,
     ) {
 
-        // ── 首页：输入 → 登记构建 ────────────────────────────────────
-        composable(MmaRoute.Home.route) {
-            val vm: BuildViewModel = viewModel(
+        // ── 项目（startDestination）：封装工作台（输入 + 列表）────────
+        composable(MmaRoute.Projects.route) {
+            val buildVm: BuildViewModel = viewModel(
                 factory = remember(app) { BuildViewModelFactory(repository) },
             )
-            val pendingId by vm.pendingId.collectAsStateWithLifecycle()
+            val historyVm: HistoryViewModel = viewModel(
+                factory = remember(app) { HistoryViewModelFactory(repository) },
+            )
+            val records by historyVm.records.collectAsStateWithLifecycle()
+            val pendingId by buildVm.pendingId.collectAsStateWithLifecycle()
 
             LaunchedEffect(pendingId) {
                 val id = pendingId ?: return@LaunchedEffect
-                vm.consumePendingId()
+                buildVm.consumePendingId()
                 navController.navigate(MmaRoute.Building.create(id)) {
                     launchSingleTop = true
                 }
             }
 
-            HomeScreen(
-                onBuild = { input -> vm.startBuild(input) },
+            ProjectsScreen(
+                records = records,
+                onBuild = { input -> buildVm.startBuild(input) },
+                onOpen = { id -> navController.navigate(MmaRoute.Preview.create(id)) },
+                onDelete = historyVm::delete,
                 bottomBar = mainBottomBar,
             )
         }
 
-        // ── 历史（主页级：共享底栏，无返回箭头） ─────────────────────
-        composable(MmaRoute.History.route) {
-            val vm: HistoryViewModel = viewModel(
-                factory = remember(app) { HistoryViewModelFactory(repository) },
-            )
-            val records by vm.records.collectAsStateWithLifecycle()
+        // ── 开发中（主页级：共享底栏，无返回箭头）─────────────────────
+        composable(MmaRoute.Developing.route) {
+            DevelopingScreen(bottomBar = mainBottomBar)
+        }
 
-            HistoryScreen(
-                records = records,
-                onOpen = { id -> navController.navigate(MmaRoute.Preview.create(id)) },
-                onDelete = vm::delete,
+        // ── 我的（主页级：共享底栏，无返回箭头）───────────────────────
+        composable(MmaRoute.Profile.route) {
+            ProfileScreen(
                 bottomBar = mainBottomBar,
+                onFeatureNotReady = { feature ->
+                    // 用户点击 Phase-2 占位条目：走「操作/审计」类日志（合规保留期最长）
+                    // + Toast 轻反馈（点击有回应，不误导功能已可用）
+                    MmaLogger.operation(
+                        "profile_feature_not_ready",
+                        message = "占位条目被点击：$feature",
+                    )
+                    Toast.makeText(context, "$feature 还在开发中，敬请期待", Toast.LENGTH_SHORT).show()
+                },
             )
         }
 
@@ -164,9 +181,9 @@ fun MmaNavHost(
             ResultScreen(
                 record = record,
                 onPreview = { navController.navigate(MmaRoute.Preview.create(id)) },
-                onAgain = { navController.popBackStack(MmaRoute.Home.route, inclusive = false) },
+                onAgain = { navController.popBackStack(MmaRoute.Projects.route, inclusive = false) },
                 onRetry = { record?.sourceRef?.let { vm.startBuild(it) } },
-                onBackHome = { navController.popBackStack(MmaRoute.Home.route, inclusive = false) },
+                onBackHome = { navController.popBackStack(MmaRoute.Projects.route, inclusive = false) },
             )
         }
 
