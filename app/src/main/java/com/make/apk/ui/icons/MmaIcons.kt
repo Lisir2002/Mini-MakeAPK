@@ -1,0 +1,45 @@
+package com.make.apk.ui.icons
+
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Icon
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import com.make.apk.R
+
+/**
+ * MMA 自有 SVG 图标集——`res/drawable/ic_*.xml`（SVG 路径数据转 VectorDrawable）。
+ *
+ * 取代 `material-icons-extended`：整库数 MB 而本应用只用数枚，且全链路走 SVG
+ * 源文件（图标资产可审计、可手改、无运行时字体加载）。新增图标时把 SVG pathData
+ * 贴进对应 `ic_*.xml` 并在 [MmaIcons] 登记即可。
+ */
+object MmaIcons {
+    val ArrowBack: Int = R.drawable.ic_arrow_back
+    val History: Int = R.drawable.ic_history
+    val CheckCircle: Int = R.drawable.ic_check_circle
+    val SentimentDissatisfied: Int = R.drawable.ic_sentiment_dissatisfied
+}
+
+/**
+ * 渲染一枚 SVG 图标。装饰性用法（按钮内已有文字标签）传 `contentDescription = null`；
+ * 独立表意（如成败态大图标）必须传描述（WCAG 2.2 AA）。
+ */
+@Composable
+fun MmaIcon(
+    iconRes: Int,
+    contentDescription: String?,
+    modifier: Modifier = Modifier,
+    size: Dp = 24.dp,
+    tint: Color = Color.Unspecified,
+) {
+    Icon(
+        painter = painterResource(id = iconRes),
+        contentDescription = contentDescription,
+        modifier = modifier.size(size),
+        tint = tint,
+    )
+}

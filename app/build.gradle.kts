@@ -53,7 +53,9 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            // R8 代码压缩 + 混淆（规则见 proguard-rules.pro）；资源压缩依赖代码压缩先行
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             if (hasReleaseSigning) {
                 signingConfig = signingConfigs.getByName("release")
@@ -96,7 +98,8 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling)
     implementation(libs.androidx.material3)
-    implementation(libs.androidx.material.icons.extended)
+    // 图标全部走 res/drawable 下的 SVG 矢量（见 ui/icons/MmaIcons.kt），
+    // 不引 material-icons-extended——整库数 MB 且本应用零使用（2026-10-25 移除）。
 
     // ── 数据层：Room（SQLite ORM）────────────────────────────────────
     implementation(libs.androidx.room.runtime)

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  MMA 启动图标背景层：珊瑚粉（设计令牌 primary #F19E97）到深一档的柔和渐变。
+  VectorDrawable 渐变 API 24+ 起可用，与项目 minSdk 24 对齐。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path android:pathData="M0,0 L108,0 L108,108 L0,108 Z">
+        <aapt:attr xmlns:aapt="http://schemas.android.com/aapt" name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="0"
+                android:startY="0"
+                android:endX="108"
+                android:endY="108">
+                <item android:offset="0" android:color="#FFF19E97" />
+                <item android:offset="1" android:color="#FFE8837B" />
+            </gradient>
+        </aapt:attr>
+    </path>
+</vector>

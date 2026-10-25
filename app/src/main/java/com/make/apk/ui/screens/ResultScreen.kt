@@ -17,6 +17,8 @@ import androidx.compose.ui.unit.sp
 import com.make.apk.data.model.BuildRecord
 import com.make.apk.data.model.BuildStatus
 import com.make.apk.ui.components.CuteButton
+import com.make.apk.ui.icons.MmaIcon
+import com.make.apk.ui.icons.MmaIcons
 
 /**
  * 构建结果页（**无状态**）：成功庆祝 / 失败错误态。
@@ -43,9 +45,15 @@ fun ResultScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
         ) {
-            Text(
-                text = if (succeeded) "🎉" else "🫥",
-                fontSize = 56.sp,
+            MmaIcon(
+                iconRes = if (succeeded) MmaIcons.CheckCircle else MmaIcons.SentimentDissatisfied,
+                contentDescription = if (succeeded) "构建成功" else "构建失败",
+                size = 64.dp,
+                tint = if (succeeded) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.error
+                },
             )
 
             Text(

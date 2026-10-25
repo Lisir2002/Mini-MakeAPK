@@ -12,6 +12,13 @@
 - **Release 签名基础设施（环境变量驱动）**：`app/build.gradle.kts` 顶部约定四个变量（`MMA_KEYSTORE_FILE` / `MMA_KEYSTORE_PASSWORD` / `MMA_KEY_ALIAS` / `MMA_KEY_PASSWORD`），齐备即自动签名、缺任一维持未签名；`release.yml` 新增「配置 Release 签名」步骤，从 GitHub Secrets（`MMA_KEYSTORE_BASE64` 等四件套）解码密钥库至 `RUNNER_TEMP` 并注入环境变量，密钥不落仓库、日志自动脱敏；`docs/DEPLOYMENT.md` §5 同步重写（含量表 / keytool 生成命令 / Play 上架说明）
 - **官方发布签名已启用**：生成正式密钥库（PKCS12 / RSA 4096 / 别名 `mma` / 证书 DN `CN=MMA, OU=Release, O=Mini-MakeAPK, C=CN` / 有效期至 2054-03-12），四个 GitHub Secret 已注入；密钥库与口令本地备份于工作区 `keystore/`（`.gitignore` 排除，绝密），`v0.0.0.0+1` 起 Release 产物为签名 APK
 
+### Changed
+- **Release 构建启用 R8 full mode + 资源压缩**：`isMinifyEnabled = true` + `isShrinkResources = true`；`proguard-rules.pro` 重写为「库方 consumer rules 为主 + 自有边界兜底」——保留崩溃栈文件名/行号、Room 实体/DAO/`AppDatabase`、SQLCipher JNI 类、ViewModel 手工工厂、kotlinx.serialization 序列化器；对 Tink（SQLCipher 加密栈传递依赖）引用的编译期注解类 `com.google.errorprone.annotations.**` / `javax.annotation.concurrent.**` 补 `-dontwarn`（R8 full 模式 missing class）
+- **图标全面矢量化**：移除 `androidx-material-icons-extended` 整库依赖（该库以代码态进 dex、本应用零使用）；新增 `res/drawable/` 六个 SVG 矢量（`ic_arrow_back` / `ic_history` / `ic_check_circle` / `ic_sentiment_dissatisfied` / `ic_launcher_foreground` / `ic_launcher_background`）与自适应启动图标（`mipmap-anydpi-v26` 三层 adaptive-icon + `mipmap-anydpi` 全幅矢量回退，覆盖 API 24/25）；UI 经 `ui/icons/MmaIcons.kt` 的 `MmaIcon` 统一接入（首屏历史按钮、三屏返回按钮、结果页状态图标——emoji 替换为带 `contentDescription` 的矢量，屏幕阅读器可读）；Paparazzi 基线已按新 UI 重录
+
+### Performance
+- **包体瘦身实测**：release APK 36,115,392 B → **24,990,179 B（-30.8%）**，其中 `classes.dex` 2.47 MB、`resources.arsc` 103 KB；签名链保持 v2 scheme、证书 SHA-256 `a7986a85…beb4e2` 与 `v0.0.0.0+1` 一致
+
 ### Fixed
 - CI 环境：两个工作流移除 `android-actions/setup-android@v3`——其内部 `sdkmanager tools` 因遗留 `tools` 包已从 SDK 仓库移除而必崩，改用 GitHub 托管 runner 自带的 Android SDK（`ANDROID_HOME` 已预置且许可已接受）
 

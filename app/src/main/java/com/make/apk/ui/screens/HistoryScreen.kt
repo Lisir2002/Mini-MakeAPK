@@ -4,9 +4,11 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.MaterialTheme
@@ -21,6 +23,8 @@ import androidx.compose.ui.unit.dp
 import com.make.apk.data.model.BuildRecord
 import com.make.apk.data.model.BuildStatus
 import com.make.apk.ui.components.CuteCard
+import com.make.apk.ui.icons.MmaIcon
+import com.make.apk.ui.icons.MmaIcons
 
 /**
  * 构建历史页（**无状态**：列表由调用方观察数据层后传入）。
@@ -45,7 +49,14 @@ fun HistoryScreen(
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 TextButton(onClick = onBack) {
-                    Text("‹ 返回")
+                    MmaIcon(
+                        iconRes = MmaIcons.ArrowBack,
+                        contentDescription = null,
+                        size = 18.dp,
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("返回")
                 }
                 Text(
                     "构建历史",

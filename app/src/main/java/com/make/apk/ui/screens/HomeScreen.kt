@@ -2,9 +2,12 @@ package com.make.apk.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -22,6 +25,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.make.apk.ui.components.CuteButton
+import com.make.apk.ui.icons.MmaIcon
+import com.make.apk.ui.icons.MmaIcons
 
 // 首屏：单一输入流（URL/HTML 粘贴优先），契合全年龄段 + 舒适（brainstorm 决策）。
 // initialInput 仅用于测试/深链预填，默认空（用户态以内部 state 为准）。
@@ -75,6 +80,13 @@ fun HomeScreen(
 
             if (onOpenHistory != null) {
                 TextButton(onClick = onOpenHistory) {
+                    MmaIcon(
+                        iconRes = MmaIcons.History,
+                        contentDescription = null,
+                        size = 18.dp,
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
                     Text("查看构建历史")
                 }
             }
