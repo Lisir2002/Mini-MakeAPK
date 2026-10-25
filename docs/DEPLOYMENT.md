@@ -83,6 +83,17 @@ sequenceDiagram
   **密钥与口令不落仓库、日志自动脱敏**。未配置 Secret 时产出 **unsigned** APK。
 - 当前密钥信息（证书 DN `CN=MMA, OU=Release, O=Mini-MakeAPK, C=CN`，RSA 4096，
   有效期至 2054-03-12，别名 `mma`）；**密钥丢失不可找回**，`.jks` 与口令须离线备份。
+- ⚠️ **PKCS12 密钥库的库口令与密钥口令必须相同**：`keytool -genkeypair` 指定不同的
+  `-keypass` 时会打警告 `Different store and key passwords not supported for PKCS12
+  KeyStores. Ignoring user-specified -keypass value.` 并**静默忽略**，导致 `MMA_KEY_PASSWORD`
+  与实际不符、打包阶段报 `Get Key failed: Given final block not properly padded`（2026-10-25 实测踩坑）。
+  本地生成命令：
+
+  ```bash
+  keytool -genkeypair -v -keystore mma-release.jks -alias mma \
+    -storetype PKCS12 -keyalg RSA -keysize 4096 -validity 10000 \
+    -storepass "$PW" -keypass "$PW" -dname "CN=MMA, OU=Release, O=Mini-MakeAPK, C=CN"
+  ```
 - 上架 Google Play：以上传密钥（Upload Key）签名即可，由 Play 重签。
 
 ## 6. 发版流程（Release）
