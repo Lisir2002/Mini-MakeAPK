@@ -27,7 +27,7 @@
 | [`DEPLOYMENT.md`](DEPLOYMENT.md) | How-to | 构建、签名、发版流程 |
 | [`build-api-contract.md`](build-api-contract.md) | Reference | 云端构建 API 契约（Phase 2 后端规格） |
 | [`data-layer.md`](data-layer.md) | Reference | **数据层设计**：Room + SQLCipher 加密 SQLite（选型实证 / 分层 / 加密 / 性能 / 迁移 / 排错） |
-| [`VERSIONING.md`](VERSIONING.md) | Reference | **版本规范**：纯四段式 `0.0.0.1-rc1`、顺延规则、RC 机制、tag 格式、本地只验证不出成品 |
+| [`VERSIONING.md`](VERSIONING.md) | Reference | **版本规范**：纯四段式 `0.0.0.1-rc2`、顺延规则、RC 机制、tag 格式、本地只验证不出成品 |
 | [`RELEASE_NOTES.md`](RELEASE_NOTES.md) | Reference | **发版日志格式规约**：三处一致、条目铁律、写作铁律、Checklist（版本日志的唯一格式标准） |
 | [`Version Log/`](Version%20Log/) | Reference | **版本日志目录**：总表 `CHANGELOG.md` + 各版本独立文档（`MMA v-Logs/`，命名与结构见目录内 README） |
 | [`logging.md`](logging.md) | Reference | **日志层设计**：九大类别、结构化事件、强制脱敏、崩溃/ANR 自研捕获、保留期与合规 |

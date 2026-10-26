@@ -9,6 +9,7 @@ Version Log/
 ├── CHANGELOG.md                  # 版本日志总表（所有版本汇总，倒序排列）
 └── MMA v-Logs/                   # 各版本独立日志
     ├── MMA 0.0.0.1-rc1 Version Log.md
+    ├── MMA 0.0.0.1-rc2 Version Log.md
     └── ...
 ```
 
