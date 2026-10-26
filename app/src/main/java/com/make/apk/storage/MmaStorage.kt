@@ -48,18 +48,26 @@ object MmaStorage {
      * 当前是否已获得公共根目录写权限（同步、无 UI；Application 与权限门共用此判断）。
      *
      * API 29 恒 false：见类 KDoc 的死区说明。
+     *
+     * **启动链安全（2026-10-26 rc2 闪退修复）**：三个分支全部以 `runCatching` 包裹——
+     * `Environment.isExternalStorageManager()` 与 `checkSelfPermission` 在部分
+     * ROM/系统时序下会抛异常，而本方法在 `Application.attachBaseContext` 的日志安装
+     * 路径上被同步调用，一旦抛异常进程在 Application 创建时即死（闪退且无任何日志）。
+     * 异常一律保守视为「未授权」，走私有兜底，功能不中断。
      */
-    fun isAuthorized(context: Context): Boolean = when {
-        Build.VERSION.SDK_INT >= Build.VERSION_CODES.R ->
-            Environment.isExternalStorageManager()
+    fun isAuthorized(context: Context): Boolean = runCatching {
+        when {
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.R ->
+                Environment.isExternalStorageManager()
 
-        Build.VERSION.SDK_INT == Build.VERSION_CODES.Q -> false
+            Build.VERSION.SDK_INT == Build.VERSION_CODES.Q -> false
 
-        else -> ContextCompat.checkSelfPermission(
-            context,
-            Manifest.permission.WRITE_EXTERNAL_STORAGE,
-        ) == PackageManager.PERMISSION_GRANTED
-    }
+            else -> ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.WRITE_EXTERNAL_STORAGE,
+            ) == PackageManager.PERMISSION_GRANTED
+        }
+    }.getOrDefault(false)
 
     /**
      * 日志目录决策：已授权且实测可写 → `MMAFile/Log`；否则私有兜底 `filesDir/logs`。

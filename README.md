@@ -8,7 +8,7 @@
 |----|-----|
 | **应用名称** | `MMA` |
 | **应用包名** | `com.make.apk` |
-| **当前版本** | `0.0.0.1-rc2`（纯四段式，规范见 [`docs/VERSIONING.md`](docs/VERSIONING.md)） |
+| **当前版本** | `0.0.0.1-rc3`（纯四段式，规范见 [`docs/VERSIONING.md`](docs/VERSIONING.md)） |
 | **成品产出** | **只在 GitHub 打 tag 时产出**；本地仅做验证（见 [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md)） |
 
 ![platform](https://img.shields.io/badge/platform-Android-3DDC84)
@@ -35,7 +35,7 @@
 
 ## 快速开始（Quick Start）
 
-> 当前为 **0.0.0.1-rc2 阶段**。本地**只做验证**，成品 APK 从 GitHub Release 获取
+> 当前为 **0.0.0.1-rc3 阶段**。本地**只做验证**，成品 APK 从 GitHub Release 获取
 > （见 [`docs/VERSIONING.md`](docs/VERSIONING.md)、[`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md)）。
 
 ```bash
@@ -73,7 +73,7 @@ MMA/  （仓库 Mini-MakeAPK）
 │   ├── DOC_CHARTER.md         # 文档规矩（本仓所有文档的总纲）
 │   ├── INDEX.md               # 文档地图
 │   ├── ARCHITECTURE.md        # 系统架构
-│   ├── VERSIONING.md          # 版本规范（纯四段式 0.0.0.1-rc2）
+│   ├── VERSIONING.md          # 版本规范（纯四段式 0.0.0.1-rc3）
 │   ├── RELEASE_NOTES.md       # 发版日志格式规约（三处一致）
 │   ├── Version Log/           # 版本日志：CHANGELOG 总表 + 各版本独立文档
 │   ├── AGENT_COLLABORATION.md # AI Agent 协同协议
@@ -114,7 +114,7 @@ MMA/  （仓库 Mini-MakeAPK）
 
 ## 版本与许可
 
-- 版本规范：纯四段式 `MAJOR.MINOR.PATCH.BUILD[-rcN]`（当前 `0.0.0.1-rc2`；正式版需用户授权、否则发 RC；无 `+N` 后缀），见 [`docs/VERSIONING.md`](docs/VERSIONING.md)。
+- 版本规范：纯四段式 `MAJOR.MINOR.PATCH.BUILD[-rcN]`（当前 `0.0.0.1-rc3`；正式版需用户授权、否则发 RC；无 `+N` 后缀），见 [`docs/VERSIONING.md`](docs/VERSIONING.md)。
 - 版本日志：[`docs/Version Log/CHANGELOG.md`](docs/Version%20Log/CHANGELOG.md)（遵循 Keep a Changelog，格式规约见 [`docs/RELEASE_NOTES.md`](docs/RELEASE_NOTES.md)）。
 - 许可：当前为**专有 / 内部项目**，开源许可待定。如需使用请先联系维护者。
 

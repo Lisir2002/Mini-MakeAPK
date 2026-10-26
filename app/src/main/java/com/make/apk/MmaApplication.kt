@@ -60,13 +60,18 @@ class MmaApplication : Application() {
 
     private fun installLogging() {
         val debuggable = (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
+        // 启动链防御（2026-10-26 rc2 闪退修复）：目录决策不得杀死进程。
+        // resolveLogDirectory → isAuthorized → Environment.isExternalStorageManager
+        // 在部分 ROM 上会抛异常；此处兜底私有目录，保证日志系统永远装得上。
+        val logDirectory = runCatching { MmaStorage.resolveLogDirectory(this) }
+            .getOrElse { MmaStorage.privateFallback(this) }
         MmaLogger.install(
             LogConfig(
                 minLevel = if (debuggable) LogLevel.DEBUG else LogLevel.INFO,
                 logcatMinLevel = if (debuggable) LogLevel.DEBUG else null,
-                // 已授权 → MMAFile/Log；未授权/不可写 → 私有兜底（免存储权限、卸载即清理）。
+                // 已授权 → MMAFile/Log；未授权/不可写/决策异常 → 私有兜底（免存储权限、卸载即清理）。
                 // 此处必须同步决策：attachBaseContext 阶段无 UI，绝不能等授权。
-                fileDirectory = MmaStorage.resolveLogDirectory(this),
+                fileDirectory = logDirectory,
                 fileMinLevel = LogLevel.INFO,
             ),
         )
@@ -87,8 +92,12 @@ class MmaApplication : Application() {
      * （`StoragePermissionGate`）负责，本类绝不弹 UI。
      */
     private fun initStorageIfAuthorized() {
-        if (!MmaStorage.isAuthorized(this)) return
-        if (MmaStorage.ensureAll()) {
+        // 启动链防御（2026-10-26 rc2 闪退修复）：授权判断与目录创建都不得杀死进程，
+        // 异常一律视为「本轮不初始化」，私有兜底目录继续可用。
+        val authorized = runCatching { MmaStorage.isAuthorized(this) }.getOrDefault(false)
+        if (!authorized) return
+        val ready = runCatching { MmaStorage.ensureAll() }.getOrDefault(false)
+        if (ready) {
             MmaLogger.startup(
                 event = "storage_ready",
                 message = "MMAFile 目录就绪",

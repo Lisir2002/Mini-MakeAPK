@@ -59,11 +59,16 @@ fun StoragePermissionGate(modifier: Modifier = Modifier) {
 /**
  * 授权成功后的公共目录就绪动作（幂等，可重复触发）：
  * 确保全结构 + 把文件日志从私有兜底迁到 MMAFile/Log（redirectFileSink 内部同目录短路）。
+ *
+ * 全路径 runCatching：本函数在 LaunchedEffect 协程内执行，未捕获异常会传播到
+ * Compose 层导致应用崩溃（2026-10-26 rc2 闪退修复的同源防御）。
  */
 private suspend fun ensurePublicStorage() {
     withContext(Dispatchers.IO) {
-        if (MmaStorage.ensureAll()) {
-            MmaLogger.redirectFileSink(MmaStorage.dir(MmaDir.LOG))
+        runCatching {
+            if (MmaStorage.ensureAll()) {
+                MmaLogger.redirectFileSink(MmaStorage.dir(MmaDir.LOG))
+            }
         }
     }
 }

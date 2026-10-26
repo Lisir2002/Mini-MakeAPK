@@ -38,8 +38,8 @@ android {
         //   版本号不带 +N 后缀（2026-10-25 起，用户确认）。
         // versionCode：Android 安装唯一性要求的内部整数，单调递增，但不进版本串/tag；
         //   发布 tag = v<versionName>。递增规则与发版流程见 docs/VERSIONING.md。
-        versionCode = 3
-        versionName = "0.0.0.1-rc2"
+        versionCode = 4
+        versionName = "0.0.0.1-rc3"
     }
 
     signingConfigs {
@@ -140,6 +140,8 @@ dependencies {
     // 截图回归测试（Paparazzi，纯 JVM，无需模拟器）
     testImplementation(libs.junit)
     testImplementation(libs.paparazzi)
+    // 启动路径集成测试（Robolectric：真跑 Application/Activity 生命周期，覆盖 Paparazzi 盲区）
+    testImplementation(libs.robolectric)
 }
 
 // Room 编译期配置：导出 schema 便于版本迁移审计（输出到 app/schemas/）
