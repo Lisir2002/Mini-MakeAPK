@@ -1,6 +1,7 @@
 package com.make.apk.ui.components
 
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -42,6 +43,7 @@ fun MmaTopBar(
     onBack: (() -> Unit)? = null,
     translucent: Boolean = false,
     hazeState: HazeState? = LocalHazeState.current,
+    actions: @Composable RowScope.() -> Unit = {},
 ) {
     MmaTranslucentSurface(
         modifier = modifier.fillMaxWidth(),
@@ -74,6 +76,8 @@ fun MmaTopBar(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
+            Spacer(modifier = Modifier.weight(1f))
+            actions()
         }
     }
 }

@@ -38,8 +38,8 @@ android {
         //   版本号不带 +N 后缀（2026-10-25 起，用户确认）。
         // versionCode：Android 安装唯一性要求的内部整数，单调递增，但不进版本串/tag；
         //   发布 tag = v<versionName>。递增规则与发版流程见 docs/VERSIONING.md。
-        versionCode = 6
-        versionName = "0.0.0.1-diag2"
+        versionCode = 7
+        versionName = "0.0.0.1-rc4"
     }
 
     signingConfigs {
@@ -49,18 +49,22 @@ android {
                 storePassword = mmaKeystorePassword
                 keyAlias = mmaKeyAlias
                 keyPassword = mmaKeyPassword
+                // 签名方案 v1 + v2 + v3 全开：v1 兼容老设备、v2 防篡改、
+                // v3 支持密钥轮换；三者齐备覆盖最广安装场景（用户明确要求）。
+                enableV1Signing = true
+                enableV2Signing = true
+                enableV3Signing = true
             }
         }
     }
 
     buildTypes {
         release {
-            // ── 诊断版临时配置（rc3 装机仍闪退定位用，验证后回滚）──────────
-            // isDebuggable：adb run-as 可读私有目录 + 诊断对话框守卫；
-            // 关 minify/shrink：崩溃堆栈保持原始类名/方法名/行号，可读。
-            isDebuggable = true
-            isMinifyEnabled = false
-            isShrinkResources = false
+            // 正式发布配置：关闭 debuggable、开启 R8 压缩与资源压缩。
+            // （诊断版曾临时开启 debuggable + 关闭 minify 以定位 rc3 闪退，验证后已回滚。）
+            isDebuggable = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             if (hasReleaseSigning) {
                 signingConfig = signingConfigs.getByName("release")

@@ -23,7 +23,7 @@ MAJOR.MINOR.PATCH.BUILD[-rcN]
 > 历史版本 `v0.0.0.0+1` 中的 `+1` 即当时的 versionCode 展示方式，该 tag 与其
 > Release/CHANGELOG 记录保持原样作为史实，新版本一律不带。
 
-当前（即将发布）：`versionName = "0.0.0.1-rc3"`，`versionCode = 4` → tag `v0.0.0.1-rc3`。
+当前（即将发布）：`versionName = "0.0.0.1-rc4"`，`versionCode = 7` → tag `v0.0.0.1-rc4`。
 
 ---
 

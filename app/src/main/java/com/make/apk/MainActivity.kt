@@ -22,10 +22,6 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             MmaTheme {
-                // 诊断版专用（debuggable 构建）：上次崩溃即席回传，见 CrashReportGate。
-                if ((applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0) {
-                    com.make.apk.diagnostic.CrashReportGate()
-                }
                 MmaApp(
                     onFirstFrameDrawn = {
                         // 启动终点：首帧绘制完成（用户真正看到内容的时刻），

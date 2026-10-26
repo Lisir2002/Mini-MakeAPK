@@ -2,6 +2,7 @@ package com.make.apk.ui.components
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -53,6 +54,7 @@ fun MmaScreen(
     bottomBar: @Composable () -> Unit = {},
     containerColor: Color = MaterialTheme.colorScheme.background,
     translucent: Boolean? = null,
+    actions: @Composable RowScope.() -> Unit = {},
     content: @Composable (PaddingValues) -> Unit,
 ) {
     val scaffoldStyle = LocalMmaDesign.current.scaffold
@@ -68,6 +70,7 @@ fun MmaScreen(
                 title = title,
                 onBack = onBack,
                 translucent = chromeTranslucent,
+                actions = actions,
             )
         },
         bottomBar = bottomBar,
