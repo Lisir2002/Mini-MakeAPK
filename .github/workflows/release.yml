@@ -120,13 +120,24 @@ jobs:
           fi
           KS="$RUNNER_TEMP/mma-release.jks"
           echo "${MMA_KEYSTORE_BASE64}" | base64 -d > "$KS"
+          # 变量名须与 app/build.gradle.kts 的 System.getenv 读取名逐一对应：
+          #   MMA_KEYSTORE_FILE / MMA_KEYSTORE_PASSWORD / MMA_KEY_ALIAS / MMA_KEY_PASSWORD
+          # 任一为空即 hasReleaseSigning=false，产物将静默变为未签名（2026-10-26 rc2 实测踩坑：
+          # secret 名 MMA_KEY_ALIAS 被误写为 MMA_KEYSTORE_ALIAS，别名双处失配致未签名）。
           {
             echo "MMA_KEYSTORE_FILE=${KS}"
             echo "MMA_KEYSTORE_PASSWORD=${{ secrets.MMA_KEYSTORE_PASSWORD }}"
-            echo "MMA_KEYSTORE_ALIAS=${{ secrets.MMA_KEYSTORE_ALIAS }}"
+            echo "MMA_KEY_ALIAS=${{ secrets.MMA_KEY_ALIAS }}"
             echo "MMA_KEY_PASSWORD=${{ secrets.MMA_KEY_PASSWORD }}"
           } >> "$GITHUB_ENV"
-          echo "签名密钥已注入（路径与口令均不在日志中展示）"
+          # 注入后自检：别名/口令任一为空立即失败，不允许带病产出未签名成品
+          for v in MMA_KEYSTORE_FILE MMA_KEYSTORE_PASSWORD MMA_KEY_ALIAS MMA_KEY_PASSWORD; do
+            if [ -z "${!v:-}" ]; then
+              echo "::error::签名变量 ${v} 为空——secret 名与 GITHUB_ENV 键失配，拒绝产出未签名成品"
+              exit 1
+            fi
+          done
+          echo "签名密钥已注入（路径与口令均不在日志中展示，四变量自检通过）"
 
       - name: 构建 Release APK
         run: ./gradlew assembleRelease --no-daemon --stacktrace
@@ -216,18 +227,34 @@ jobs:
           fi
 
       # 已存在的 Release 只更新附件、保留人工标题/正文（避免覆盖人工修订）；
-      # 不存在则用 CHANGELOG 条目正文创建。
+      # 不存在则用 CHANGELOG 条目正文 + 标题概括表创建（规约见 docs/RELEASE_NOTES.md §2）。
       - name: 创建或更新 Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
+          # 标题概括来源：docs/Version Log/release-titles.md（表格行「| 版本号 | 概括 |」）
+          # 缺条目则退回无概括标题并 warning（不阻断发布，由格式校验脚本事后拦截）
+          # 遍历字段匹配：兼容行首尾有无竖线、单元格有无空格的写法
+          VN="${GITHUB_REF_NAME#v}"
+          TITLE_SUMMARY=$(awk -F'|' -v v="$VN" '
+            { for (i = 1; i < NF; i++) {
+                k = $i; gsub(/^[ \t]+|[ \t]+$/, "", k)
+                if (k == v) { s = $(i + 1); gsub(/^[ \t]+|[ \t]+$/, "", s); print s; exit }
+              } }' "docs/Version Log/release-titles.md" 2>/dev/null || true)
+          if [ -n "${TITLE_SUMMARY}" ]; then
+            TITLE="MMA ${GITHUB_REF_NAME} — ${TITLE_SUMMARY}"
+          else
+            echo "::warning::release-titles.md 无 [${VN}] 概括，标题将不带「— 概括」段（规约见 docs/RELEASE_NOTES.md §2）"
+            TITLE="MMA ${GITHUB_REF_NAME}"
+          fi
           if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
             echo "Release ${GITHUB_REF_NAME} 已存在：保留人工标题/正文，仅更新附件"
             gh release upload "${GITHUB_REF_NAME}" out/*.apk --clobber
           else
             gh release create "${GITHUB_REF_NAME}" \
-              --title "MMA ${GITHUB_REF_NAME}" \
+              --title "${TITLE}" \
               --notes-file release-notes.md \
-              --prerelease="${{ steps.pre.outputs.prerelease }}"
+              --prerelease="${{ steps.pre.outputs.prerelease }}" \
+              out/*.apk
           fi

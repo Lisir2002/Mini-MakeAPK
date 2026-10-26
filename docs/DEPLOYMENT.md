@@ -63,7 +63,8 @@ sequenceDiagram
 ## 5. 签名（Signing）
 
 > **状态：官方发布签名已配置（2026-10-25）**——密钥库已生成、四个 GitHub Secret 已注入，
-> `v0.0.0.0+1` 起 Release 产物均为签名 APK。密钥库与口令的本地备份见工作区
+> `v0.0.0.0+1` 起 Release 产物均为签名 APK（`v0.0.0.1-rc2` 曾因 workflow secret 名笔误
+> 短暂产出未签名包，已修复并重发，见 §5 命名红线）。密钥库与口令的本地备份见工作区
 > `keystore/`（已被 `.gitignore` 排除，**绝密**）。
 
 - `debug`：使用 Android 默认 debug keystore（仅本地验证用）。
@@ -81,6 +82,11 @@ sequenceDiagram
   `MMA_KEYSTORE_PASSWORD`、`MMA_KEY_ALIAS`、`MMA_KEY_PASSWORD`；
   `release.yml` 会先解码密钥到 `RUNNER_TEMP` 再注入上述环境变量，
   **密钥与口令不落仓库、日志自动脱敏**。未配置 Secret 时产出 **unsigned** APK。
+- ⚠️ **命名三处一致红线（2026-10-26 rc2 实测踩坑）**：环境变量名 = Secret 名 = `GITHUB_ENV`
+  注入键，三处必须逐字相同。曾因 `release.yml` 把 `MMA_KEY_ALIAS` 误写为
+  `MMA_KEYSTORE_ALIAS`，`secrets.*` 引用解析为空、别名变量静默缺失，`hasReleaseSigning`
+  判 false 而**不带任何报错地产出未签名 APK**。现 workflow 已加四变量非空自检：任一为空
+  立即 `::error::` 失败，拒绝带病发布。
 - 当前密钥信息（证书 DN `CN=MMA, OU=Release, O=Mini-MakeAPK, C=CN`，RSA 4096，
   有效期至 2054-03-12，别名 `mma`）；**密钥丢失不可找回**，`.jks` 与口令须离线备份。
 - ⚠️ **PKCS12 密钥库的库口令与密钥口令必须相同**：`keytool -genkeypair` 指定不同的

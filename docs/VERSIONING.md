@@ -142,6 +142,7 @@ git push origin "v$(versionName)"
 - [ ] BUILD 段较上一正式版 **+1**（前三段仅在用户明确指定的产品级节点才动，且后级归零）
 - [ ] `app/build.gradle.kts` 中 `versionCode` 已 +1（大于历史上任何一次，含 RC）
 - [ ] `docs/Version Log/CHANGELOG.md` 已把 `[Unreleased]` 晋级为 `[<versionName>] - 日期`，且条目符合 `docs/RELEASE_NOTES.md` 格式规约
+- [ ] `docs/Version Log/release-titles.md` 已为本版本新增标题概括行（≤20 字，用户语言；Release 标题「— 概括」段的唯一来源）
 - [ ] 本地 `testDebugUnitTest` + `verifyPaparazziDebug` 全绿
 - [ ] tag 名 `v<versionName>` 与 `versionName` 完全一致（**不带 `+N`**）
 

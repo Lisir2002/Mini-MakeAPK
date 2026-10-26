@@ -26,10 +26,13 @@
 |------|------|------|
 | 发布 tag | `v{版本号}` | `v0.0.0.1-rc1`、`v0.0.0.1` |
 | Release 标题 | `MMA {版本号} — {更新内容概括}` | `MMA v0.0.0.1-rc1 — 界面图标矢量重绘与安装包瘦身三成` |
+| 标题概括表 | `docs/Version Log/release-titles.md`（每行 `\| 版本号 \| 概括 \|`） | 概括段的唯一来源，发版时必须为本版本新增一行 |
 | 安装包 | `MMA-v{版本号}-{变体}.apk` | `MMA-v0.0.0.1-rc1.apk`、`MMA-v0.0.0.1-release.apk` |
 | 独立版本文档 | `MMA {版本号} Version Log.md` | `MMA 0.0.0.1-rc1 Version Log.md` |
 
 - **标题概括**：≤20 字，用**用户语言**描述本次最核心的 1～2 个变化，禁止内部术语。
+  由 `docs/Version Log/release-titles.md` 提供，CI 创建 Release 时读取拼接；漏写该版本行时
+  CI 产出无概括标题并 warning，事后由格式校验脚本（`check-release-format.py`）拦截。
 - **变体**：`rcN`（预览版）/ `release`（正式版），CI 按 tag 是否含 `-rc` 自动判定。
 - 反例：`v0.0.0.1`（无概括）、`Release v0.0.0.1`（无意义前缀）、`feat: vector icons`（开发语言）。
 
