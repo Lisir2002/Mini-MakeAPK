@@ -2,10 +2,12 @@ package com.make.apk.data.security
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.database.sqlite.SQLiteDatabase
 import android.util.Base64
 import androidx.core.content.edit
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKeys
+import com.make.apk.data.local.AppDatabase
 import com.make.apk.logging.MmaLogger
 import java.security.SecureRandom
 
@@ -38,16 +40,27 @@ object SqlCipherPassphrase {
      * 故安全路径失败时降级为**内存态随机口令**（不落盘）：口令丢失等价于
      * 历史库重置，应用保持可用，绝不因加密层故障拒绝启动。
      */
-    fun obtain(context: Context): ByteArray {
+    fun obtain(context: Context, dbName: String = AppDatabase.DATABASE_NAME): ByteArray {
         runCatching { return obtainSecure(context) }
             .onFailure {
                 // 降级：每次进程一个随机口令（不持久化）。此时无法解密旧库，
-                // Room 首次查询会走「库损坏/打不开」路径，由 UI 层降级为空态。
+                // Room 首次查询会走「库损坏/打不开」路径，由 Repository 读 Flow 的
+                // catch 兜底降级为空态——但旧库文件若残留会永远打不开、功能废掉。
+                // 故此处主动删除无法解锁的旧库，让 Room 用新口令重建空库（自愈）。
                 MmaLogger.error(
                     event = "db_passphrase_fallback",
                     message = "Keystore 口令获取失败，降级为内存态随机口令",
                     throwable = it,
                 )
+                runCatching {
+                    val dbFile = context.getDatabasePath(dbName)
+                    SQLiteDatabase.deleteDatabase(dbFile)
+                }.onSuccess {
+                    MmaLogger.error(
+                        event = "db_passphrase_fallback_wiped",
+                        message = "已删除无法用持久口令解锁的旧库，将用内存口令重建空库",
+                    )
+                }
             }
         return ByteArray(PASSPHRASE_BYTES).also { bytes -> SecureRandom().nextBytes(bytes) }
     }

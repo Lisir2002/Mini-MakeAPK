@@ -47,6 +47,11 @@ object AppDatabaseFactory {
             .openHelperFactory(openHelperFactory)
             .addCallback(PerformancePragmas)
             .addMigrations(*MIGRATIONS)
+            // 自愈（2026-10-26 定位 rc3/diag1 闪退根因后加固）：schema 版本/迁移不匹配时
+            // 删库重建，避免 Room 直接抛 IllegalStateException 闪退。加密库打不开（口令失配/
+            // 旧库损坏）时本项不覆盖 openHelper 打开阶段的异常，由 Repository 读 Flow 的
+            // catch 兜底降级为空态——两层共同保证"数据库任何故障都不杀进程"。
+            .fallbackToDestructiveMigration()
             .build()
     }
 }

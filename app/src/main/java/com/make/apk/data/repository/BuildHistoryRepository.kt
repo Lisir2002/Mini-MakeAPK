@@ -13,7 +13,9 @@ import com.make.apk.data.model.BuildEngine
 import com.make.apk.data.model.BuildInputType
 import com.make.apk.data.model.BuildRecord
 import com.make.apk.data.model.BuildStatus
+import com.make.apk.logging.MmaLogger
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
 
 /**
@@ -40,18 +42,43 @@ class BuildHistoryRepository(
 
     // ── 读 ────────────────────────────────────────────────────────────
 
+    /**
+     * 全部读路径统一加 [catch] 兜底（2026-10-26 定位 rc3/diag1 闪退根因后加固）。
+     *
+     * 崩溃链路：首屏先用空初始值渲染（可见）→ 首帧后 Flow 真正订阅并打开 SQLCipher 加密库
+     * → 若 Keystore 降级致口令失配、旧库损坏或 schema 不匹配，库打开/查询抛异常，
+     * 异常从 Flow 冒泡到 `collectAsStateWithLifecycle` 直接炸 UI 线程。
+     * 任何读失败一律降级为安全值（空列表/空/null/0），**绝不把数据库故障泄漏到 UI 层**。
+     */
+
     /** 全部历史（按创建时间倒序）。数据量可控；长列表请用 [pagedHistory]。 */
     fun observeAll(): Flow<List<BuildRecord>> =
         dao.observeAll().map { list -> list.map(BuildRecordEntity::toDomain) }
+            .catch { e ->
+                MmaLogger.error("observe_all_failed", e)
+                emit(emptyList())
+            }
 
     fun observeById(id: Long): Flow<BuildRecord?> =
         dao.observeById(id).map { it?.toDomain() }
+            .catch { e ->
+                MmaLogger.error("observe_by_id_failed", e)
+                emit(null)
+            }
 
     fun observeByStatus(status: BuildStatus): Flow<List<BuildRecord>> =
         dao.observeByStatus(status).map { list -> list.map(BuildRecordEntity::toDomain) }
+            .catch { e ->
+                MmaLogger.error("observe_by_status_failed", e)
+                emit(emptyList())
+            }
 
     fun observeCountByStatus(status: BuildStatus): Flow<Int> =
         dao.observeCountByStatus(status)
+            .catch { e ->
+                MmaLogger.error("observe_count_by_status_failed", e)
+                emit(0)
+            }
 
     /**
      * 分页历史流（Paging3）。ViewModel 侧用 `.cachedIn(viewModelScope)` 缓存。
@@ -64,6 +91,10 @@ class BuildHistoryRepository(
             .flow
             // PagingData.map 的 transform 是 suspend，不能传函数引用，必须用 lambda。
             .map { page -> page.map { entity -> entity.toDomain() } }
+            .catch { e ->
+                MmaLogger.error("paged_history_failed", e)
+                emit(PagingData.empty())
+            }
 
     // ── 写 ────────────────────────────────────────────────────────────
 
