@@ -38,8 +38,8 @@ android {
         //   版本号不带 +N 后缀（2026-10-25 起，用户确认）。
         // versionCode：Android 安装唯一性要求的内部整数，单调递增，但不进版本串/tag；
         //   发布 tag = v<versionName>。递增规则与发版流程见 docs/VERSIONING.md。
-        versionCode = 4
-        versionName = "0.0.0.1-rc3"
+        versionCode = 5
+        versionName = "0.0.0.1-diag1"
     }
 
     signingConfigs {
@@ -55,9 +55,12 @@ android {
 
     buildTypes {
         release {
-            // R8 代码压缩 + 混淆（规则见 proguard-rules.pro）；资源压缩依赖代码压缩先行
-            isMinifyEnabled = true
-            isShrinkResources = true
+            // ── 诊断版临时配置（rc3 装机仍闪退定位用，验证后回滚）──────────
+            // isDebuggable：adb run-as 可读私有目录 + 诊断对话框守卫；
+            // 关 minify/shrink：崩溃堆栈保持原始类名/方法名/行号，可读。
+            isDebuggable = true
+            isMinifyEnabled = false
+            isShrinkResources = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             if (hasReleaseSigning) {
                 signingConfig = signingConfigs.getByName("release")

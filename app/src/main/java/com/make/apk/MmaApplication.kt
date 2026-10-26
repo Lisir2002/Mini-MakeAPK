@@ -15,6 +15,7 @@ import com.make.apk.logging.LogLevel
 import com.make.apk.logging.MmaLogger
 import com.make.apk.logging.StartupTracer
 import com.make.apk.storage.MmaStorage
+import java.io.File
 import kotlin.concurrent.thread
 
 /**
@@ -63,8 +64,19 @@ class MmaApplication : Application() {
         // 启动链防御（2026-10-26 rc2 闪退修复）：目录决策不得杀死进程。
         // resolveLogDirectory → isAuthorized → Environment.isExternalStorageManager
         // 在部分 ROM 上会抛异常；此处兜底私有目录，保证日志系统永远装得上。
-        val logDirectory = runCatching { MmaStorage.resolveLogDirectory(this) }
-            .getOrElse { MmaStorage.privateFallback(this) }
+        //
+        // 诊断版（debuggable，2026-10-26 rc3 装机仍闪退定位期）：日志优先写
+        // getExternalFilesDir/mma-logs——免权限、用户可用文件管理器查看，
+        // 崩溃文件重启后由 MainActivity 的诊断对话框直接展示（见 CrashReportUI）。
+        val logDirectory = if (debuggable) {
+            runCatching {
+                @Suppress("DEPRECATION")
+                File(getExternalFilesDir(null), "mma-logs").apply { mkdirs() }
+            }.getOrElse { runCatching { MmaStorage.resolveLogDirectory(this) }.getOrElse { MmaStorage.privateFallback(this) } }
+        } else {
+            runCatching { MmaStorage.resolveLogDirectory(this) }
+                .getOrElse { MmaStorage.privateFallback(this) }
+        }
         MmaLogger.install(
             LogConfig(
                 minLevel = if (debuggable) LogLevel.DEBUG else LogLevel.INFO,

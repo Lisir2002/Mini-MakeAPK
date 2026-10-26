@@ -6,6 +6,7 @@ import android.util.Base64
 import androidx.core.content.edit
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKeys
+import com.make.apk.logging.MmaLogger
 import java.security.SecureRandom
 
 /**
@@ -28,10 +29,30 @@ object SqlCipherPassphrase {
     private const val PASSPHRASE_BYTES = 32
 
     /**
-     * 取得（必要时先生成）数据库口令。
-     * 需在后台线程调用（首次生成涉及 Keystore 与文件 I/O）。
+     * 取得（必要时先生成）数据库口令。需在后台线程调用（首次生成涉及 Keystore 与文件 I/O）。
+     *
+     * **启动链防御（2026-10-26 rc3 装机仍闪退后的加固）**：本方法在
+     * `MmaNavHost` 组合期经 `app.buildHistoryRepository` 被同步触发，
+     * Keystore 故障（国产 ROM 上 `MasterKeys.getOrCreate` 偶发失败为已知案例）
+     * 会直接杀死进程——表现为打开即闪退、无 MMAFile 目录、无外部可见日志。
+     * 故安全路径失败时降级为**内存态随机口令**（不落盘）：口令丢失等价于
+     * 历史库重置，应用保持可用，绝不因加密层故障拒绝启动。
      */
     fun obtain(context: Context): ByteArray {
+        runCatching { return obtainSecure(context) }
+            .onFailure {
+                // 降级：每次进程一个随机口令（不持久化）。此时无法解密旧库，
+                // Room 首次查询会走「库损坏/打不开」路径，由 UI 层降级为空态。
+                MmaLogger.error(
+                    event = "db_passphrase_fallback",
+                    message = "Keystore 口令获取失败，降级为内存态随机口令",
+                    throwable = it,
+                )
+            }
+        return ByteArray(PASSPHRASE_BYTES).also { bytes -> SecureRandom().nextBytes(bytes) }
+    }
+
+    private fun obtainSecure(context: Context): ByteArray {
         val prefs = encryptedPreferences(context)
 
         val encoded = prefs.getString(KEY_PASSPHRASE, null)
