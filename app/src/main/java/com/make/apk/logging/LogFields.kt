@@ -45,4 +45,27 @@ object LogFields {
 
     /** 采样率（0.0–1.0），用于还原真实量级。 */
     const val SAMPLE_RATE = "sample_rate"
+
+    // ── 设备 / 应用上下文（仅设备类别信息，不含任何可识别标识）───────────
+
+    /** 应用版本名（如 0.0.0.1-rc5）。 */
+    const val APP_VERSION = "app_version"
+
+    /** 应用版本号（versionCode，如 8）。 */
+    const val APP_VERSION_CODE = "app_version_code"
+
+    /** 构建类型（debug / release）。 */
+    const val BUILD_TYPE = "build_type"
+
+    /** 设备型号（如 Pixel_7）。 */
+    const val DEVICE_MODEL = "device_model"
+
+    /** 设备厂商（如 Google）。 */
+    const val DEVICE_MANUFACTURER = "device_manufacturer"
+
+    /** 系统版本号（如 14）。 */
+    const val OS_VERSION = "os_version"
+
+    /** 系统 SDK 级别（如 34）。 */
+    const val OS_SDK = "os_sdk"
 }

@@ -31,14 +31,30 @@ data class LogEvent(
     /** 进程内单调递增序号，用于排序与去重。 */
     val sequence: Long = TraceContext.nextSequence(),
     val threadName: String = Thread.currentThread().name,
+    // ── 设备 / 应用上下文（构造时一次性计算，调用点无需改动）─────────────
+    // 全部走 LogContext，带 try-catch 兜底；仅设备类别信息，符合脱敏红线。
+    /** ISO8601 时间戳（设备默认时区，构造时计算一次，线程安全）。 */
+    val timestampIso: String = LogContext.isoFrom(timestampMs),
+    val appVersion: String = LogContext.appVersion,
+    val appVersionCode: String = LogContext.appVersionCode,
+    val deviceModel: String = LogContext.deviceModel,
+    val deviceManufacturer: String = LogContext.deviceManufacturer,
+    val osVersion: String = LogContext.osVersion,
+    val osSdk: Int = LogContext.osSdk,
+    val buildType: String = LogContext.buildType,
 ) {
 
-    /** 供文件输出的一行文本（已脱敏、已截断）。 */
+    /** 供文件输出的一行文本（已脱敏、已截断，字段顺序固定、机器可解析）。 */
     fun format(): String = buildString {
-        append(timestampMs)
+        append(timestampIso)
         append(' ').append(level.name).append('/').append(category.name)
         append(" [").append(event).append(']')
-        if (!message.isNullOrBlank()) append(' ').append(message)
+        // 设备 / 应用上下文（顺序固定）
+        append(" model=").append(deviceManufacturer).append(' ').append(deviceModel)
+        append(" os=").append(osVersion).append('/').append(osSdk)
+        append(" app=").append(appVersion).append('/').append(appVersionCode)
+        append(" bt=").append(buildType)
+        if (!message.isNullOrBlank()) append(" msg=").append(message)
         if (fields.isNotEmpty()) {
             append(' ').append(JsonLite.encode(fields))
         }

@@ -40,6 +40,10 @@ object AppDatabaseFactory {
 
     fun create(context: Context): AppDatabase {
         val appContext = context.applicationContext
+        // SQLCipher 原生库显式加载（双保险，覆盖其它入口）：
+        // 新版 sqlcipher-android 不再自动 loadLibs，必须在构造
+        // SupportOpenHelperFactory 之前完成，否则 nativeOpen 抛 UnsatisfiedLinkError。
+        SqlCipherInitializer.initOnce()
         val passphrase = SqlCipherPassphrase.obtain(appContext)
 
         // 参数：(口令, 数据库打开钩子, 是否启用 WAL)

@@ -232,13 +232,34 @@ object MmaLogger {
             return false
         }
 
+        // 设备 / 应用上下文（仅设备类别信息，符合脱敏红线），并入 fields 一并脱敏与落库。
+        // 注意：LogEvent 自身已有默认 props 供 format() 展示，这里再往 fields 并入一份
+        // 用于落库 / 查询（fieldsJson → 加密 DB），避免新增 Room 列与 Migration。
+        val appVersion = LogContext.appVersion
+        val appVersionCode = LogContext.appVersionCode
+        val buildType = LogContext.buildType
+        val deviceModel = LogContext.deviceModel
+        val deviceManufacturer = LogContext.deviceManufacturer
+        val osVersion = LogContext.osVersion
+        val osSdk = LogContext.osSdk
+
         val logEvent = LogEvent(
             timestampMs = System.currentTimeMillis(),
             level = level,
             category = category,
             event = event,
             message = Sanitizer.sanitizeMessage(message),
-            fields = Sanitizer.sanitizeFields(fields),
+            fields = Sanitizer.sanitizeFields(
+                fields + mapOf(
+                    LogFields.APP_VERSION to appVersion,
+                    LogFields.APP_VERSION_CODE to appVersionCode,
+                    LogFields.BUILD_TYPE to buildType,
+                    LogFields.DEVICE_MODEL to deviceModel,
+                    LogFields.DEVICE_MANUFACTURER to deviceManufacturer,
+                    LogFields.OS_VERSION to osVersion,
+                    LogFields.OS_SDK to osSdk,
+                ),
+            ),
             throwable = throwable,
         )
 

@@ -7,6 +7,7 @@ import android.content.pm.ApplicationInfo
 import android.os.Bundle
 import com.make.apk.data.local.AppDatabase
 import com.make.apk.data.local.AppDatabaseFactory
+import com.make.apk.data.local.SqlCipherInitializer
 import com.make.apk.data.repository.ExportRunRepository
 import com.make.apk.data.repository.LogRepository
 import com.make.apk.data.repository.ProjectRepository
@@ -48,6 +49,11 @@ class MmaApplication : Application() {
 
     override fun attachBaseContext(base: Context?) {
         super.attachBaseContext(base)
+        // SQLCipher 原生库显式加载（核心修复）：新版 sqlcipher-android 不再自动
+        // loadLibs，必须在打开加密库前 System.loadLibrary("sqlcipher")，否则
+        // nativeOpen 抛 UnsatisfiedLinkError。置于最前，早于日志与追踪器，
+        // 保证任何数据库入口启动前原生符号已就绪。
+        SqlCipherInitializer.initOnce()
         StartupTracer.begin()
         installLogging()
     }

@@ -205,4 +205,52 @@ class MmaLoggerTest {
             ),
         )
     }
+
+    @Test
+    fun format_includesIsoTimestampDeviceModelAndAppVersion() {
+        installForTest()
+        val event = LogEvent(
+            timestampMs = 1_700_000_000_000L,
+            level = LogLevel.ERROR,
+            category = LogCategory.ERROR,
+            event = "project_save_failed",
+            message = "boom",
+        )
+        val line = event.format()
+
+        // ISO8601 时间戳（日期 T 时分秒.毫秒 + 时区），验证已非裸毫秒
+        assertTrue(
+            "format() 应含 ISO8601 时间戳",
+            line.contains(Regex("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}")),
+        )
+        // 设备类别信息
+        assertTrue("format() 应含机型 model=", line.contains("model="))
+        // 应用版本号（当前 0.0.0.1-rc6 / versionCode 9）
+        assertTrue("format() 应含 app 版本", line.contains("app=0.0.0.1-rc6/9"))
+        // 构建类型（debug 测试变体）
+        assertTrue("format() 应含构建类型", line.contains("bt=debug"))
+    }
+
+    @Test
+    fun contextFields_areCarriedIntoPersistedFieldsJson() {
+        installForTest()
+        MmaLogger.error(
+            "project_save_failed",
+            message = "boom",
+            fields = mapOf(LogFields.SUCCESS to false),
+        )
+        val event = sink.events.first()
+
+        // 经 log() 合并后，fields 应携带设备 / 应用上下文（仅设备类别信息）
+        assertTrue("fields 应含 app_version", event.fields.containsKey(LogFields.APP_VERSION))
+        assertTrue("fields 应含 device_model", event.fields.containsKey(LogFields.DEVICE_MODEL))
+        assertTrue("fields 应含 build_type", event.fields.containsKey(LogFields.BUILD_TYPE))
+
+        // 落库映射直接序列化 fields → fieldsJson，故上下文自动进入加密 DB，无需新增列
+        val entity = event.toEntity()
+        val fieldsJson = entity.fieldsJson ?: error("fieldsJson 不应为空")
+        assertTrue("fieldsJson 应含 app_version", fieldsJson.contains("\"app_version\""))
+        assertTrue("fieldsJson 应含 device_model", fieldsJson.contains("\"device_model\""))
+        assertTrue("fieldsJson 应含 build_type", fieldsJson.contains("\"build_type\""))
+    }
 }

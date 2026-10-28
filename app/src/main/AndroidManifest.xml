@@ -21,6 +21,7 @@
         android:roundIcon="@mipmap/ic_launcher"
         android:label="MMA"
         android:supportsRtl="true"
+        android:extractNativeLibs="true"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
 
         <activity
