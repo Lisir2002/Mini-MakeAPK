@@ -1,10 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Adaptive 启动图标（API 26+）：背景 = 珊瑚粉渐变，前景 = 白包裹箱 + 箭头。
-  API 24/25 回退到 mipmap-anydpi/ic_launcher.xml（同款设计的全幅矢量）。
+  Adaptive 启动图标（API 26+）。
+  背景：纯白 @color/ic_launcher_background（与素材底色一致）；
+  前景：mipmap-*/ic_launcher_foreground.png —— MiniMe-MMA 主体（吉祥物 + 网页卡 → APK 卡 + 光环），
+       108dp 网格、主体宽占 80%，圆形 / 方形遮罩下均不裁切关键元素。
+  素材与生成脚本：docs/design/assets/app-icon/ + scripts/design/build_launcher_icon.py。
+  API 24/25 回退到 mipmap-*/ic_launcher.png（白底圆角方，同款主体）。
+
+  关于 monochrome（Android 13 主题图标）：不提供。素材是多彩位图，按深色阈值取剪影会把
+  卡片阴影一并带进来形成脏块；宁可不支持主题图标，也不交付劣质剪影——取舍与复现方式见
+  docs/design/assets/app-icon/README.md。
 -->
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
-    <background android:drawable="@drawable/ic_launcher_background" />
-    <foreground android:drawable="@drawable/ic_launcher_foreground" />
-    <monochrome android:drawable="@drawable/ic_launcher_foreground" />
+    <background android:drawable="@color/ic_launcher_background" />
+    <foreground android:drawable="@mipmap/ic_launcher_foreground" />
 </adaptive-icon>

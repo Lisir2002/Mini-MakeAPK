@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  启动图标背景色：纯白，与新版图标素材底色一致。
+  API 26+ 由 mipmap-anydpi-v26/ic_launcher.xml 引用为 adaptive 背景层；
+  API 24/25 使用 mipmap-*/ic_launcher.png（已烘焙白底圆角方）。
+-->
+<resources>
+    <color name="ic_launcher_background">#FFFFFFFF</color>
+</resources>
