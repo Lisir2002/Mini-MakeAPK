@@ -65,6 +65,36 @@ data class AlphaScale(
     val a7: Float = 1f,
 )
 
+/**
+ * 阴影抬升令牌——DESIGN_LANGUAGE.md §7 `elevation-1` / `elevation-2` 的可覆盖形态。
+ *
+ * JSON 的 `elevation-1/2` 是 CSS 阴影串（偏移/模糊/透明），Compose 层不直接消费阴影串，
+ * 故映射为「抬升量 dp」近似：elevation-1 → 2dp（轻抬）、elevation-2 → 6dp（中抬），
+ * 实际投影由 `Modifier.shadow` 在组件层按此量级绘制（来源 design-tokens.json elevation）。
+ */
+data class ElevationScale(
+    /** 2dp——轻抬升（卡片/输入框默认，对应 elevation-1）。 */
+    val elevation1: Dp = 2.dp,
+
+    /** 6dp——中抬升（弹窗/浮层，对应 elevation-2）。 */
+    val elevation2: Dp = 6.dp,
+)
+
+/**
+ * 顶底栏 chrome 尺寸令牌——design-tokens.json `chrome` 段的可覆盖形态。
+ *
+ * 覆盖 M3 默认：TopAppBar 默认 56~64dp、NavigationBar 默认 80dp；本项目收敛为
+ * 顶栏 52dp / 底栏 56dp（更紧凑利落，契合黑白中性风）。业务经
+ * `LocalMmaDesign.current.chrome.*` 读取，零裸写高度字面量。
+ */
+data class ChromeScale(
+    /** 52dp——顶栏高度（design-tokens.json chrome.top-bar-height）。 */
+    val topBarHeight: Dp = 52.dp,
+
+    /** 56dp——底栏高度（design-tokens.json chrome.bottom-bar-height）。 */
+    val bottomBarHeight: Dp = 56.dp,
+)
+
 /** 表面材质档位——骨架「插拔换样式」的粒度单位（DESIGN_LANGUAGE §7 规划）。 */
 enum class MaterialTier {
     /** 纯色平面：默认档，最省电，磨砂关闭时使用。 */
@@ -126,6 +156,8 @@ data class ScaffoldStyle(
  *
  * @param spacing 间距阶梯。
  * @param alpha 透明度阶梯（预留）。
+ * @param elevation 阴影抬升阶梯（[ElevationScale]，来源 elevation-1/2）。
+ * @param chrome 顶底栏尺寸（[ChromeScale]，来源 design-tokens.json chrome）。
  * @param defaultMaterial 组件默认材质档位（预留；当前组件均按 Flat 渲染）。
  * @param translucent 磨砂参数（预留，[MaterialTier.Translucent] 档消费）。
  * @param scaffold 骨架样式（预留，Phase-2 顶栏/底栏插拔消费）。
@@ -133,6 +165,8 @@ data class ScaffoldStyle(
 data class MmaDesign(
     val spacing: SpacingScale = SpacingScale(),
     val alpha: AlphaScale = AlphaScale(),
+    val elevation: ElevationScale = ElevationScale(),
+    val chrome: ChromeScale = ChromeScale(),
     val defaultMaterial: MaterialTier = MaterialTier.Flat,
     val translucent: TranslucentSpec = TranslucentSpec(),
     val scaffold: ScaffoldStyle = ScaffoldStyle(),

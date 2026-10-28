@@ -2,36 +2,55 @@ package com.make.apk.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// 设计令牌：OKLCH 来源见 /workspace/DESIGN_LANGUAGE.md §2
+// 设计令牌：OKLCH 来源见 /workspace/docs/design/tokens/design-tokens.json（唯一事实来源）。
 // 此处为精确转换后的 sRGB hex（oklch → srgb 计算），亮/暗双主题共用命名。
 // 团队共享唯一来源：设计层与安卓层禁止各自发明色值。
+// 2025 改版：珊瑚粉可爱风 → 黑白为主 + 蓝色点缀（见 DESIGN_LANGUAGE.md §0/§2）。
 
 // ── 明亮主题 ──
-val md_bg_light                = Color(0xFFF9F8F5) // --bg            OKLCH(0.98 0.004 95)
-val md_surface_light           = Color(0xFFFFFFFF) // --surface
-val md_surface2_light          = Color(0xFFF6F5F3) // --surface-2     OKLCH(0.97 0.003 95)
-val md_onSurface_light         = Color(0xFF2D2823) // --on-surface    OKLCH(0.28 0.012 60)
-val md_onSurfaceVariant_light  = Color(0xFF6D6863) // --on-surface-variant OKLCH(0.52 0.01 60)
-val md_outline_light           = Color(0xFFDFDEDB) // --outline       OKLCH(0.90 0.004 80)
-val md_primary_light           = Color(0xFFF19E97) // --primary 珊瑚粉 OKLCH(0.78 0.10 25)
-val md_onPrimary_light         = Color(0xFFFDFCF8) // --on-primary    OKLCH(0.99 0.005 95)
-val md_primaryContainer_light  = Color(0xFFFFDFD8) // --primary-container OKLCH(0.93 0.04 30)
-val md_onPrimaryContainer_light= Color(0xFF643B34) // OKLCH(0.40 0.06 30)
-val md_success_light           = Color(0xFF88D1A2) // OKLCH(0.80 0.10 155)
-val md_warning_light           = Color(0xFFE2BF76) // OKLCH(0.82 0.10 85)
-val md_error_light             = Color(0xFFD55753) // OKLCH(0.62 0.16 25)
+val md_bg_light                = Color(0xFFF6F7F9) // --bg                 OKLCH(0.9759 0.0029 264.5)
+val md_surface_light           = Color(0xFFFFFFFF) // --surface            OKLCH(1.0000 0.0000 89.9)
+val md_surface2_light          = Color(0xFFF0F1F3) // --surface-2          OKLCH(0.9579 0.0029 264.5)
+val md_onSurface_light         = Color(0xFF14171A) // --on-surface         OKLCH(0.2027 0.0076 248.2)
+val md_onSurfaceVariant_light  = Color(0xFF5B616E) // --on-surface-variant OKLCH(0.4921 0.0221 265.8)
+val md_outline_light           = Color(0xFFE2E5E9) // --outline            OKLCH(0.9208 0.0063 255.5)
+val md_outlineVariant_light    = Color(0xFFEDEFF2) // --outline-variant    OKLCH(0.9515 0.0046 258.3)
+val md_primary_light           = Color(0xFF2563EB) // --primary 蓝点缀     OKLCH(0.5461 0.2152 262.9)
+val md_onPrimary_light         = Color(0xFFFFFFFF) // --on-primary         OKLCH(1.0000 0.0000 89.9)
+val md_primaryContainer_light  = Color(0xFFE6EFFF) // --primary-container  OKLCH(0.9501 0.0236 262.1)
+val md_onPrimaryContainer_light= Color(0xFF0B3FA8) // --on-primary-container OKLCH(0.4110 0.1765 262.3)
+val md_success_light           = Color(0xFF16A34A) // --success            OKLCH(0.6271 0.1699 149.2)
+val md_warning_light           = Color(0xFFD97706) // --warning            OKLCH(0.6658 0.1574 58.3)
+val md_error_light             = Color(0xFFDC2626) // --error              OKLCH(0.5771 0.2152 27.3)
 
 // ── 暗黑主题 ──
-val md_bg_dark                 = Color(0xFF191512) // OKLCH(0.20 0.008 60)
-val md_surface_dark            = Color(0xFF25211E) // OKLCH(0.25 0.008 60)
-val md_surface2_dark           = Color(0xFF312D2A) // OKLCH(0.30 0.008 60)
-val md_onSurface_dark          = Color(0xFFE5E4E2) // OKLCH(0.92 0.004 95)
-val md_onSurfaceVariant_dark   = Color(0xFFA39D98) // OKLCH(0.70 0.01 60)
-val md_outline_dark            = Color(0xFF4A4744) // OKLCH(0.40 0.006 60)
-val md_primary_dark            = Color(0xFFFFABA3) // OKLCH(0.82 0.10 25)
-val md_onPrimary_dark          = Color(0xFF231715) // OKLCH(0.22 0.02 30)
-val md_primaryContainer_dark   = Color(0xFF5E362F) // OKLCH(0.38 0.06 30)
-val md_onPrimaryContainer_dark = Color(0xFFF3C0B7) // OKLCH(0.85 0.06 30) 深色主色容器上的浅珊瑚字
-val md_success_dark            = Color(0xFF6AC48C) // OKLCH(0.75 0.12 155)
-val md_warning_dark            = Color(0xFFDBB155) // OKLCH(0.78 0.12 85)
-val md_error_dark              = Color(0xFFF97770) // OKLCH(0.72 0.16 25) 比亮色提明度保对比
+val md_bg_dark                 = Color(0xFF0E0F11) // --bg                 OKLCH(0.1682 0.0045 264.4)
+val md_surface_dark            = Color(0xFF16181B) // --surface            OKLCH(0.2082 0.0067 258.4)
+val md_surface2_dark           = Color(0xFF1E2125) // --surface-2          OKLCH(0.2463 0.0088 255.6)
+val md_onSurface_dark          = Color(0xFFF2F4F6) // --on-surface         OKLCH(0.9662 0.0034 247.9)
+val md_onSurfaceVariant_dark   = Color(0xFF9BA1A8) // --on-surface-variant OKLCH(0.7063 0.0123 252.1)
+val md_outline_dark            = Color(0xFF2A2E33) // --outline            OKLCH(0.2993 0.0107 254.0)
+val md_outlineVariant_dark     = Color(0xFF23272C) // --outline-variant    OKLCH(0.2708 0.0109 254.0)
+val md_primary_dark            = Color(0xFF5B8DEF) // --primary 蓝点缀     OKLCH(0.6545 0.1562 262.5)
+val md_onPrimary_dark          = Color(0xFF0A1A33) // --on-primary         OKLCH(0.2195 0.0538 259.0)
+val md_primaryContainer_dark   = Color(0xFF15315E) // --primary-container  OKLCH(0.3184 0.0872 259.5)
+val md_onPrimaryContainer_dark = Color(0xFFC7DBFF) // --on-primary-container OKLCH(0.8882 0.0543 262.2)
+val md_success_dark            = Color(0xFF22C55E) // --success            OKLCH(0.7227 0.1920 149.6)
+val md_warning_dark            = Color(0xFFF59E0B) // --warning            OKLCH(0.7686 0.1647 70.1)
+val md_error_dark              = Color(0xFFF87171) // --error              OKLCH(0.7106 0.1661 22.2)
+
+// ── 蓝色点缀家族（中性黑白为主，蓝为唯一点缀；无亮/暗后缀，双主题共用 scale） ──
+val md_blue_50  = Color(0xFFEFF4FF) // OKLCH(0.9666 0.0157 266.3)
+val md_blue_100 = Color(0xFFDBE6FF) // OKLCH(0.9243 0.0361 266.7)
+val md_blue_200 = Color(0xFFBFD3FF) // OKLCH(0.8665 0.0651 265.8)
+val md_blue_300 = Color(0xFF93B4FF) // OKLCH(0.7748 0.1139 265.6)
+val md_blue_400 = Color(0xFF5B8DEF) // OKLCH(0.6545 0.1562 262.5)
+val md_blue_500 = Color(0xFF3B6FE0) // OKLCH(0.5686 0.1814 263.2)
+val md_blue_600 = Color(0xFF2563EB) // OKLCH(0.5461 0.2152 262.9)
+val md_blue_700 = Color(0xFF1D4FD0) // OKLCH(0.4827 0.2060 263.9)
+val md_blue_800 = Color(0xFF1A41A8) // OKLCH(0.4186 0.1713 264.3)
+val md_blue_900 = Color(0xFF15346F) // OKLCH(0.3392 0.1090 261.7)
+
+// info 语义色复用 primary（亮/暗同 primary 组），不单独发明色值。
+val md_info_light  = md_primary_light
+val md_info_dark   = md_primary_dark

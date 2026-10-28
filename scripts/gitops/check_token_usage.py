@@ -48,13 +48,15 @@ COMPONENT_SIZES = {
     0,    # 无间距
     1,    # 磨砂容器描边宽度（MmaTranslucentSurface / DESIGN_LANGUAGE §7）
     2,    # 准星竖线宽度（ProjectTypeSelector / project-editor-design.md §9.1）
+    16,   # 圆角组件尺寸 radius-lg（design-tokens.json radius.lg=16；RoundedCornerShape 内 dp 已由圆角规则豁免，此处覆盖独立 .dp 用途）
+    20,   # 圆角组件尺寸 radius-xl（design-tokens.json radius.xl=20；bottomSheet 顶部圆角，经门禁白名单）
     24,   # 图标默认尺寸（M3 Icon / MmaIcons.size 默认）
     32,   # 权限弹窗圆底（64dp）内图标（PermissionSpec 视觉规格）
     36,   # 项目页空态图标（ProjectsScreen）
     40,   # 项目列表行图标（ProjectsScreen / ProjectIcon）
     48,   # 「我的」页信息卡图标（ProfileScreen）
-    56,   # 顶栏规范高度（M3 TopAppBar，MmaTopBar.heightIn 下限）
-          #   兼 ProjectIcon 默认边长（新建项目页身份区，§4.1）
+    52,   # 顶栏规范高度（design-tokens.json chrome.top-bar-height=52；MmaTopBar.heightIn 下限经 LocalMmaDesign.chrome.topBarHeight）
+    56,   # 底栏规范高度（design-tokens.json chrome.bottom-bar-height=56，覆盖 M3 NavigationBar 默认 80；兼 ProjectIcon 默认边长 §4.1）
     64,   # 结果页图标容器（ResultScreen）/ 权限弹窗图标底 / 开发中页图标
     72,   # 构建脉冲图标容器（BuildingPulse）
 }

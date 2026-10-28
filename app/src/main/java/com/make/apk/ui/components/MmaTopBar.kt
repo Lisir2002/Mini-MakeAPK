@@ -16,9 +16,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import com.make.apk.ui.icons.MmaIcon
 import com.make.apk.ui.icons.MmaIcons
+import com.make.apk.ui.theme.LocalMmaDesign
 import com.make.apk.ui.theme.Spacing
 import com.make.apk.ui.LocalHazeState
 import dev.chrisbanes.haze.HazeState
@@ -55,7 +55,7 @@ fun MmaTopBar(
         Row(
             modifier = Modifier
                 .statusBarsPadding()
-                .heightIn(min = 56.dp)
+                .heightIn(min = LocalMmaDesign.current.chrome.topBarHeight)
                 .padding(horizontal = Spacing.space2, vertical = Spacing.space2),
             verticalAlignment = Alignment.CenterVertically,
         ) {

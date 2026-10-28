@@ -2,6 +2,7 @@ package com.make.apk.ui.components
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
+import androidx.compose.foundation.layout.height
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Text
@@ -55,13 +56,16 @@ fun MmaBottomBar(
     val blurState = if (chromeTranslucent) hazeState else null
 
     NavigationBar(
-        modifier = blurState?.let { state ->
+        // 合并 hazeChild（磨砂态）或原始 modifier，再统一覆写高度为 56dp（覆盖 M3 NavigationBar 默认 80dp）。
+        modifier = (if (blurState != null) {
             modifier.hazeChild(
-                state = state,
+                state = blurState,
                 shape = RectangleShape,
                 style = hazeChromeStyle(spec, surfaceColor),
             )
-        } ?: modifier,
+        } else {
+            modifier
+        }).height(LocalMmaDesign.current.chrome.bottomBarHeight),
         containerColor = when {
             blurState != null -> Color.Transparent // 视觉由 hazeChild 的 tint 提供
             chromeTranslucent -> surfaceColor.copy(alpha = spec.alpha)

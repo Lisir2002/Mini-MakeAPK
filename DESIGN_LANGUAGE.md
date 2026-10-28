@@ -2,96 +2,133 @@
 
 > 本规范是整套配套开发技能的**共享宪法**。无论后续安装 `frontend-design`、`claude-android-ninja` 还是 `oklch-tokens`，产出的设计与代码都必须对齐本文件。
 > 适用平台：**纯原生安卓 / Jetpack Compose / Material 3**。
-> 关键词：**可爱、简约、柔和、圆润、iOS 质感、低彩度但温暖**。
+> 关键词：**简约、克制、柔和、圆润、iOS 质感、低彩度中性（黑白为主 + 蓝点缀）**。
+
+---
+
+## 0. 铁律：禁止硬编码 UI（最高优先级）
+
+**一切颜色 / 尺寸 / 圆角 / 字号 / 阴影一律走设计令牌，绝不裸写。**
+
+- **颜色**：`ui/theme/Color.kt` 的 `md_*` 常量 / `MaterialTheme.colorScheme.*`；业务代码禁止 `Color(0x…)`、`Color.Red` 等命名色。
+- **圆角**：`MaterialTheme.shapes.*`（来源 `AppShapes`）；业务代码禁止直写 `RoundedCornerShape(…)`。
+- **间距**：`Spacing.*` 阶梯（来源 `LocalMmaDesign.current.spacing`）；禁止裸写 `N.dp`（白名单见下方）。
+- **字号**：`MaterialTheme.typography.*`；禁止裸写 `N.sp`。
+- **顶底栏高度**：`LocalMmaDesign.current.chrome.topBarHeight`(52) / `bottomBarHeight`(56)；禁止裸写高度字面量。
+- **阴影**：`LocalMmaDesign.current.elevation.*`（来源 elevation-1/2）；禁止裸写阴影参数。
+
+**豁免**：仅 `ui/theme/` 包为令牌定义处（可直接写 `Color(0x…)` / `RoundedCornerShape` / `N.dp`）；其余业务代码一律经令牌，违反即门禁失败 + 回退。
+
+**门禁**：`scripts/gitops/check_token_usage.py --strict` 扫描 `ui/`（排除 `theme/`）的裸写色值 / 圆角 / 字号 / 非白名单 dp；`COMPONENT_SIZES` 白名单含 16(radius-lg) / 20(radius-xl) / 52(top-bar) / 56(bottom-bar) 等组件规范值，新增值须注明来源。
 
 ---
 
 ## 1. 设计原则（三条铁律）
 
-1. **色彩单调但温暖**：全界面只用**一个主色**（珊瑚粉），其余皆暖中性灰；禁止多色拼贴。可爱感来自**圆润形状 + 柔和阴影 + 轻微动效**，而非花哨配色。
+1. **色彩中性为主 + 蓝点缀**：全界面只用**一个主色**（蓝 `#2563EB`），其余皆中性黑白灰；禁止多色拼贴。质感来自**圆润形状 + 柔和阴影 + 轻微动效**，而非花哨配色。
 2. **圆润优先**：大圆角、柔和扩散阴影、轻微弹性动效，营造 iOS 般的亲和无攻击性。
 3. **留白即设计**：遵循 8pt 栅格，宁空勿挤；信息密度低、呼吸感强。
 
 ---
 
-## 2. 色彩系统（OKLCH 感知均匀色板）
+## 2. 色彩系统（黑白为主 + 蓝色点缀）
 
 > 使用 **OKLCH**（而非 HEX/RGB），保证明度/彩度可预测、亮暗主题一致、可程序化生成。
 > 颜色值含义：`OKLCH(明度 0~1, 彩度 0~0.37, 色相 0~360)`。
+> 设计哲学：**中性黑白为骨架，蓝色为唯一点缀色**；禁止珊瑚粉等多彩主色，禁止多色拼贴。
 
 ### 2.1 明亮主题令牌
 
 | 令牌 | OKLCH | 用途 |
 |------|-------|------|
-| `--bg` | `OKLCH(0.98 0.004 95)` | 页面背景（暖白） |
-| `--surface` | `OKLCH(1 0 0)` | 卡片/弹窗表面（纯白） |
-| `--surface-2` | `OKLCH(0.97 0.003 95)` | 次级表面/分组底 |
-| `--on-surface` | `OKLCH(0.28 0.012 60)` | 主文字（暖深灰） |
-| `--on-surface-variant` | `OKLCH(0.52 0.01 60)` | 次文字/占位符 |
-| `--outline` | `OKLCH(0.90 0.004 80)` | 分隔线/边框 |
-| `--primary` | `OKLCH(0.78 0.10 25)` | **主色·柔和珊瑚粉（可爱核心）** |
-| `--on-primary` | `OKLCH(0.99 0.005 95)` | 主色上的文字（近白） |
-| `--primary-container` | `OKLCH(0.93 0.04 30)` | 主色浅容器（柔和粉底） |
-| `--on-primary-container` | `OKLCH(0.40 0.06 30)` | 浅容器上的文字 |
+| `--bg` | `OKLCH(0.9759 0.0029 264.5)` | 页面背景（近白冷灰） |
+| `--surface` | `OKLCH(1.0000 0.0000 89.9)` | 卡片/弹窗表面（纯白） |
+| `--surface-2` | `OKLCH(0.9579 0.0029 264.5)` | 次级表面/分组底 |
+| `--on-surface` | `OKLCH(0.2027 0.0076 248.2)` | 主文字（近黑） |
+| `--on-surface-variant` | `OKLCH(0.4921 0.0221 265.8)` | 次文字/占位符 |
+| `--outline` | `OKLCH(0.9208 0.0063 255.5)` | 分隔线/边框 |
+| `--outline-variant` | `OKLCH(0.9515 0.0046 258.3)` | 弱分隔线 |
+| `--primary` | `OKLCH(0.5461 0.2152 262.9)` | **主色·蓝点缀（#2563EB）** |
+| `--on-primary` | `OKLCH(1.0000 0.0000 89.9)` | 主色上的文字（白） |
+| `--primary-container` | `OKLCH(0.9501 0.0236 262.1)` | 主色浅容器（淡蓝底） |
+| `--on-primary-container` | `OKLCH(0.4110 0.1765 262.3)` | 浅容器上的文字（深蓝） |
 
-**可选语义色（克制使用，仅在必要处出现）**：
+**蓝色点缀家族（非主色，用于强调/链接/选中态；双主题共用 scale）**：
 
-| 令牌 | OKLCH | 用途 |
-|------|-------|------|
-| `--success` | `OKLCH(0.80 0.10 155)` | 成功（薄荷绿） |
-| `--warning` | `OKLCH(0.82 0.10 85)` | 警告（暖黄） |
-| `--error` | `OKLCH(0.62 0.16 25)` | 错误（珊瑚红） |
+| 令牌 | HEX | OKLCH |
+|------|-----|------|
+| `--blue-50` | `#EFF4FF` | `OKLCH(0.9666 0.0157 266.3)` |
+| `--blue-100` | `#DBE6FF` | `OKLCH(0.9243 0.0361 266.7)` |
+| `--blue-200` | `#BFD3FF` | `OKLCH(0.8665 0.0651 265.8)` |
+| `--blue-300` | `#93B4FF` | `OKLCH(0.7748 0.1139 265.6)` |
+| `--blue-400` | `#5B8DEF` | `OKLCH(0.6545 0.1562 262.5)` |
+| `--blue-500` | `#3B6FE0` | `OKLCH(0.5686 0.1814 263.2)` |
+| `--blue-600` | `#2563EB` | `OKLCH(0.5461 0.2152 262.9)`（= primary 亮） |
+| `--blue-700` | `#1D4FD0` | `OKLCH(0.4827 0.2060 263.9)` |
+| `--blue-800` | `#1A41A8` | `OKLCH(0.4186 0.1713 264.3)` |
+| `--blue-900` | `#15346F` | `OKLCH(0.3392 0.1090 261.7)` |
+
+**语义色（克制使用，仅状态）**：
+
+| 令牌 | 亮 OKLCH | 暗 OKLCH | 用途 |
+|------|----------|----------|------|
+| `--success` | `OKLCH(0.6271 0.1699 149.2)` | `OKLCH(0.7227 0.1920 149.6)` | 成功（绿） |
+| `--warning` | `OKLCH(0.6658 0.1574 58.3)` | `OKLCH(0.7686 0.1647 70.1)` | 警告（琥珀） |
+| `--error` | `OKLCH(0.5771 0.2152 27.3)` | `OKLCH(0.7106 0.1661 22.2)` | 错误（红） |
+| `--info` | 复用 `--primary` | 复用 `--primary` | 信息（蓝） |
 
 ### 2.2 暗黑主题令牌
 
 | 令牌 | OKLCH | 用途 |
 |------|-------|------|
-| `--bg` | `OKLCH(0.20 0.008 60)` | 深暖灰背景 |
-| `--surface` | `OKLCH(0.25 0.008 60)` | 卡片表面 |
-| `--surface-2` | `OKLCH(0.30 0.008 60)` | 次级表面 |
-| `--on-surface` | `OKLCH(0.92 0.004 95)` | 主文字 |
-| `--on-surface-variant` | `OKLCH(0.70 0.01 60)` | 次文字 |
-| `--outline` | `OKLCH(0.40 0.006 60)` | 分隔线 |
-| `--primary` | `OKLCH(0.82 0.10 25)` | 暗色下提高明度保可爱 |
-| `--on-primary` | `OKLCH(0.22 0.02 30)` | 主色上的文字 |
-| `--primary-container` | `OKLCH(0.38 0.06 30)` | 主色容器 |
-| `--on-primary-container` | `OKLCH(0.85 0.06 30)` | 深色主色容器上的文字（浅珊瑚） |
-| `--error` | `OKLCH(0.72 0.16 25)` | 错误（比亮色提明度保对比） |
-| `--success` | `OKLCH(0.75 0.12 155)` | 成功 |
-| `--warning` | `OKLCH(0.78 0.12 85)` | 警告 |
+| `--bg` | `OKLCH(0.1682 0.0045 264.4)` | 近黑冷灰背景 |
+| `--surface` | `OKLCH(0.2082 0.0067 258.4)` | 卡片表面 |
+| `--surface-2` | `OKLCH(0.2463 0.0088 255.6)` | 次级表面 |
+| `--on-surface` | `OKLCH(0.9662 0.0034 247.9)` | 主文字（近白） |
+| `--on-surface-variant` | `OKLCH(0.7063 0.0123 252.1)` | 次文字 |
+| `--outline` | `OKLCH(0.2993 0.0107 254.0)` | 分隔线 |
+| `--outline-variant` | `OKLCH(0.2708 0.0109 254.0)` | 弱分隔线 |
+| `--primary` | `OKLCH(0.6545 0.1562 262.5)` | 暗色主色·蓝点缀（#5B8DEF，提明度保对比） |
+| `--on-primary` | `OKLCH(0.2195 0.0538 259.0)` | 主色上的文字（深蓝黑） |
+| `--primary-container` | `OKLCH(0.3184 0.0872 259.5)` | 主色容器（深蓝） |
+| `--on-primary-container` | `OKLCH(0.8882 0.0543 262.2)` | 容器上的文字（浅蓝） |
+| `--success` | `OKLCH(0.7227 0.1920 149.6)` | 成功 |
+| `--warning` | `OKLCH(0.7686 0.1647 70.1)` | 警告 |
+| `--error` | `OKLCH(0.7106 0.1661 22.2)` | 错误（提明度保对比） |
 
 ### 2.3 色彩使用规则
-- **主界面色调单调**：列表、卡片、底栏只用 `--bg / --surface / --on-surface / --primary` 四族，不引入额外色相。
+- **中性骨架 + 蓝点缀**：列表、卡片、底栏只用 `--bg / --surface / --on-surface / --primary` 四族，不引入额外色相；蓝色是唯一彩色点缀，用于主操作/链接/选中态。
 - **语义色仅用于状态**：错误红只出现在校验失败；成功/警告同理，不用于装饰。
-- **主色占比 < 15%**：主色是"点睛"，不是"铺面"；大面积留白+中性。
+- **主色占比 < 15%**：主色是"点睛"，不是"铺面"；大面积留白+中性黑白。
 - **可访问性**：正文与背景对比度 ≥ 4.5:1（AA）；主色按钮上的白字需复核对比。
 
 ---
 
-## 3. 形状与圆角（iOS 风大圆角）
+## 3. 形状与圆角
 
 | 令牌 | 值 | 适用 |
 |------|----|------|
-| `--radius-sm` | `8dp` | 小组件/标签 |
-| `--radius-md` | `16dp` | 卡片/输入框（默认） |
-| `--radius-lg` | `24dp` | 大卡片/底部 sheet |
+| `--radius-sm` | `6dp` | 小组件/标签 |
+| `--radius-md` | `12dp` | 卡片/输入框（默认） |
+| `--radius-lg` | `16dp` | 大卡片/底部 sheet |
+| `--radius-xl` | `20dp` | 大 sheet 顶部圆角 |
 | `--radius-pill` | `999dp` | 按钮/胶囊/头像 |
 
 - 卡片默认 `--radius-md` 或 `--radius-lg`（柔和包裹感）。
-- 按钮优先 `--radius-pill`（最可爱）；次级按钮可用 `--radius-md`。
+- 按钮优先 `--radius-pill`（最克制利落）；次级按钮可用 `--radius-md`。
 - 禁止尖角（radius=0）与极小圆角（<4dp）。
 
 **Compose M3 映射**（`AppShapes`，唯一圆角来源）：
 
 | M3 档位 | 值 | 对应令牌 |
 |---------|-----|---------|
-| `extraSmall` | 8dp | `--radius-sm` |
-| `small` | 16dp | `--radius-md`（卡片/输入框默认） |
-| `medium` | 16dp | `--radius-md`（M3 Card 默认档） |
-| `large` | 24dp | `--radius-lg` |
+| `extraSmall` | 6dp | `--radius-sm` |
+| `small` | 12dp | `--radius-md`（卡片/输入框默认） |
+| `medium` | 12dp | `--radius-md`（M3 Card 默认档） |
+| `large` | 16dp | `--radius-lg` |
 | `extraLarge` | 999dp | `--radius-pill`（胶囊） |
 
-页面禁止直写 `RoundedCornerShape(...)`，一律 `MaterialTheme.shapes.*`；需要 24dp 圆角时显式用 `shapes.large`，`extraLarge` 是胶囊档，勿用于普通卡片。
+页面禁止直写 `RoundedCornerShape(...)`，一律 `MaterialTheme.shapes.*`；需要 16dp 圆角时显式用 `shapes.large`，`extraLarge` 是胶囊档，勿用于普通卡片。`--radius-xl`(20dp) 供 bottomSheet 顶部圆角，经门禁白名单 `COMPONENT_SIZES` 的 `20`。
 
 ---
 
@@ -115,14 +152,26 @@
 
 ---
 
-## 5. 字体与排版（圆润友好）
+## 5. 字体与排版
 
-- **字族（优先圆体）**：英文/数字 `Nunito` / `Quicksand` / `Baloo 2`；中文 `思源柔黑` / `站酷快乐体`（需确认授权后引入字体文件）。
-- **默认回退**：系统圆体 → Material 3 默认无衬线（避免未引入字体时崩坏）。
-- **字号阶梯**：`12 / 14 / 16 / 20 / 24 / 32 / 40 dp`。
-- **字重**：Regular(400) / Medium(500) / SemiBold(600) / Bold(700)；标题用 600，正文 400。
+- **字族（系统无衬线优先）**：英文/数字 `Inter` / 系统无衬线；中文 `Noto Sans SC` / 系统无衬线。
+- **默认回退**：系统无衬线 → Material 3 默认无衬线（避免未引入字体时崩坏）。
+- **字号阶梯（token 化，见 design-tokens.json typography）**：
+
+| 令牌 | 字号 | 行高 | 字重 | 用途 |
+|------|------|------|------|------|
+| `--display` | 28sp | 34sp | 600 | 大标题 / 页头 |
+| `--headline` | 22sp | 28sp | 600 | 区块标题 |
+| `--title` | 18sp | 24sp | 600 | 卡片标题 / 顶栏标题 |
+| `--body-lg` | 16sp | 24sp | 400 | 正文（大） |
+| `--body-md` | 14sp | 21sp | 400 | 正文（默认）/ 副标题 |
+| `--label` | 13sp | 18sp | 500 | 标签 / 底栏 tab |
+| `--caption` | 12sp | 16sp | 500 | 辅助说明 |
+
+- **字重**：Regular(400) / Medium(500) / SemiBold(600)；标题用 600，正文 400，标签 500。
 - **行高**：正文 1.5×，标题 1.2×。
-- **禁止**：默认 Roboto 作为主视觉字（偏中性、不可爱）；字间距过度拉伸。
+- **Compose 映射**（`AppTypography`）：`displayLarge←display`、`headlineMedium←headline`、`titleLarge←title`、`bodyLarge←body-lg`、`bodyMedium←body-md`、`labelLarge←label`、`labelMedium←caption`。
+- **禁止**：默认 Roboto 作为主视觉字（偏中性）；字间距过度拉伸。
 
 ---
 
@@ -142,8 +191,9 @@
 ## 7. 质感与阴影（iOS 柔光）
 
 - **阴影风格**：大模糊半径、低透明度、偏下偏移，模拟自然光柔光。
-- `--elevation-1`：`0 1dp 2dp rgba(0,0,0,0.04), 0 2dp 8dp rgba(0,0,0,0.06)`
-- `--elevation-2`：`0 4dp 12dp rgba(0,0,0,0.06), 0 8dp 24dp rgba(0,0,0,0.08)`
+- `--elevation-1`：`0 1px 2px rgba(16,20,26,.06), 0 1px 3px rgba(16,20,26,.08)`
+- `--elevation-2`：`0 4px 12px rgba(16,20,26,.08), 0 8px 24px rgba(16,20,26,.10)`
+- **Compose 抬升量**：阴影串不直用于 Compose，映射为 `LocalMmaDesign.current.elevation`（[ElevationScale]）——`elevation-1 → elevation1≈2.dp`、`elevation-2 → elevation2≈6.dp`，由组件层 `Modifier.shadow` 按此量级绘制（见 theme/MmaDesign.kt）。
 - **描边**：低对比 1dp `--outline`，用于分隔而非硬阴影。
 - **可加极轻渐变/玻璃质感**，但保持单调克制（如卡片顶部 2% 白渐变高光）。
 
