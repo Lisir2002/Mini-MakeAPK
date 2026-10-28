@@ -7,11 +7,10 @@ import com.make.apk.data.model.Project
 import com.make.apk.data.model.ProjectEntry
 import com.make.apk.data.model.ShellAction
 import com.make.apk.data.model.ShellMenuItem
-import com.make.apk.data.model.ShellPresets
-import com.make.apk.data.model.ShellSpec
 import com.make.apk.logging.MmaLogger
 import com.make.apk.ui.editor.ProjectDirectory
 import com.make.apk.ui.editor.RepositoryProjectDirectory
+import com.make.apk.ui.shell.visibleTopTabItems
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -25,11 +24,11 @@ import kotlinx.coroutines.launch
  *
  * ## 职责边界
  *
- * - **加载项目**：从 [ProjectDirectory] 观察项目（读 URL 入口 + 主题色 + 项目名）；
- * - **切换预置子模板**：只改 [ShellPreviewUiState.shellSpec]，**不动** [ShellPreviewUiState.runtimeConfig]
- *   ——这正是"切换壳不重载 WebView"的实现基础（内容运行时与壳形态彻底解耦）；
+ * - **加载项目**：从 [ProjectDirectory] 观察项目（读 URL 入口 + 主题色 + 项目名 + 壳契约）；
  * - **执行壳动作**：顶栏动作 / 顶栏 tab / 底栏条目的 [ShellAction.NavigateUrl]
- *   落到"内容区加载目标 URL"。
+ *   落到"内容区加载目标 URL"；
+ * - **不做壳编辑**：预览页**不提供**任何切换 / 编辑壳的入口（用户指令："预览就是预览"）。
+ *   壳的编辑只在进阶配置页进行，改完项目 spec 后预览自动跟随。
  *
  * ## 无障碍与可解释性
  *
@@ -93,34 +92,46 @@ class ShellPreviewViewModel(
             )
             return
         }
-        val base = ShellPresets.CLASSIC
-        // 壳形态：项目已配置过壳就用项目那份（"预览 == 导出"的前提）；
-        // 未配置（默认壳 = 四区全关）则回落到默认预置子模板「经典款」。
-        val renderedSpec = if (project.shellSpec != ShellSpec.DEFAULT) project.shellSpec else base.spec
-        // **同源不变式**：高亮的预置 id 由"实际渲染的壳"反查得到（不是另写一份），
-        // 因此"高亮项 == 渲染项"恒成立——不允许出现"高亮经典款、渲染极简款"这类不一致。
-        // 项目配置的是**自定义壳**（与任何预置都不逐字段相等）→ 不高亮任何预置（null），
-        // 选择条据此显示"自定义"态。
-        val highlightedPresetId = ShellPresets.matchingBySpec(renderedSpec)?.id
-        _uiState.value = resetShellRuntime(
-            _uiState.value.copy(
-                loading = false,
-                projectNotFound = false,
-                previewable = true,
-                apkName = project.apkName,
-                themeColor = project.themeColor,
-                runtimeConfig = project.toRuntimeConfig(),
-                unsupportedMessage = null,
-                currentUrl = entry.url,
-                isExampleContent = isExampleUrl(entry.url),
-                selectedPresetId = highlightedPresetId,
-                shellSpec = renderedSpec,
+        // **同源不变式（预览 == 导出）**：渲染的壳恒为项目自己存的 spec，
+        // 不做任何"未配置就套经典款"的兜底 —— 一旦兜底，用户在预览里看到的
+        // （带顶底栏的经典款）与导出后真机上的（四区全关的纯网页）就不是同一个东西，
+        // 据此调出来的配置全是错的。想换壳请去进阶配置页改项目 spec。
+        _uiState.value = pruneDanglingSelection(
+            resetShellRuntime(
+                _uiState.value.copy(
+                    loading = false,
+                    projectNotFound = false,
+                    previewable = true,
+                    apkName = project.apkName,
+                    themeColor = project.themeColor,
+                    runtimeConfig = project.toRuntimeConfig(),
+                    unsupportedMessage = null,
+                    currentUrl = entry.url,
+                    isExampleContent = isExampleUrl(entry.url),
+                    shellSpec = project.shellSpec,
+                ),
             ),
         )
     }
 
     /**
-     * 复位壳的**抽屉运行态**（[selectPreset] 与 [applyProject] 共用，杜绝两处各写各的）。
+     * 修剪**选中态**：项目 spec 变更后，旧的选中 id 可能已在新 spec 里不存在
+     * （tab 被删 / 条目被隐藏），此时它是**悬空引用**——渲染层拿不到对应条目，
+     * 表现为"某个 tab 一直高亮但点不动"或"高亮项与实际页错位"。
+     *
+     * 只清**不在新 spec 中**的 id，存在的则保留（用户正在看的那一页不该被无故重置）。
+     */
+    private fun pruneDanglingSelection(state: ShellPreviewUiState): ShellPreviewUiState {
+        val tabIds = visibleTopTabItems(state.shellSpec.topTabs).map { it.id }.toSet()
+        val bottomIds = state.shellSpec.bottomBar.items.filter { it.visible }.map { it.id }.toSet()
+        return state.copy(
+            selectedTopTabId = state.selectedTopTabId?.takeIf { it in tabIds },
+            selectedBottomItemId = state.selectedBottomItemId?.takeIf { it in bottomIds },
+        )
+    }
+
+    /**
+     * 复位壳的**抽屉运行态**（[applyProject] 专用，杜绝两处各写各的）。
      *
      * 必须复位的原因：项目流是长流（Room 行一变就重新发射），新推送的 spec 可能
      * 已关掉抽屉区或删掉了条目；此时渲染层不再渲染抽屉 UI，用户**没有任何手段**再关抽屉
@@ -134,27 +145,6 @@ class ShellPreviewViewModel(
             drawerOpen = false,
             contentPaused = false,
         )
-
-    // ── 预置子模板 ─────────────────────────────────────────────────────
-
-    /**
-     * 切换预置子模板。
-     *
-     * 只改壳契约，**不改** [ShellPreviewUiState.runtimeConfig] → WebView 不重载。
-     * 选中态复位到"契约自带的默认选中"，避免上一个模板的条目 id 串味；
-     * 抽屉运行态经 [resetShellRuntime] 一并复位（与 [applyProject] 共用同一份复位逻辑）。
-     */
-    fun selectPreset(presetId: String) {
-        val preset = ShellPresets.byId(presetId)
-        _uiState.value = resetShellRuntime(
-            _uiState.value.copy(
-                selectedPresetId = preset.id,
-                shellSpec = preset.spec,
-                selectedTopTabId = null,
-                selectedBottomItemId = null,
-            ),
-        )
-    }
 
     // ── 壳交互 ─────────────────────────────────────────────────────────
 

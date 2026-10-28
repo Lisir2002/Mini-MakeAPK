@@ -7,22 +7,19 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.BasicAlertDialog
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.DialogProperties
 import com.make.apk.ui.components.CuteButton
+import com.make.apk.ui.components.MmaDialog
+import com.make.apk.ui.components.MmaTextButton
 import com.make.apk.ui.icons.MmaIcon
+import com.make.apk.ui.theme.ControlShapes
+import com.make.apk.ui.theme.LocalMmaDesign
 import com.make.apk.ui.theme.Spacing
 
 /**
@@ -43,7 +40,6 @@ import com.make.apk.ui.theme.Spacing
  * @param onConfirm 主按钮：FirstTime/Rationale → 发起系统请求；GoToSettings → 打开设置页。
  * @param onDismiss 次按钮（「以后再说」）/ 点击弹窗外。
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MmaPermissionDialog(
     spec: MmaPermissionSpec,
@@ -52,19 +48,23 @@ fun MmaPermissionDialog(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    BasicAlertDialog(
+    // 自绘外壳（scrim + 28dp 容器 + 弹簧进场）；按钮由内容自带（主操作是全宽胶囊
+    // CuteButton，与外壳的右对齐文字按钮区排版不同），故 dismissLabel = null。
+    MmaDialog(
         onDismissRequest = onDismiss,
+        title = spec.title,
+        dismissLabel = null,
+        centered = true,
         modifier = modifier,
-        // 平台默认宽度会限制我们的圆角容器；关掉后由弹窗自身 padding 控制
-        properties = DialogProperties(usePlatformDefaultWidth = false),
-    ) {
-        MmaPermissionDialogContent(
-            spec = spec,
-            stage = stage,
-            onConfirm = onConfirm,
-            onDismiss = onDismiss,
-        )
-    }
+        content = {
+            MmaPermissionDialogContent(
+                spec = spec,
+                stage = stage,
+                onConfirm = onConfirm,
+                onDismiss = onDismiss,
+            )
+        },
+    )
 }
 
 /**
@@ -80,6 +80,7 @@ internal fun MmaPermissionDialogContent(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
 ) {
+    val control = LocalMmaDesign.current.control
     val message = when (stage) {
         PermissionDialogStage.FirstTime -> spec.firstTimeMessage
         PermissionDialogStage.Rationale -> spec.rationaleMessage
@@ -91,57 +92,43 @@ internal fun MmaPermissionDialogContent(
         spec.confirmText
     }
 
-    Surface(
-        modifier = Modifier.padding(horizontal = Spacing.space5),
-        shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.surface,
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(Spacing.space3),
     ) {
-        Column(
-            modifier = Modifier.padding(Spacing.space6),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(Spacing.space3),
+        Box(
+            modifier = Modifier
+                .size(control.badgeIconSize)
+                .clip(ControlShapes.pill)
+                .background(MaterialTheme.colorScheme.primaryContainer),
+            contentAlignment = Alignment.Center,
         ) {
-            Box(
-                modifier = Modifier
-                    .size(64.dp) // 图标底规范尺寸（PermissionSpec 视觉规格，已登记门禁允许集）
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primaryContainer),
-                contentAlignment = Alignment.Center,
-            ) {
-                MmaIcon(
-                    iconRes = spec.iconRes,
-                    contentDescription = null, // 标题已表意，装饰性图标免重复朗读
-                    size = 32.dp, // 圆底内图标规范尺寸（已登记门禁允许集）
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                )
-            }
-
-            Text(
-                text = spec.title,
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onSurface,
-                textAlign = TextAlign.Center,
+            MmaIcon(
+                iconRes = spec.iconRes,
+                contentDescription = null, // 标题已表意，装饰性图标免重复朗读
+                size = control.badgeIconSize / 2,
+                tint = MaterialTheme.colorScheme.onPrimaryContainer,
             )
-
-            Text(
-                text = message,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-            )
-
-            CuteButton(
-                text = confirmText,
-                onClick = onConfirm,
-                modifier = Modifier.fillMaxWidth(),
-            )
-
-            TextButton(
-                onClick = onDismiss,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(text = spec.dismissText, style = MaterialTheme.typography.labelLarge)
-            }
         }
+
+        Text(
+            text = message,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
+
+        CuteButton(
+            text = confirmText,
+            onClick = onConfirm,
+            modifier = Modifier.fillMaxWidth(),
+        )
+
+        MmaTextButton(
+            label = spec.dismissText,
+            onClick = onDismiss,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }

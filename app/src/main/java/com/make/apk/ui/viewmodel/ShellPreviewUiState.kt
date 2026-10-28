@@ -1,8 +1,6 @@
 package com.make.apk.ui.viewmodel
 
 import com.make.apk.data.model.ProjectDefaults
-import com.make.apk.data.model.ShellPreset
-import com.make.apk.data.model.ShellPresets
 import com.make.apk.data.model.ShellSpec
 import com.make.apk.data.model.WebRuntimeConfig
 
@@ -42,24 +40,20 @@ data class ShellPreviewUiState(
     val previewable: Boolean = false,
     /** 不可预览时的可见提示（用户能看懂的原因）。 */
     val unsupportedMessage: String? = null,
-    /** 全部预置子模板（选择 UI 的数据源）。 */
-    val presets: List<ShellPreset> = ShellPresets.ALL,
     /**
-     * 当前选中的预置子模板 id；**null = 不高亮任何预置**（"自定义"态）。
+     * 当前生效的壳契约**恒等于项目自己存的 spec**（预览 == 导出的同源不变式）。
      *
-     * ## 不变式（高亮 == 渲染）
+     * ## 为什么不再有"预置子模板"字段
      *
-     * 非 null 时，该 id **必须**由"实际渲染的壳"反查得到（[ShellPresets.matchingBySpec]），
-     * 故 [ShellPresets.byId] 解析出的预置契约与 [shellSpec] **逐字段相等**——
-     * 即"选择条高亮的模板"与"实际渲染的壳"永远同源，不可能出现
-     * "高亮经典款、实际渲染极简款"这类状态不一致。
+     * 原状态带 `presets` / `selectedPresetId`，预览页据此渲染一条"壳模板"切换条，
+     * 且当项目未配置壳时把渲染 spec 偷偷替换成 `ShellPresets.CLASSIC`——
+     * 这直接破坏了"预览 == 导出"：导出用的是项目 spec（未配置 = 四区全关的纯网页），
+     * 预览却显示带顶底栏的经典款，用户据此调完的配置装到真机上完全不是一回事。
      *
-     * null 表示"当前渲染的壳是项目自定义壳，与任何预置都不相等"，
-     * 此时选择条不高亮任何预置（改显示"自定义"态），从根上消灭不一致。
+     * 预览页的职责只有一个：**如实渲染项目将要导出的那台"设备"**。
+     * 想换壳去进阶配置页（预置壳 / 自定义都在那里配），配完回来预览即见。
      */
-    val selectedPresetId: String? = ShellPresets.CLASSIC.id,
-    /** 当前生效的壳契约（= 选中预置子模板的 spec，或项目自定义壳）。 */
-    val shellSpec: ShellSpec = ShellPresets.CLASSIC.spec,
+    val shellSpec: ShellSpec = ShellSpec.DEFAULT,
     /** 当前选中的顶栏 tab 条目 id。 */
     val selectedTopTabId: String? = null,
     /** 当前选中的底栏条目 id。 */

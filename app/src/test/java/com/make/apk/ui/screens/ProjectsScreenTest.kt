@@ -95,11 +95,7 @@ class ProjectsScreenTest {
                     .background(MaterialTheme.colorScheme.background),
                 contentAlignment = Alignment.Center,
             ) {
-                DeleteConfirmContent(
-                    apkName = "示例网址",
-                    onConfirm = {},
-                    onDismiss = {},
-                )
+                DeleteConfirmContent(apkName = "示例网址")
             }
         }
     }

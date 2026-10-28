@@ -2,7 +2,6 @@ package com.make.apk.ui.editor
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,8 +13,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PageSize
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -32,6 +29,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.make.apk.ui.components.CuteCard
 import com.make.apk.data.model.ProjectType
 import com.make.apk.ui.icons.MmaIcon
 import com.make.apk.ui.icons.MmaIcons
@@ -167,16 +165,16 @@ private fun ProjectTypeCard(
         MaterialTheme.colorScheme.onSurfaceVariant
     }
 
-    Card(
+    CuteCard(
         modifier = modifier
             .scale(scale)
             .semantics(mergeDescendants = true) {
                 contentDescription = accessibilityLabelOf(type)
                 role = Role.Button
-            }
-            .clickable(onClickLabel = "选择项目类型") { onSelected(type) },
+            },
+        onClick = { onSelected(type) },
+        containerColor = containerColor,
         shape = MaterialTheme.shapes.large,
-        colors = CardDefaults.cardColors(containerColor = containerColor),
     ) {
         Column(
             modifier = Modifier

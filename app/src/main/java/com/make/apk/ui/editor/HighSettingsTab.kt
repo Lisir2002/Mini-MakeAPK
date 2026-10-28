@@ -4,19 +4,19 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.BasicAlertDialog
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.window.DialogProperties
 import com.make.apk.ui.components.CuteCard
+import com.make.apk.ui.components.MmaDialog
+import com.make.apk.ui.components.MmaTextButton
+import com.make.apk.ui.screens.DELETE_CONFIRM_TEXT
+import com.make.apk.ui.screens.DELETE_CONFIRM_TITLE
 import com.make.apk.ui.screens.DeleteConfirmContent
 import com.make.apk.ui.theme.Spacing
 
@@ -31,7 +31,6 @@ import com.make.apk.ui.theme.Spacing
  *
  * @param apkName 待删除项目名（提示里点名，降低误删近似项概率）。
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HighSettingsTab(
     apkName: String,
@@ -84,30 +83,27 @@ fun HighSettingsTab(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                TextButton(onClick = { showDeleteConfirm = true }) {
-                    Text(
-                        text = "删除项目",
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                }
+                MmaTextButton(
+                    label = "删除项目",
+                    onClick = { showDeleteConfirm = true },
+                    color = MaterialTheme.colorScheme.error,
+                )
             }
         }
     }
 
     if (showDeleteConfirm) {
-        BasicAlertDialog(
+        MmaDialog(
             onDismissRequest = { showDeleteConfirm = false },
-            properties = DialogProperties(usePlatformDefaultWidth = false),
-        ) {
-            DeleteConfirmContent(
-                apkName = apkName.ifBlank { "该项目" },
-                onConfirm = {
-                    showDeleteConfirm = false
-                    onDelete()
-                },
-                onDismiss = { showDeleteConfirm = false },
-            )
-        }
+            title = DELETE_CONFIRM_TITLE,
+            confirmLabel = DELETE_CONFIRM_TEXT,
+            onConfirm = {
+                showDeleteConfirm = false
+                onDelete()
+            },
+            destructive = true,
+            content = { DeleteConfirmContent(apkName = apkName.ifBlank { "该项目" }) },
+        )
     }
 }
 

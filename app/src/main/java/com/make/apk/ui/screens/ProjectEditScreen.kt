@@ -13,13 +13,13 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import com.make.apk.data.model.ShellSpec
 import com.make.apk.data.model.VersionScheme
 import com.make.apk.ui.components.MmaScreen
+import com.make.apk.ui.components.MmaTextButton
 import com.make.apk.ui.editor.EditField
 import com.make.apk.ui.editor.EditIdentityCard
 import com.make.apk.ui.editor.EditTabRow
@@ -100,9 +100,11 @@ fun ProjectEditScreen(
                     },
                 )
             }
-            TextButton(onClick = onSave, enabled = state.canSave) {
-                Text("保存")
-            }
+            MmaTextButton(
+                label = "保存",
+                onClick = onSave,
+                enabled = state.canSave,
+            )
         },
     ) { innerPadding ->
         Column(

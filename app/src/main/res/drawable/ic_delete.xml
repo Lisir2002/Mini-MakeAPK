@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  SVG 来源：Material Icons "delete"（Apache-2.0）路径数据转为 Android VectorDrawable。
+  24dp 网格，tint 由调用方注入，底色纯黑。
+  壳条目行的「删除」动作图标（自绘图标按钮使用，危险操作走 error 色）。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M6,19c0,1.1 0.9,2 2,2h8c1.1,0 2,-0.9 2,-2V7H6v12zM19,4h-3.5l-1,-1h-5l-1,1H5v2h14V4z" />
+</vector>

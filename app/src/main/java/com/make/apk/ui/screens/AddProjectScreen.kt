@@ -12,12 +12,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -30,7 +28,10 @@ import androidx.compose.ui.unit.dp
 import com.make.apk.data.model.ProjectDefaults
 import com.make.apk.data.model.ProjectType
 import com.make.apk.data.model.VersionScheme
+import com.make.apk.ui.components.MmaChip
+import com.make.apk.ui.components.MmaDialog
 import com.make.apk.ui.components.MmaScreen
+import com.make.apk.ui.components.MmaTextButton
 import com.make.apk.ui.editor.AddField
 import com.make.apk.ui.editor.FieldMessage
 import com.make.apk.ui.editor.FieldMessageText
@@ -41,6 +42,7 @@ import com.make.apk.ui.editor.ProjectTypeSelector
 import com.make.apk.ui.editor.SectionCard
 import com.make.apk.ui.editor.ThemeColorSwatches
 import com.make.apk.ui.editor.VersionSchemeChips
+import com.make.apk.ui.icons.MmaIcons
 import com.make.apk.ui.theme.Spacing
 import com.make.apk.ui.viewmodel.AddProjectUiState
 
@@ -94,18 +96,21 @@ fun AddProjectScreen(
         onBack = requestBack,
         modifier = modifier,
         actions = {
-            TextButton(
+            // 自绘文字按钮：原生 TextButton 的内边距与涟漪与自绘顶栏不同皮肤。
+            MmaTextButton(
+                label = "保存",
                 onClick = onSave,
                 enabled = state.canSave,
-            ) {
+            ) { contentColor ->
                 if (state.saving) {
                     // 保存中：进度圈替代文字（同一槽位，避免双击重复提交）
                     CircularProgressIndicator(
                         modifier = Modifier.size(SAVE_PROGRESS_SIZE),
                         strokeWidth = SAVE_PROGRESS_STROKE,
+                        color = contentColor,
                     )
                 } else {
-                    Text("保存")
+                    Text("保存", color = contentColor)
                 }
             }
         },
@@ -175,9 +180,10 @@ fun AddProjectScreen(
                         )
                     }
                 }
-                TextButton(onClick = onPickIcon) {
-                    Text("选择图标")
-                }
+                MmaTextButton(
+                    label = ICON_PICK_LABEL,
+                    onClick = onPickIcon,
+                )
                 messageOf(state, AddField.ICON)?.let { message ->
                     FieldMessageText(message = message)
                 }
@@ -281,32 +287,38 @@ private fun SuggestionChipRow(
     modifier: Modifier = Modifier,
 ) {
     if (suggestion.isBlank()) return
-    AssistChip(
+    MmaChip(
+        label = "采用${label}建议：$suggestion",
+        selected = false,
         onClick = onApply,
+        leadingIcon = MmaIcons.CheckCircle,
         modifier = modifier,
-        label = { Text("采用${label}建议：$suggestion") },
     )
 }
 
-/** 「放弃修改？」确认对话框（返回意图唯一确认出口，文案不与校验器耦合）。 */
+/**
+ * 「放弃修改？」确认对话框（返回意图唯一确认出口，文案不与校验器耦合）。
+ *
+ * 走自绘 [MmaDialog]：原生 `AlertDialog` 的标题 / 正文 / 按钮排版与全站弹窗不同皮肤，
+ * 且按钮强制为 `TextButton`（Material 涟漪 + 内边距）。
+ */
 @Composable
 private fun DiscardChangesDialog(
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
 ) {
-    AlertDialog(
+    MmaDialog(
         onDismissRequest = onDismiss,
-        title = { Text("放弃新建项目？") },
-        text = { Text("已填写的内容不会被保存。") },
-        confirmButton = {
-            TextButton(onClick = onConfirm) {
-                Text("放弃", color = MaterialTheme.colorScheme.error)
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("继续编辑")
-            }
+        title = DISCARD_TITLE,
+        confirmLabel = DISCARD_CONFIRM,
+        onConfirm = onConfirm,
+        destructive = true,
+        content = {
+            Text(
+                text = DISCARD_BODY,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         },
     )
 }
@@ -316,6 +328,18 @@ private fun DiscardChangesDialog(
  */
 private fun messageOf(state: AddProjectUiState, field: AddField): FieldMessage? =
     state.errors[field] ?: state.warnings[field]
+
+/** 图标选择按钮文案。 */
+private const val ICON_PICK_LABEL: String = "选择图标"
+
+/** 放弃确认弹窗标题。 */
+private const val DISCARD_TITLE: String = "放弃新建项目？"
+
+/** 放弃确认主操作文案（危险操作，按钮走 error 色）。 */
+private const val DISCARD_CONFIRM: String = "放弃"
+
+/** 放弃确认正文。 */
+private const val DISCARD_BODY: String = "已填写的内容不会被保存。"
 
 /** 应用名称输入框标签。 */
 private const val APK_NAME_LABEL: String = "应用名称"

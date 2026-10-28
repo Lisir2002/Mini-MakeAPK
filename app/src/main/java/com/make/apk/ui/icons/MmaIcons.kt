@@ -38,6 +38,13 @@ object MmaIcons {
     val TypeHtml: Int = R.drawable.ic_type_html
     val TypeVue: Int = R.drawable.ic_type_vue
     val TypePhp: Int = R.drawable.ic_type_php
+
+    // ── 条目行操作（自绘图标按钮）──────────────────────────────────────
+    val Edit: Int = R.drawable.ic_edit
+    val Delete: Int = R.drawable.ic_delete
+
+    // ── 步进器（自绘数字步进器，与 Add 成对）──────────────────────────
+    val Minus: Int = R.drawable.ic_minus
 }
 
 /**

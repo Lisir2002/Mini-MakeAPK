@@ -43,9 +43,9 @@ import com.make.apk.data.model.ShellTopTabs
  *
  * | 档位 | 选中态表现 | 底部指示条 | 药丸背景 |
  * |---|---|---|---|
- * | [ShellSelectionStyle.INDICATOR] | 强调色文字 + 底部强调色指示条（M3 TabRow 风格） | ✅ 有 | ❌ 无 |
- * | [ShellSelectionStyle.PILL] | 强调容器色药丸背景 + 容器色上的前景色文字 | ❌ 无 | ✅ 有 |
- * | [ShellSelectionStyle.TEXT] | 强调色文字 + 字重强调（**无任何背景**） | ❌ 无 | ❌ 无 |
+ * | [ShellSelectionStyle.INDICATOR] | 强调色文字 + 底部强调色指示条（M3 TabRow 风格） | 有 | 无 |
+ * | [ShellSelectionStyle.PILL] | 强调容器色药丸背景 + 容器色上的前景色文字 | 无 | 有 |
+ * | [ShellSelectionStyle.TEXT] | 强调色文字 + 字重强调（**无任何背景**） | 无 | 无 |
  *
  * ## [showIndicator]（[ShellTopTabs.showSelectionIndicator]）的语义
  *

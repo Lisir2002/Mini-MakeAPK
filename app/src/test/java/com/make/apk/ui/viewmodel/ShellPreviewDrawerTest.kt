@@ -123,7 +123,10 @@ class ShellPreviewDrawerTest {
     }
 
     @Test
-    fun selectPreset_closesDrawerAndClearsSelection() = runTest(dispatcher) {
+    fun shellSpecUpdate_closesDrawerAndClearsSelection() = runTest(dispatcher) {
+        // 原用例测的是"预览页切预置壳"，该功能已移除（预览不提供切壳入口）。
+        // 复位逻辑本身仍必须存在：项目 spec 被改（如关掉抽屉、删掉条目）后，
+        // 运行态若不复位，内容区 WebView 会永久停在 onPause() —— 表现为"内容永不刷新"。
         directory.put(drawerProject(pauseContent = true))
         val vm = ShellPreviewViewModel(projectId = 1L, directory = directory)
         advanceUntilIdle()
@@ -133,7 +136,9 @@ class ShellPreviewDrawerTest {
         advanceUntilIdle()
         assertTrue(vm.uiState.value.drawerOpen)
 
-        vm.selectPreset(ShellPresets.MINIMAL.id)
+        // 项目 spec 更新（模拟用户在进阶配置页改完壳并落库）。
+        // 必须推**内容不同**的项目：项目流带去重，同值不会触发发射。
+        directory.put(drawerProject(pauseContent = false))
         advanceUntilIdle()
 
         assertFalse(vm.uiState.value.drawerOpen)

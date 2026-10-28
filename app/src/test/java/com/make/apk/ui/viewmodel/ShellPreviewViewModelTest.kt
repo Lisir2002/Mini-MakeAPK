@@ -91,26 +91,21 @@ class ShellPreviewViewModelTest {
     }
 
     @Test
-    fun firstFrame_highlightedPresetMatchesRenderedShell() = runTest(dispatcher) {
-        // 状态一致性：选择条高亮的模板 id 必须与实际生效的壳契约来自同一套预置，
-        // 不允许出现"高亮经典款、渲染裸壳（DEFAULT）"。
+    fun firstFrame_rendersProjectShellExactly_noPresetFallback() = runTest(dispatcher) {
+        // **新不变式（钉死）**：预览渲染的壳恒等于项目自己存的 spec。
+        // 曾有过"项目未配壳就偷偷套经典款"的兜底 —— 那会让预览（带顶底栏）
+        // 与导出（四区全关的纯网页）不是同一个东西，据此调出的配置全是错的。
         directory.put(urlProject())
         val vm = ShellPreviewViewModel(projectId = 1L, directory = directory)
         advanceUntilIdle()
 
         val state = vm.uiState.value
-        val preset = ShellPresets.byId(state.selectedPresetId)
-        assertEquals(preset.spec, state.shellSpec)
-        assertTrue(state.shellSpec.topBar.enabled)
-
-        // **不变式（钉死）**：高亮的预置 id 解析回的契约，必须与实际渲染的壳**逐字段相等**。
-        // 高亮项与渲染项"同源"——由渲染中的壳反查得到，不允许各写各的。
-        assertNotNull("项目未配置壳 → 必须高亮默认预置「经典款」", state.selectedPresetId)
         assertEquals(
-            "高亮的预置模板必须与实际渲染的壳一致（不允许'高亮经典款、渲染别的壳'）",
-            ShellPresets.byId(state.selectedPresetId).spec,
+            "项目未配置壳 → 必须原样渲染 ShellSpec.DEFAULT，绝不套任何预置",
+            ShellSpec.DEFAULT,
             state.shellSpec,
         )
+        assertFalse("未配置壳的项目不得凭空长出顶栏", state.shellSpec.topBar.enabled)
     }
 
     @Test
@@ -123,21 +118,7 @@ class ShellPreviewViewModelTest {
 
         assertEquals(ShellPresets.MINIMAL.spec, vm.uiState.value.shellSpec)
 
-        // 不变式（钉死）：高亮项与渲染项**同源**——项目壳恰好等于某个预置时，
-        // 高亮的必须是**那个**预置（由渲染中的壳反查得到），绝不是恒定的"经典款"。
-        assertEquals(
-            "项目已配置的壳恰好等于「极简款」→ 高亮的必须是「极简款」，不得是「经典款」",
-            ShellPresets.MINIMAL.id,
-            vm.uiState.value.selectedPresetId,
-        )
-        assertEquals(
-            "高亮的预置模板必须与实际渲染的壳一致",
-            ShellPresets.byId(vm.uiState.value.selectedPresetId).spec,
-            vm.uiState.value.shellSpec,
-        )
-
-        // 另一面：项目配置了**自定义壳**（与任何预置都不逐字段相等）→
-        // 不高亮任何预置（null），选择条据此显示"自定义"态；渲染的仍是项目自己那份。
+        // 另一面：项目配置了**自定义壳**（与任何预置都不逐字段相等）→ 原样渲染。
         val custom = urlProject().copy(
             shellSpec = ShellSpec.DEFAULT.copy(drawer = ShellDrawer(enabled = true)),
         )
@@ -146,35 +127,40 @@ class ShellPreviewViewModelTest {
         advanceUntilIdle()
 
         assertEquals("自定义壳必须被原样渲染", custom.shellSpec, customVm.uiState.value.shellSpec)
-        assertNull("自定义壳不属于任何预置 → 不得高亮任何预置", customVm.uiState.value.selectedPresetId)
     }
 
     @Test
-    fun selectPreset_changesShellOnly_andKeepsRuntimeConfigReference() = runTest(dispatcher) {
-        directory.put(urlProject())
+    fun projectSpecUpdate_isReflectedInPreview() = runTest(dispatcher) {
+        // 项目流是长流：spec 一改（用户在进阶配置页改完）预览必须跟随——
+        // 这是"配完壳回来预览即见"的实现基础。
+        directory.put(urlProject().copy(shellSpec = ShellSpec.DEFAULT))
         val vm = ShellPreviewViewModel(projectId = 1L, directory = directory)
         advanceUntilIdle()
+        assertEquals(ShellSpec.DEFAULT, vm.uiState.value.shellSpec)
 
-        val before = vm.uiState.value.runtimeConfig
-        vm.selectPreset(ShellPresets.TABBED.id)
-
-        val after = vm.uiState.value
-        assertEquals(ShellPresets.TABBED.id, after.selectedPresetId)
-        assertEquals(ShellPresets.TABBED.spec, after.shellSpec)
-        // 关键：内容运行时配置**同一引用** → WebView 的去重判定命中 → 不 reload
-        assertTrue(before === after.runtimeConfig)
+        directory.put(urlProject().copy(shellSpec = ShellPresets.TABBED.spec))
+        advanceUntilIdle()
+        assertEquals(
+            "项目 spec 更新后预览必须跟随（不允许停留在旧壳）",
+            ShellPresets.TABBED.spec,
+            vm.uiState.value.shellSpec,
+        )
     }
 
     @Test
-    fun selectPreset_resetsSelectionState() = runTest(dispatcher) {
-        directory.put(urlProject())
+    fun projectUpdate_resetsSelectionState() = runTest(dispatcher) {
+        // 新推送的 spec 可能已删掉条目 / 关掉抽屉，旧选中态会变成悬空引用 → 必须复位。
+        directory.put(urlProject().copy(shellSpec = ShellPresets.TABBED.spec))
         val vm = ShellPreviewViewModel(projectId = 1L, directory = directory)
         advanceUntilIdle()
 
         vm.onTopTabSelected(ShellPresets.TABBED.spec.topTabs.items[1])
         assertEquals(ShellPresets.TABBED.spec.topTabs.items[1].id, vm.uiState.value.selectedTopTabId)
 
-        vm.selectPreset(ShellPresets.CLASSIC.id)
+        // 换一套**内容不同**的壳（模拟用户在进阶配置页改完落库）：
+        // 项目流带去重，推送完全相同的值不会触发发射，故这里必须换 spec。
+        directory.put(urlProject().copy(shellSpec = ShellPresets.MINIMAL.spec))
+        advanceUntilIdle()
         assertNull(vm.uiState.value.selectedTopTabId)
         assertNull(vm.uiState.value.selectedBottomItemId)
     }

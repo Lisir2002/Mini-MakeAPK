@@ -95,6 +95,87 @@ data class ChromeScale(
     val bottomBarHeight: Dp = 56.dp,
 )
 
+/**
+ * 控件尺度令牌——**自绘控件**的全部几何常量（DESIGN_LANGUAGE §7 新增 `control` 段）。
+ *
+ * ## 为什么必须存在
+ *
+ * 项目铁律是「禁止硬编码 UI」。自绘一套控件（下拉 / 弹窗 / 开关 / 分段 / 芯片 / 步进器）
+ * 会引入大量几何常量：若散落在业务代码里写裸 dp，设计令牌门禁必然被不断加白名单，
+ * 白名单越加越长 == 硬编码事实上合法化。故**先把几何收进令牌**，业务层只读
+ * `LocalMmaDesign.current.control.*`，门禁一行白名单都不用加。
+ *
+ * ## 数值来源
+ *
+ * 取自 Material 3 Expressive 分段式菜单 / 控件规范（联网调研，2026-10）：
+ * 菜单项高 48、图标 20、分段间隙 2、菜单宽 112–280、字段高 56；
+ * 开关轨道 52×32 / 滑块 24 为 M3 标准几何；触控最小 48 为无障碍底线。
+ */
+data class ControlScale(
+    /** 48dp——菜单 / 列表项最小高度（M3 规范项高，同时是最小触控区）。 */
+    val menuItemHeight: Dp = 48.dp,
+
+    /** 2dp——分段式菜单的组间 / 项间间隙（M3E `SegmentedGap`）。 */
+    val menuGroupGap: Dp = 2.dp,
+
+    /** 112dp——菜单最小宽度（M3E 下限）。 */
+    val menuMinWidth: Dp = 112.dp,
+
+    /** 280dp——菜单最大宽度（M3E 上限，超过则截断而非铺满）。 */
+    val menuMaxWidth: Dp = 280.dp,
+
+    /** 20dp——菜单项 / 行内前导图标尺寸（M3E `ItemLeadingIconSize`）。 */
+    val menuItemIcon: Dp = 20.dp,
+
+    /** 12dp——菜单项水平内边距（M3E `ItemHorizontalPadding`）。 */
+    val menuItemPaddingH: Dp = 12.dp,
+
+    /** 56dp——下拉 / 输入字段标准高度（与 M3 filled text field 一致）。 */
+    val fieldHeight: Dp = 56.dp,
+
+    /** 52dp——开关轨道宽度（M3 Switch 几何）。 */
+    val switchTrackWidth: Dp = 52.dp,
+
+    /** 32dp——开关轨道高度（M3 Switch 几何）。 */
+    val switchTrackHeight: Dp = 32.dp,
+
+    /** 24dp——开关滑块直径（M3 Switch 几何）。 */
+    val switchThumb: Dp = 24.dp,
+
+    /** 4dp——开关滑块距轨道边缘的内缩量（= (32-24)/2）。 */
+    val switchThumbInset: Dp = 4.dp,
+
+    /** 36dp——药丸芯片高度（比字段矮一档，用于筛选 / 预置选择）。 */
+    val chipHeight: Dp = 36.dp,
+
+    /** 40dp——步进器按钮与图标按钮边长（满足 40+ 触控，列表行内不膨胀）。 */
+    val iconButtonSize: Dp = 40.dp,
+
+    /** 20dp——单选圆点直径（M3 RadioButton 几何）。 */
+    val radioSize: Dp = 20.dp,
+
+    /** 2dp——单选圆环描边宽度。 */
+    val radioStroke: Dp = 2.dp,
+
+    /** 3dp——Tab 选中指示器高度（比 M3 默认 2dp 重一档，远距可辨）。 */
+    val tabIndicatorHeight: Dp = 3.dp,
+
+    /** 1dp——分隔线厚度（hairline）。 */
+    val dividerHeight: Dp = 1.dp,
+
+    /** 320dp——弹窗最大宽度（M3 规范区间 280–560 的手机档，平板不铺满）。 */
+    val dialogMaxWidth: Dp = 320.dp,
+
+    /** 40dp——主按钮高度（M3 filled button 标准几何）。 */
+    val buttonHeight: Dp = 40.dp,
+
+    /** 72dp——大状态图标边长（加载 / 空态插画位）。 */
+    val statusIconSize: Dp = 72.dp,
+
+    /** 64dp——圆形图标底边长（权限弹窗等"说明型"弹窗的视觉锚点，图标取其一半）。 */
+    val badgeIconSize: Dp = 64.dp,
+)
+
 /** 表面材质档位——骨架「插拔换样式」的粒度单位（DESIGN_LANGUAGE §7 规划）。 */
 enum class MaterialTier {
     /** 纯色平面：默认档，最省电，磨砂关闭时使用。 */
@@ -167,6 +248,7 @@ data class MmaDesign(
     val alpha: AlphaScale = AlphaScale(),
     val elevation: ElevationScale = ElevationScale(),
     val chrome: ChromeScale = ChromeScale(),
+    val control: ControlScale = ControlScale(),
     val defaultMaterial: MaterialTier = MaterialTier.Flat,
     val translucent: TranslucentSpec = TranslucentSpec(),
     val scaffold: ScaffoldStyle = ScaffoldStyle(),

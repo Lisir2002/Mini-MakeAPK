@@ -10,13 +10,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.BasicAlertDialog
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -24,12 +21,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.make.apk.data.model.Project
 import com.make.apk.ui.components.CuteCard
+import com.make.apk.ui.components.MmaDialog
+import com.make.apk.ui.components.MmaTextButton
 import com.make.apk.ui.components.MmaScreen
 import com.make.apk.ui.editor.ProjectIcon
 import com.make.apk.ui.editor.displayLabelOf
@@ -146,75 +144,42 @@ fun ProjectsScreen(
  * @param onConfirm 确认：由调用方执行真正的删除。
  * @param onDismiss 取消 / 点击弹窗外 / 返回键：只关闭，**不删**。
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun DeleteConfirmDialog(
     apkName: String,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    BasicAlertDialog(
+    MmaDialog(
         onDismissRequest = onDismiss,
-        // 平台默认宽度会挤压我们自己的圆角容器；关掉后由内容自身 padding 控制
-        properties = DialogProperties(usePlatformDefaultWidth = false),
-    ) {
-        DeleteConfirmContent(
-            apkName = apkName,
-            onConfirm = onConfirm,
-            onDismiss = onDismiss,
-        )
-    }
+        title = DELETE_CONFIRM_TITLE,
+        confirmLabel = DELETE_CONFIRM_TEXT,
+        onConfirm = onConfirm,
+        destructive = true,
+        content = { DeleteConfirmContent(apkName = apkName) },
+    )
 }
 
 /**
- * 删除确认弹窗内容（无 Dialog 外壳的纯内容 composable）。
+ * 删除确认弹窗的**纯内容**（只讲后果，按钮由 [MmaDialog] 统一提供）。
+ *
+ * 为什么按钮不在这里：此前本函数自带按钮行，导致"弹窗外壳"（[MmaDialog]）与
+ * "内容"各有一套按钮排版 —— 一旦外壳换了圆角 / 间距，内容里的按钮就与全站弹窗
+ * 不同皮肤。现在统一由外壳渲染按钮区，本函数只负责文案。
  *
  * 与 [DeleteConfirmDialog] 同源：截图回归直接钉本函数，像素仅差一层 scrim 背景。
  */
 @Composable
 internal fun DeleteConfirmContent(
     apkName: String,
-    onConfirm: () -> Unit,
-    onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Surface(
-        modifier = modifier.padding(horizontal = Spacing.space5),
-        shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.surface,
-    ) {
-        Column(
-            modifier = Modifier.padding(Spacing.space6),
-            verticalArrangement = Arrangement.spacedBy(Spacing.space3),
-        ) {
-            Text(
-                text = DELETE_CONFIRM_TITLE,
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            Text(
-                text = "「$apkName」将被删除，项目数据会一并清除，且无法恢复。",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(Spacing.space2, Alignment.End),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                TextButton(onClick = onDismiss) {
-                    Text(text = DELETE_DISMISS_TEXT, style = MaterialTheme.typography.labelLarge)
-                }
-                TextButton(onClick = onConfirm) {
-                    Text(
-                        text = DELETE_CONFIRM_TEXT,
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                }
-            }
-        }
-    }
+    Text(
+        text = "「$apkName」将被删除，项目数据会一并清除，且无法恢复。",
+        modifier = modifier,
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
 }
 
 /** 空态：图标 + 「还没有项目，点右上角 ＋ 新建一个」引导。 */
@@ -296,9 +261,11 @@ private fun ProjectRow(
                 }
             }
             if (onDelete != null) {
-                TextButton(onClick = onDelete) {
-                    Text("删除")
-                }
+                MmaTextButton(
+                    label = "删除",
+                    onClick = onDelete,
+                    color = MaterialTheme.colorScheme.error,
+                )
             }
         }
     }
@@ -315,10 +282,12 @@ private val EMPTY_STATE_ICON_SIZE: Dp = 36.dp
 private val ROW_ICON_SIZE: Dp = 40.dp
 
 /** 删除确认弹窗标题。 */
-private const val DELETE_CONFIRM_TITLE: String = "删除项目"
+internal const val DELETE_CONFIRM_TITLE: String = "删除项目"
 
-/** 删除确认弹窗·确认（执行删除，走 `error` 色文案）。 */
-private const val DELETE_CONFIRM_TEXT: String = "确认删除"
-
-/** 删除确认弹窗·取消（关闭，不删）。 */
-private const val DELETE_DISMISS_TEXT: String = "取消"
+/**
+ * 删除确认弹窗·确认（执行删除，走 `error` 色文案）。
+ *
+ * `internal`：高级配置 Tab 的删除确认与本项目列表**同源同文案**（一处改、两处生效），
+ * 避免两处各写一份导致措辞漂移。
+ */
+internal const val DELETE_CONFIRM_TEXT: String = "确认删除"

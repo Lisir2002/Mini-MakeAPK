@@ -322,7 +322,6 @@ fun MmaNavHost(
                 ShellPreviewScreen(
                     state = state,
                     onBack = { navController.popBackStack() },
-                    onPresetSelected = vm::selectPreset,
                     onTopTabSelected = vm::onTopTabSelected,
                     onBottomItemSelected = vm::onBottomItemSelected,
                     onDrawerItemSelected = vm::onDrawerItemSelected,

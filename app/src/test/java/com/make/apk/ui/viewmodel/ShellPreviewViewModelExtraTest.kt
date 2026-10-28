@@ -59,63 +59,11 @@ class ShellPreviewViewModelExtraTest {
         Dispatchers.resetMain()
     }
 
-    // ── 1. 切换子模板不重载 WebView ──────────────────────────────────────
+    // ── 1. 非法 projectId ───────────────────────────────────────────────
 
-    @Test
-    fun selectPreset_acrossAllPresets_neverChangesRuntimeConfigReference() = runTest(dispatcher) {
-        directory.put(urlProject())
-        val vm = ShellPreviewViewModel(projectId = 1L, directory = directory)
-        advanceUntilIdle()
-
-        val before = vm.uiState.value.runtimeConfig
-        assertNotNull(before)
-
-        ShellPresets.ALL.forEach { preset ->
-            vm.selectPreset(preset.id)
-            advanceUntilIdle()
-            val after = vm.uiState.value.runtimeConfig
-            assertTrue(
-                "切换到 ${preset.id} 后 runtimeConfig 引用必须不变（否则 WebView 会 reload）",
-                before === after,
-            )
-        }
-    }
-
-    @Test
-    fun selectPreset_neverChangesEntryUrl() = runTest(dispatcher) {
-        directory.put(urlProject())
-        val vm = ShellPreviewViewModel(projectId = 1L, directory = directory)
-        advanceUntilIdle()
-
-        val entryBefore = vm.uiState.value.runtimeConfig?.entry
-        ShellPresets.ALL.forEach { preset ->
-            vm.selectPreset(preset.id)
-            advanceUntilIdle()
-            assertEquals(
-                "切换到 ${preset.id} 不得改变内容区入口地址",
-                entryBefore,
-                vm.uiState.value.runtimeConfig?.entry,
-            )
-        }
-    }
-
-    @Test
-    fun selectPreset_onlyChangesShellAndSelectionState() = runTest(dispatcher) {
-        directory.put(urlProject())
-        val vm = ShellPreviewViewModel(projectId = 1L, directory = directory)
-        advanceUntilIdle()
-
-        vm.onTopTabSelected(ShellPresets.TABBED.spec.topTabs.items[1])
-        vm.selectPreset(ShellPresets.TABBED.id)
-        advanceUntilIdle()
-
-        assertEquals(ShellPresets.TABBED.id, vm.uiState.value.selectedPresetId)
-        assertEquals(ShellPresets.TABBED.spec, vm.uiState.value.shellSpec)
-        assertNull("切换模板后顶栏选中态应复位", vm.uiState.value.selectedTopTabId)
-        assertNull("切换模板后底栏选中态应复位", vm.uiState.value.selectedBottomItemId)
-    }
-
-    // ── 2. 非法 projectId ───────────────────────────────────────────────
+    // 说明：原「切换预置子模板不重载 WebView」一组用例已随功能删除而移除 ——
+    // 预览页不再提供切壳入口（用户指令"预览就是预览"），该不变式失去载体。
+    // 取而代之的是 §3 的「渲染的壳恒等于项目 spec」。
 
     @Test
     fun invalidProjectId_marksNotFoundAndIsNotPreviewable() = runTest(dispatcher) {
@@ -138,26 +86,25 @@ class ShellPreviewViewModelExtraTest {
         assertTrue(vm.uiState.value.projectNotFound)
     }
 
-    // ── 3. 预置高亮与实际渲染壳的一致性（评审偏差 3 的核心不变量）──────
+    // ── 3. 渲染的壳恒等于项目 spec（预览 == 导出的核心不变量）────────────
 
     @Test
-    fun highlightedPreset_matchesRenderedShell_whenProjectHasNoShell() = runTest(dispatcher) {
+    fun renderedShell_equalsProjectSpec_whenProjectHasNoShell() = runTest(dispatcher) {
         directory.put(urlProject())
         val vm = ShellPreviewViewModel(projectId = 1L, directory = directory)
         advanceUntilIdle()
 
         val state = vm.uiState.value
         assertEquals(
-            "高亮的预置模板必须就是实际渲染的那一套",
-            ShellPresets.byId(state.selectedPresetId).spec,
+            "未配置壳 → 必须渲染 ShellSpec.DEFAULT（不得偷偷套任何预置）",
+            ShellSpec.DEFAULT,
             state.shellSpec,
         )
     }
 
     @Test
-    fun highlightedPreset_matchesRenderedShell_whenProjectHasConfiguredShell() = runTest(dispatcher) {
-        // 项目已配置壳（MINIMAL）→ 渲染的必须是项目那份；
-        // 此时"高亮的预置模板"也必须与渲染的壳一致，否则选择条会指向另一套壳。
+    fun renderedShell_equalsProjectSpec_whenProjectHasConfiguredShell() = runTest(dispatcher) {
+        // 项目已配置壳（MINIMAL）→ 渲染的必须是项目那份，逐字段相等。
         directory.put(urlProject().copy(shellSpec = ShellPresets.MINIMAL.spec))
         val vm = ShellPreviewViewModel(projectId = 1L, directory = directory)
         advanceUntilIdle()
@@ -168,11 +115,21 @@ class ShellPreviewViewModelExtraTest {
             ShellPresets.MINIMAL.spec,
             state.shellSpec,
         )
-        assertEquals(
-            "高亮的预置模板必须与实际渲染的壳一致（不允许'高亮经典款、渲染极简款'）",
-            ShellPresets.byId(state.selectedPresetId).spec,
-            state.shellSpec,
-        )
+    }
+
+    @Test
+    fun renderedShell_equalsProjectSpec_forEveryPreset() = runTest(dispatcher) {
+        // 全景钉死：无论项目配成哪一套预置，预览渲染的都必须与项目 spec 逐字段相等。
+        ShellPresets.ALL.forEach { preset ->
+            directory.put(urlProject().copy(shellSpec = preset.spec))
+            val vm = ShellPreviewViewModel(projectId = 1L, directory = directory)
+            advanceUntilIdle()
+            assertEquals(
+                "项目配成 ${preset.id} → 预览必须渲染同一份",
+                preset.spec,
+                vm.uiState.value.shellSpec,
+            )
+        }
     }
 
     // ── 4. 动作模型的登记但不执行 ───────────────────────────────────────

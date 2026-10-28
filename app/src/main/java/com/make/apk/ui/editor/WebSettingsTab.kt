@@ -1,43 +1,38 @@
 package com.make.apk.ui.editor
 
 import android.webkit.WebSettings as AndroidWebSettings
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.MenuAnchorType
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.RadioButton
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import com.make.apk.data.model.WebSettings
 import com.make.apk.ui.components.CuteCard
+import com.make.apk.ui.components.MmaDropdownField
+import com.make.apk.ui.components.MmaOption
+import com.make.apk.ui.components.MmaSegmentedChoice
+import com.make.apk.ui.components.MmaSwitchRow
 import com.make.apk.ui.theme.Spacing
 
 /**
  * 基本配置 Tab（§10.2）：全部 Web 运行时设置 + 主题色，均接 [WebSettings] / `themeColor`。
  *
- * 控件选型（§10.2 + DESIGN_LANGUAGE）：开关用 M3 `Switch`；单项选择（打开方式 / UA）
- * 用 `RadioButton`；缓存模式用 `ExposedDropdownMenu`（避免实验性 `SegmentedButton` 扩散 `@OptIn`）；
- * 主题色用预设色板（用户可选，硬编码处已 token-gate）。
+ * ## 控件全部自绘（项目铁律：不吃原生那碗饭）
+ *
+ * - 开关 → [MmaSwitchRow]（自绘轨道滑块 + 弹簧位移）；
+ * - 互斥选项（打开方式 / UA）→ [MmaSegmentedChoice]（分段容器，选中整片填充）；
+ * - 缓存模式 → [MmaDropdownField]（分段式弹出菜单，选中项脱离 run）；
+ * - 主题色 → [ThemeColorSwatches]（与新建页共用，防两处漂移）。
+ *
+ * 原生 `Switch` / `RadioButton` / `ExposedDropdownMenuBox` 一律不再使用。
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WebSettingsTab(
     webSettings: WebSettings,
@@ -54,176 +49,63 @@ fun WebSettingsTab(
     CuteCard(modifier = modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.padding(Spacing.space4),
-            verticalArrangement = Arrangement.spacedBy(Spacing.space3),
+            verticalArrangement = Arrangement.spacedBy(Spacing.space4),
         ) {
-            SettingsSwitchRow(
+            MmaSwitchRow(
                 label = "启用 JavaScript",
                 checked = webSettings.javascriptEnabled,
                 onCheckedChange = onJavascriptEnabledChanged,
             )
-            SettingsSwitchRow(
+            MmaSwitchRow(
                 label = "启用 DOM Storage",
                 checked = webSettings.domStorageEnabled,
                 onCheckedChange = onDomStorageEnabledChanged,
             )
 
-            // 打开方式：WebView 内嵌 / Custom Tabs 外链
-            SectionLabel(text = OPEN_MODE_LABEL)
-            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.space4)) {
-                RadioRow(
-                    selected = webSettings.fitToApp,
-                    label = OPEN_MODE_WEBVIEW,
-                    onSelect = { onFitToAppChanged(true) },
-                )
-                RadioRow(
-                    selected = !webSettings.fitToApp,
-                    label = OPEN_MODE_CUSTOM_TABS,
-                    onSelect = { onFitToAppChanged(false) },
-                )
-            }
+            // 打开方式：WebView 内嵌 / Custom Tabs 外链（互斥，画成一段）
+            MmaSegmentedChoice(
+                label = OPEN_MODE_LABEL,
+                options = OPEN_MODE_OPTIONS,
+                selectedValue = webSettings.fitToApp,
+                onSelected = onFitToAppChanged,
+                modifier = Modifier.fillMaxWidth(),
+            )
 
-            SettingsSwitchRow(
+            MmaSwitchRow(
                 label = "第三方 Cookie",
                 description = THIRD_PARTY_HINT,
                 checked = webSettings.thirdPartyCookies,
                 onCheckedChange = onThirdPartyCookiesChanged,
             )
 
-            CacheModeRow(
-                selected = webSettings.cacheMode,
+            // 缓存模式：自绘下拉（原生 ExposedDropdownMenuBox 已弃用）
+            MmaDropdownField(
+                label = CACHE_MODE_LABEL,
+                selectedLabel = CACHE_MODE_OPTIONS
+                    .firstOrNull { it.first == webSettings.cacheMode }
+                    ?.second
+                    ?: CACHE_MODE_OPTIONS.first().second,
+                options = CACHE_MODE_OPTIONS.map { (value, text) -> MmaOption(value, text) },
                 onSelected = onCacheModeChanged,
+                modifier = Modifier.fillMaxWidth(),
             )
 
             UserAgentRow(
                 userAgent = webSettings.userAgent,
                 onUserAgentChanged = onUserAgentChanged,
+                modifier = Modifier.fillMaxWidth(),
             )
 
             // 主题色
-            SectionLabel(text = THEME_COLOR_LABEL)
+            Text(
+                text = THEME_COLOR_LABEL,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
             ThemeColorSwatches(
                 selected = themeColor,
                 onSelected = onThemeColorChanged,
             )
-        }
-    }
-}
-
-/** 分区小标题（控件组的语义标题，区别于卡片标题）。 */
-@Composable
-private fun SectionLabel(text: String, modifier: Modifier = Modifier) {
-    Text(
-        text = text,
-        modifier = modifier,
-        style = MaterialTheme.typography.titleMedium,
-        color = MaterialTheme.colorScheme.onSurface,
-    )
-}
-
-/** 开关行：标签（+ 可选说明）+ 右侧 `Switch`。 */
-@Composable
-private fun SettingsSwitchRow(
-    label: String,
-    description: String? = null,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            if (description != null) {
-                Text(
-                    text = description,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
-    }
-}
-
-/** 单选行：圆圈 + 标签，整行可点。 */
-@Composable
-private fun RadioRow(
-    selected: Boolean,
-    label: String,
-    onSelect: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Row(
-        modifier = modifier.clickable(onClick = onSelect),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Spacing.space2),
-    ) {
-        RadioButton(selected = selected, onClick = null)
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-    }
-}
-
-/** 缓存模式下拉（默认 / 优先缓存 / 不缓存 / 仅缓存）。值取自 [AndroidWebSettings] 伴生常量。 */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun CacheModeRow(
-    selected: Int,
-    onSelected: (Int) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    var expanded by remember { mutableStateOf(false) }
-    val label = CACHE_MODE_OPTIONS.firstOrNull { it.first == selected }?.second
-        ?: CACHE_MODE_OPTIONS.first().second
-    Column(
-        modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(Spacing.space1),
-    ) {
-        ExposedDropdownMenuBox(
-            expanded = expanded,
-            onExpandedChange = { expanded = it },
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            OutlinedTextField(
-                value = label,
-                onValueChange = {},
-                readOnly = true,
-                singleLine = true,
-                label = { Text(CACHE_MODE_LABEL) },
-                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                modifier = Modifier
-                    .menuAnchor(MenuAnchorType.PrimaryEditable, true)
-                    .fillMaxWidth(),
-                shape = MaterialTheme.shapes.small,
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                    unfocusedBorderColor = MaterialTheme.colorScheme.outline,
-                ),
-            )
-            ExposedDropdownMenu(
-                expanded = expanded,
-                onDismissRequest = { expanded = false },
-            ) {
-                CACHE_MODE_OPTIONS.forEach { (value, text) ->
-                    DropdownMenuItem(
-                        text = { Text(text) },
-                        onClick = {
-                            onSelected(value)
-                            expanded = false
-                        },
-                    )
-                }
-            }
         }
     }
 }
@@ -235,35 +117,32 @@ private fun UserAgentRow(
     onUserAgentChanged: (String?) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // 真实值以 webSettings.userAgent 为准；输入框只持有一份本地草稿，随外部值变化重置。
+    var customValue by remember(userAgent) { mutableStateOf(userAgent ?: "") }
     val mode = when (userAgent) {
         null -> UaMode.DEFAULT
         DESKTOP_USER_AGENT -> UaMode.DESKTOP
         else -> UaMode.CUSTOM
     }
-    // 自定义输入框的本地草稿：仅交互态（真实值以 webSettings.userAgent 为准），随外部值变化重置。
-    var customValue by remember(userAgent) { mutableStateOf(userAgent ?: "") }
-    Column(
-        modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(Spacing.space2),
-    ) {
-        SectionLabel(text = UA_LABEL)
-        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.space4)) {
-            RadioRow(
-                selected = mode == UaMode.DEFAULT,
-                label = UA_DEFAULT,
-                onSelect = { onUserAgentChanged(null) },
-            )
-            RadioRow(
-                selected = mode == UaMode.DESKTOP,
-                label = UA_DESKTOP,
-                onSelect = { onUserAgentChanged(DESKTOP_USER_AGENT) },
-            )
-            RadioRow(
-                selected = mode == UaMode.CUSTOM,
-                label = UA_CUSTOM,
-                onSelect = { onUserAgentChanged(customValue) },
-            )
-        }
+
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(Spacing.space2)) {
+        MmaSegmentedChoice(
+            label = UA_LABEL,
+            options = listOf(
+                MmaOption(UaMode.DEFAULT, UA_DEFAULT),
+                MmaOption(UaMode.DESKTOP, UA_DESKTOP),
+                MmaOption(UaMode.CUSTOM, UA_CUSTOM),
+            ),
+            selectedValue = mode,
+            onSelected = { selected ->
+                when (selected) {
+                    UaMode.DEFAULT -> onUserAgentChanged(null)
+                    UaMode.DESKTOP -> onUserAgentChanged(DESKTOP_USER_AGENT)
+                    UaMode.CUSTOM -> onUserAgentChanged(customValue)
+                }
+            },
+            modifier = Modifier.fillMaxWidth(),
+        )
         if (mode == UaMode.CUSTOM) {
             ProjectTextField(
                 value = customValue,
@@ -279,10 +158,7 @@ private fun UserAgentRow(
     }
 }
 
-// token-gate: allow: 用户可选主题色预设，属用户数据而非设计令牌（设计语言允许用户自定义主题色）。
-// 色板已提取为共享组件 ThemeColorSwatches（新建页与编辑页共用，防两处漂移）。
-
-/** UA 选择模式。 */
+/** UA 选择模式（分段控件的取值域）。 */
 private enum class UaMode { DEFAULT, DESKTOP, CUSTOM }
 
 /** 桌面版 User-Agent（选「桌面」时写入）。 */
@@ -308,3 +184,13 @@ private const val UA_DESKTOP: String = "桌面"
 private const val UA_CUSTOM: String = "自定义"
 private const val UA_CUSTOM_LABEL: String = "自定义 UA"
 private const val THEME_COLOR_LABEL: String = "主题色"
+
+/**
+ * 打开方式选项（value 即 `WebSettings.fitToApp`：true = 内嵌 WebView）。
+ *
+ * 声明在文案常量之后：Kotlin 顶层属性按声明顺序初始化，引用后置的 const 会编译失败。
+ */
+private val OPEN_MODE_OPTIONS: List<MmaOption<Boolean>> = listOf(
+    MmaOption(true, OPEN_MODE_WEBVIEW),
+    MmaOption(false, OPEN_MODE_CUSTOM_TABS),
+)
