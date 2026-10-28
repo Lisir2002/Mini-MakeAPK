@@ -7,7 +7,10 @@
   app/src/main/res/mipmap-{m,h,x,xx,xxx}dpi/ic_launcher.png             # 48dp 基准，API 24/25 回退
 说明：
   * 启动图标只取「主体」（字标在 48dp 下不可读，且会被自适应遮罩裁掉），字标仅保留在商店大图；
-  * 主体按 `--scale` 占画布宽度，默认 0.80——圆形 / 方形遮罩下均不裁切关键元素；
+  * 自适应前景按 `--scale` 占画布宽度，默认 0.61——必须落在 108dp 画布的**安全区**内
+    （可视区 72dp ≈ 66.7%，安全区 66dp ≈ 61%）。超过 66% 时圆形 / 方形遮罩会切掉光环与卡片边缘，
+    表现为「图标被裁、不完整」（0.80 即为此前的事故值）；
+  * 传统图标（API 24/25 无自适应遮罩）按 `--legacy-scale` 单独放大到 0.70，避免在启动器上显小；
   * 素材近白底归一为纯白，与 @color/ic_launcher_background 无缝；
   * 传统图标烘焙 22% 圆角与白底，避免在 API 24/25 启动器上出现硬边。
 
@@ -105,13 +108,29 @@ def render(mark: Image.Image, size: int, scale: float, radius_ratio: float = 0.0
     return canvas.resize((size, size), Image.LANCZOS)
 
 
-def write_preview(mark: Image.Image, scale: float, radius_ratio: float, out: str) -> None:
-    """输出效果预览：圆形遮罩 / 方形遮罩 / 48dp 实际尺寸。"""
-    master = render(mark, 432, scale)
-    circle = Image.new("L", (432, 432), 0)
-    ImageDraw.Draw(circle).ellipse((0, 0, 431, 431), fill=255)
-    squircle = Image.new("L", (432, 432), 0)
-    ImageDraw.Draw(squircle).rounded_rectangle((0, 0, 431, 431), radius=int(432 * radius_ratio), fill=255)
+def write_preview(
+    mark: Image.Image,
+    scale: float,
+    legacy_scale: float,
+    radius_ratio: float,
+    out: str,
+) -> None:
+    """输出效果预览：圆形遮罩 / 方形遮罩 / 48dp 实际尺寸。
+
+    自适应预览按**真实可视区**取景：系统只显示 108dp 画布中央 72dp 视窗再套遮罩，
+    故先裁中央 72dp 再套 circle / squircle——用整幅 108dp 圆预览会让内容「显得过小」，误判缩放。
+    """
+    canvas = 432                    # 108dp @4x
+    view = canvas * 72 // 108       # 72dp 可视视窗 @4x = 288
+    master = render(mark, canvas, scale)
+    off = (canvas - view) // 2
+    viewbox = master.crop((off, off, off + view, off + view))
+
+    circle = Image.new("L", (view, view), 0)
+    ImageDraw.Draw(circle).ellipse((0, 0, view - 1, view - 1), fill=255)
+    squircle = Image.new("L", (view, view), 0)
+    ImageDraw.Draw(squircle).rounded_rectangle(
+        (0, 0, view - 1, view - 1), radius=int(view * radius_ratio), fill=255)
 
     def masked(icon, mask):
         layer = Image.new("RGBA", icon.size, (0, 0, 0, 0))
@@ -119,9 +138,9 @@ def write_preview(mark: Image.Image, scale: float, radius_ratio: float, out: str
         return layer
 
     tiles = [
-        ("adaptive / circle", masked(master, circle), (58, 63, 74)),
-        ("adaptive / squircle", masked(master, squircle), WHITE),
-        ("legacy 48dp", render(mark, LEGACY_DP, scale, radius_ratio), WHITE),
+        ("adaptive / circle", masked(viewbox, circle), (58, 63, 74)),
+        ("adaptive / squircle", masked(viewbox, squircle), WHITE),
+        ("legacy 48dp", render(mark, LEGACY_DP, legacy_scale, radius_ratio), WHITE),
     ]
     sheet = Image.new("RGB", (640, 360), (240, 242, 246))
     draw = ImageDraw.Draw(sheet)
@@ -144,7 +163,10 @@ def main() -> int:
     ap.add_argument("--source", default=os.path.join(
         root, "docs/design/assets/app-icon/app-icon-source-1254.webp"))
     ap.add_argument("--res", default=os.path.join(root, "app/src/main/res"))
-    ap.add_argument("--scale", type=float, default=0.80, help="主体宽度占画布比例，默认 0.80")
+    ap.add_argument("--scale", type=float, default=0.61,
+                    help="自适应前景主体宽度占画布比例，默认 0.61（须在安全区内，>0.66 会被遮罩裁边）")
+    ap.add_argument("--legacy-scale", type=float, default=0.70,
+                    help="传统图标主体宽度占画布比例，默认 0.70（无自适应遮罩，可适当放大）")
     ap.add_argument("--radius", type=float, default=0.22, help="传统图标圆角比例，默认 0.22")
     ap.add_argument("--store-out", default=None, help="额外输出 512 商店整幅图（含字标）")
     ap.add_argument("--preview-out", default=None, help="额外输出效果预览图（遮罩 / 48dp）")
@@ -155,14 +177,15 @@ def main() -> int:
     if not os.path.exists(args.source):
         raise SystemExit(f"素材不存在：{args.source}")
     mark = load_mark(args.source, body_bottom=args.body_bottom)
-    print(f"主体裁切：{mark.width}x{mark.height}，缩放 {args.scale:.0%}（{args.source}）")
+    print(f"主体裁切：{mark.width}x{mark.height}，自适应 {args.scale:.0%} / 传统 {args.legacy_scale:.0%}"
+          f"（{args.source}）")
 
     for dpi, k in DENSITIES.items():
         out_dir = os.path.join(args.res, f"mipmap-{dpi}")
         os.makedirs(out_dir, exist_ok=True)
         render(mark, int(round(ADAPTIVE_DP * k)), args.scale).save(
             os.path.join(out_dir, "ic_launcher_foreground.png"), optimize=True)
-        render(mark, int(round(LEGACY_DP * k)), args.scale, args.radius).save(
+        render(mark, int(round(LEGACY_DP * k)), args.legacy_scale, args.radius).save(
             os.path.join(out_dir, "ic_launcher.png"), optimize=True)
         print(f"  mipmap-{dpi}: foreground {int(round(ADAPTIVE_DP * k))}px / legacy {int(round(LEGACY_DP * k))}px")
 
@@ -172,7 +195,7 @@ def main() -> int:
         print(f"商店整幅图：{args.store_out}")
 
     if args.preview_out:
-        write_preview(mark, args.scale, args.radius, args.preview_out)
+        write_preview(mark, args.scale, args.legacy_scale, args.radius, args.preview_out)
         print(f"效果预览：{args.preview_out}")
 
     return 0

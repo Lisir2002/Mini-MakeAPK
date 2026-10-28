@@ -3,7 +3,8 @@
   Adaptive 启动图标（API 26+）。
   背景：纯白 @color/ic_launcher_background（与素材底色一致）；
   前景：mipmap-*/ic_launcher_foreground.png —— MiniMe-MMA 主体（吉祥物 + 网页卡 → APK 卡 + 光环），
-       108dp 网格、主体宽占 80%，圆形 / 方形遮罩下均不裁切关键元素。
+       108dp 网格、主体宽占 61%（66dp 安全区内）：系统只显示画布中央 72dp 视窗再套遮罩，
+       超过 66% 会被圆形 / 方形遮罩裁掉光环与卡片边缘（0.80 即为事故值，已修复）。
   素材与生成脚本：docs/design/assets/app-icon/ + scripts/design/build_launcher_icon.py。
   API 24/25 回退到 mipmap-*/ic_launcher.png（白底圆角方，同款主体）。
 

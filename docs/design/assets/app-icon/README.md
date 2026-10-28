@@ -16,9 +16,11 @@ MiniMe-MMA 的应用启动图标资产与生成流水线。所有图标均由此
 
 ## 启动图标（落地到 `app/src/main/res/mipmap-*`）
 
-- **自适应前景** `ic_launcher_foreground.png`：108dp 画布，主体宽占 80%，白底与
+- **自适应前景** `ic_launcher_foreground.png`：108dp 画布，主体宽占 **61%**（落在 66dp 安全区内；
+  系统只显示画布中央 72dp 视窗再套遮罩，超 66% 会被圆形/方形遮罩裁边），白底与
   `@color/ic_launcher_background`（`#FFFFFF`）无缝拼接。
-- **传统回退** `ic_launcher.png`：48dp 基准，白底 22% 圆角方，同款主体（API 24/25 用）。
+- **传统回退** `ic_launcher.png`：48dp 基准，白底 22% 圆角方，同款主体按 70% 放大（API 24/25 用，
+  无自适应遮罩可适当放大）。
 - 已删除旧的矢量珊瑚粉图标（`ic_launcher_background.xml` / `ic_launcher_foreground.xml`
   与 `mipmap-anydpi/ic_launcher.xml`），统一改为位图，避免 API 24/25 继续用旧矢量覆盖新位图。
 
@@ -38,7 +40,8 @@ python3 scripts/design/build_launcher_icon.py \
 
 参数：
 
-- `--scale`：主体宽度占画布比例，默认 `0.80`（圆形 / 方形遮罩下均不裁切吉祥物与卡片）。
+- `--scale`：自适应前景主体宽度占画布比例，默认 `0.61`（66dp 安全区；>0.66 会被遮罩裁边）。
+- `--legacy-scale`：传统图标主体宽度占画布比例，默认 `0.70`（无自适应遮罩，可适当放大）。
 - `--radius`：传统图标圆角比例，默认 `0.22`。
 - `--body-bottom`：手动指定主体下边界像素，自动检测不准时兜底。
 
@@ -46,4 +49,5 @@ python3 scripts/design/build_launcher_icon.py \
 
 | 日期 | 变更 |
 |------|------|
+| 2026-10-28 | 修复图标被遮罩裁边：自适应前景 0.80 → 0.61（66dp 安全区内），传统图标单独 0.70；预览改为按真实 72dp 视窗取景 |
 | 2026-10-28 | 由珊瑚粉矢量图标更换为设计方提供的彩色位图图标（吉祥物 + 网页卡 → APK 卡 + 光环） |
