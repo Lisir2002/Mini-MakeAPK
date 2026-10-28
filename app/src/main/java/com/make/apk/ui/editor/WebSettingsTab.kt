@@ -286,14 +286,15 @@ private fun UserAgentRow(
     }
 }
 
-// token-gate: allow: 用户可选主题色预设，属用户数据而非设计令牌（设计语言允许用户自定义主题色）
+// token-gate: allow: 用户可选主题色预设，属用户数据而非设计令牌（设计语言允许用户自定义主题色）。
+// 色板与设计语言对齐：默认项=主色蓝，废弃的旧珊瑚粉默认项已移除（黑名单门禁拦截）。
 private val THEME_PRESETS: List<Int> = listOf(
-    0xFFE39E97.toInt(), // 珊瑚粉（默认）
-    0xFFF2B8A2.toInt(), // 蜜桃
-    0xFF9FD8C7.toInt(), // 薄荷
-    0xFF9DB8E8.toInt(), // 晴空
-    0xFFC9A9E9.toInt(), // 薰衣草
-    0xFF8A8A8A.toInt(), // 石墨
+    0xFF2563EB.toInt(), // 蓝（默认，设计语言主色）
+    0xFF0EA5E9.toInt(), // 天蓝
+    0xFF16A34A.toInt(), // 绿
+    0xFFD97706.toInt(), // 琥珀
+    0xFFDC2626.toInt(), // 红
+    0xFF14171A.toInt(), // 石墨
 )
 
 /** 主题色预设色板：选中项以主色描边标识（不引入额外图标依赖）。 */

@@ -13,10 +13,17 @@
     2. 圆角字面量     RoundedCornerShape(…)                  → 应走 shapes 令牌
     3. 间距字面量     N.dp ∉ 允许集                          → 应走 Spacing 阶梯
     4. 字号字面量     N.sp                                    → 应走 typography 令牌
+    5. 废弃色黑名单   RETIRED_COLORS 出现在任何 .kt           → 一次一除，禁止回潮
+       （黑名单扫描**全仓库** Kotlin 源码：主源码 + 测试。存在原因——2026-10 设计重构把
+        主色珊瑚粉换蓝时，裸 ARGB 字面量 `0xFFE39E97.toInt()` 不匹配 Color(0x…) 正则、
+        且 data/model 层不在令牌扫描范围，旧默认主题色漏进数据层默认值 / 主题色板 / 测试
+        固定值三处。黑名单 + 全仓扫描是兜底铁闸，逐色登记、永不摘除。）
 
 豁免机制：
-    - theme/ 包为令牌定义处，天然豁免；
-    - 行内注释 `// token-gate: allow` 逐行豁免（须写理由，见 CODE_STYLE.md）；
+    - theme/ 包为令牌定义处，天然豁免（仅对检查项 1-4；黑名单对 theme/ 同样生效）；
+    - 行内注释 `// token-gate: allow` 逐行豁免检查项 1-4（须写理由，见 CODE_STYLE.md）；
+    - 行内注释 `// legacy-color <理由>` 逐行豁免**仅检查项 5**（专用于模拟历史数据的
+      迁移测试，如旧行的珊瑚粉 themeColor；主源码禁止使用该豁免）；
     - 允许集之外的 dp 值新增，须先评估入阶梯 or 加白名单并注明来源。
 
 退出码：0 = 通过（或无违规的报告模式）；1 = --strict 且存在违规；2 = 环境错误。
@@ -39,6 +46,31 @@ SCAN_ROOTS = [
     REPO_ROOT / "app" / "src" / "main" / "java" / "com" / "make" / "apk" / "ui",
     REPO_ROOT / "template" / "src" / "main" / "java" / "com" / "make" / "apk",
 ]
+
+# 废弃色黑名单扫描根：全仓库 Kotlin 源码（主源码 + 测试）。
+# 不排除 theme/——令牌定义处出现废弃色同样违规；data/ 层、ViewModel 默认值是
+# 本次事故的漏网层（裸 ARGB 字面量不经过 Color(0x…)），必须一并罩住。
+BLACKLIST_ROOTS = [
+    REPO_ROOT / "app" / "src",
+    REPO_ROOT / "template" / "src",
+]
+
+# ── 废弃色黑名单（一次一除，永不摘除；新退役颜色继续往下登记） ────────────
+# 2026-10 UI 重构（黑白为主 + 蓝点缀）退役的旧珊瑚粉系配色。
+RETIRED_COLORS = {
+    "E39E97": "旧默认主题色珊瑚粉 #E39E97（新默认 #2563EB 蓝，见 ProjectDefaults.DEFAULT_THEME_COLOR）",
+    "F19E97": "旧主色珊瑚粉 #F19E97（新主色 #2563EB 蓝，见 theme/Color.kt）",
+    "F2B8A2": "旧主题色板·蜜桃",
+    "9FD8C7": "旧主题色板·薄荷",
+    "9DB8E8": "旧主题色板·晴空",
+    "C9A9E9": "旧主题色板·薰衣草",
+}
+# 同时命中带 alpha 前缀（0xFFE39E97）与不带前缀（0xE39E97）两种写法。
+RETIRED_COLOR_RE = re.compile(
+    r"\b0x[0-9A-Fa-f]{0,2}(" + "|".join(RETIRED_COLORS) + r")\b",
+    re.IGNORECASE,
+)
+LEGACY_MARK = "legacy-color"   # 行内豁免标记（仅黑名单规则；主源码禁用）
 
 # ── 允许集（带来源审批记录；新增值必须注明理由） ──────────────────────────
 # Spacing 阶梯（theme/MmaDesign.kt SpacingScale，DESIGN_LANGUAGE §4 紧凑档）
@@ -118,6 +150,32 @@ def check_file(path: Path) -> list[tuple[int, str, str]]:
     return violations
 
 
+def iter_blacklist_files():
+    """黑名单扫描根下全部 Kotlin 文件（主源码 + 测试，theme/ 不豁免）。"""
+    for root in BLACKLIST_ROOTS:
+        if not root.is_dir():
+            continue
+        yield from sorted(root.rglob("*.kt"))
+
+
+def check_retired_colors(path: Path) -> list[tuple[int, str, str]]:
+    """废弃色黑名单检查（返回 [(行号, 命中说明, 原文)]）。
+
+    行内 `// legacy-color <理由>` 豁免（专用于模拟历史数据的迁移测试）；
+    注释文本中的废弃色（如"旧默认珊瑚粉 #E39E97 已废弃"）不拦。
+    """
+    violations = []
+    for lineno, raw in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+        if LEGACY_MARK in raw:
+            continue
+        code = strip_comment(raw)
+        m = RETIRED_COLOR_RE.search(code)
+        if m:
+            key = m.group(1).upper()
+            violations.append((lineno, f"废弃色 {key}（{RETIRED_COLORS[key]}）", raw.strip()))
+    return violations
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="MMA 设计令牌门禁")
     parser.add_argument("--strict", action="store_true", help="有违规即失败（默认报告模式）")
@@ -140,6 +198,14 @@ def main() -> int:
             print(f"  x {rel}:{lineno} [{rule}] {snippet}")
             print(f"    ::error file={rel},line={lineno}::{rule}，应改用设计令牌"
                   f"（见 docs/ARCHITECTURE.md 令牌链路）")
+
+    for path in iter_blacklist_files():
+        for lineno, rule, snippet in check_retired_colors(path):
+            total += 1
+            rel = path.relative_to(REPO_ROOT)
+            print(f"  x {rel}:{lineno} [废弃色黑名单] {snippet}")
+            print(f"    ::error file={rel},line={lineno}::{rule}，禁止回潮"
+                  f"（确需模拟历史数据须加行内豁免 // legacy-color <理由>，主源码禁用该豁免）")
 
     print()
     if total == 0:

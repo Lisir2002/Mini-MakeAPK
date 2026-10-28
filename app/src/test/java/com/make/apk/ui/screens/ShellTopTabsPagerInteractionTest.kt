@@ -222,7 +222,7 @@ class ShellTopTabsPagerInteractionTest {
             versionScheme = VersionScheme.THREE_SEGMENT,
             versionName = "1.0.0",
             versionCode = 1,
-            themeColor = 0xFFE39E97.toInt(),
+            themeColor = 0xFF2563EB.toInt(),
             entry = ProjectEntry.Url("https://example.com"),
             webSettings = WebSettings(),
             isolationId = "webapp_pager_it",

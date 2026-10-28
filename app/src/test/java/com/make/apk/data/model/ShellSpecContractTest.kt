@@ -63,7 +63,7 @@ class ShellSpecContractTest {
 
     @Test
     fun theme_followsProjectColorByDefault() {
-        val accent = 0xFFE39E97.toInt()
+        val accent = 0xFF2563EB.toInt()
         assertEquals(accent, ShellSpec.DEFAULT.theme.resolveAccent(accent))
     }
 
@@ -251,7 +251,7 @@ class ShellSpecContractTest {
         versionName = "1.0.0",
         versionCode = 1,
         iconRef = null,
-        themeColor = 0xFFE39E97.toInt(),
+        themeColor = 0xFF2563EB.toInt(),
         entryJson = """{"type":"url","url":"https://example.com"}""",
         webSettingsJson = "{}",
         isolationId = "webapp_1",

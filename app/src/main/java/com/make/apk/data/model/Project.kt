@@ -78,8 +78,8 @@ data class Project(
  */
 object ProjectDefaults {
 
-    /** 默认主题色：设计语言主色珊瑚粉 `#E39E97`（ARGB）。 */
-    const val DEFAULT_THEME_COLOR: Int = 0xFFE39E97.toInt()
+    /** 默认主题色：设计语言主色蓝 `#2563EB`（ARGB，DESIGN_LANGUAGE §2；旧默认珊瑚粉 #E39E97 已废弃）。 */
+    const val DEFAULT_THEME_COLOR: Int = 0xFF2563EB.toInt()
 
     /** 默认版本段式：三段（§6.1 已确认）。 */
     val DEFAULT_VERSION_SCHEME: VersionScheme = VersionScheme.THREE_SEGMENT

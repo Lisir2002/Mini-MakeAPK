@@ -306,7 +306,7 @@ class Migration_4_5_Test {
                     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""".trimIndent(),
                 arrayOf<Any?>(
                     id, 1000L, 2000L, "URL", "P$id", "com.example.p$id", "THREE_SEGMENT", "1.0.0", 1,
-                    null, 0xE39E97, "{}", "{}", "webapp_$id",
+                    null, 0xE39E97, "{}", "{}", "webapp_$id", // legacy-color: 模拟历史珊瑚粉数据行（迁移兼容断言，非当前默认）
                 ),
             )
             w.execSQL(

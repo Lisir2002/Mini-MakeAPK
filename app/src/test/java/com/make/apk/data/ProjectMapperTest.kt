@@ -170,8 +170,8 @@ class ProjectMapperTest {
         assertEquals("1.0", ProjectDefaults.defaultVersionName(VersionScheme.TWO_SEGMENT))
         assertEquals(1, ProjectDefaults.DEFAULT_VERSION_CODE)
         assertEquals("webapp_42", ProjectDefaults.isolationIdOf(42))
-        // 主题色 = 珊瑚粉 #E39E97 的 ARGB
-        assertEquals(0xFFE39E97.toInt(), ProjectDefaults.DEFAULT_THEME_COLOR)
+        // 主题色 = 设计语言主色蓝 #2563EB 的 ARGB（旧默认珊瑚粉 #E39E97 已废弃，黑名单门禁拦截）
+        assertEquals(0xFF2563EB.toInt(), ProjectDefaults.DEFAULT_THEME_COLOR)
     }
 
     @Test

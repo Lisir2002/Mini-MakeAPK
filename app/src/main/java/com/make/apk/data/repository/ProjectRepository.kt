@@ -191,7 +191,7 @@ class ProjectRepository(
         /** 本地多实例数据隔离目录后缀（§2.6）。 */
         fun isolationIdOf(projectId: Long): String = ProjectDefaults.isolationIdOf(projectId)
 
-        /** 默认主题色：设计语言主色珊瑚粉 `#E39E97`（ARGB）。 */
+        /** 默认主题色：设计语言主色蓝 `#2563EB`（转发 [ProjectDefaults]，勿在此另立魔数）。 */
         const val DEFAULT_THEME_COLOR: Int = ProjectDefaults.DEFAULT_THEME_COLOR
 
         /** 默认版本段式与版本号（§2.6 / §6.1）。 */
