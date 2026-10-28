@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  项目类型准星选择器 ·「PHP」：服务端（双层机架 + 指示灯，自绘路径，24dp 网格）。
+  tint 由调用方（Compose Icon）注入，故底色用纯黑。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M3,4h18v6h-18z" />
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M3,13h18v6h-18z" />
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M5,6h2v2h-2z" />
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M5,15h2v2h-2z" />
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M10,6.5h9v1.5h-9z" />
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M10,15.5h9v1.5h-9z" />
+</vector>

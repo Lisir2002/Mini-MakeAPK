@@ -22,3 +22,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "MMA"
 include(":app")
+include(":template")

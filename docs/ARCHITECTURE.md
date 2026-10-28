@@ -30,18 +30,18 @@ flowchart LR
 |------|------|------|
 | `ui/theme` | `app/.../ui/theme/` | 设计令牌（OKLCH→Compose）、主题、动效 |
 | `ui/components` | `app/.../ui/components/` | 可爱组件：胶囊按钮、柔卡、打包脉冲 |
-| `ui/screens` | `app/.../ui/screens/` | ProjectsScreen（封装工作台：输入+列表）、BuildingScreen（进度）、ResultScreen（成功/失败）、DevelopingScreen（占位）、ProfileScreen（个人中心）、PreviewScreen（预览） |
+| `ui/screens` | `app/.../ui/screens/` | ProjectsScreen（封装工作台：输入+列表）、DevelopingScreen（占位）、ProfileScreen（个人中心）；WebViewScreen（预览复用纯组件） |
 | `ui/permission` | `app/.../ui/permission/` | 权限基础设施：三层权限状态机 + 应用内二次确认弹窗（存储权限已接入，通知/安装待 Phase-2） |
 | `ui/storage` | `app/.../ui/storage/` | 启动存储门 `StoragePermissionGate`：MMAFile 目录的授权引导与静默就绪 |
 | `storage` | `app/.../storage/` | MMAFile 外部存储唯一事实来源：目录清单 `MmaDir`、授权判断、幂等创建、日志目录决策 |
 | `ui/navigation` | `app/.../ui/navigation/` | 页面骨架：路由清单 `MmaRoute` + 导航宿主 `MmaNavHost` |
-| `ui/viewmodel` | `app/.../ui/viewmodel/` | `BuildViewModel`（构建流程）、`HistoryViewModel`（历史）；手工 DI 工厂 |
+| `ui/viewmodel` | `app/.../ui/viewmodel/` | `AddProjectViewModel` / `ProjectEditViewModel` / `ProjectListViewModel`；手工 DI 工厂 |
 | `MainActivity` | `app/.../MainActivity.kt` | 唯一载体 Activity：`setContent` + `reportFullyDrawn()`（启动终点） |
 | `ui/MmaApp` | `app/.../ui/MmaApp.kt` | 应用根：主题绑定 + 持有 NavController |
 | `data/model` | `app/.../data/model/` | 领域模型 + 枚举（无持久化注解，UI 唯一可见） |
 | `data/local` | `app/.../data/local/` | SQLite 持久化：实体、DAO、AppDatabase、类型转换器、SQLCipher 工厂 |
 | `data/security` | `app/.../data/security/` | 数据库口令经 Android Keystore 加密存储 |
-| `data/repository` | `app/.../data/repository/` | 构建历史仓储：上层唯一出口 |
+| `data/repository` | `app/.../data/repository/` | 项目与导出运行仓储：上层唯一出口 |
 | `build` (Phase 2) | 云端 | 真编译/签名/出包，契约见 [`build-api-contract.md`](build-api-contract.md) |
 
 > 数据层细节（选型实证、加密方案、性能实践、迁移策略）见 [`data-layer.md`](data-layer.md)。
@@ -62,19 +62,15 @@ flowchart LR
 ```
 MainActivity ─ setContent ─▶ MmaApp（主题 + NavController + HazeState）
                                 └─▶ MmaNavHost
-        projects ────┬──▶ building/{id} ──▶ result/{id} ──▶ preview/{id}
-                      ├──▶ developing（占位）
+        projects ────┬──▶ developing（占位）
                       └──▶ profile（个人中心）
 ```
 
 | 路由 | 页面 | 取数来源 | 骨架模板 |
 |------|------|---------|---------|
-| `projects` | ProjectsScreen | `BuildViewModel`（输入登记）+ `HistoryViewModel`（列表 Flow） | 主页（顶栏 + 底栏） |
+| `projects` | ProjectsScreen | `ProjectListViewModel`（列表 Flow）+ `ProjectRepository` | 主页（顶栏 + 底栏） |
 | `developing` | DevelopingScreen | —（占位） | 主页（顶栏 + 底栏） |
 | `profile` | ProfileScreen | `BuildConfig.VERSION_NAME` + `MmaStorage.isAuthorized` | 主页（顶栏 + 底栏） |
-| `building/{recordId}` | BuildingScreen | `BuildHistoryRepository.observeById` | 详情（仅顶栏） |
-| `result/{recordId}` | ResultScreen | `BuildHistoryRepository.observeById` | 详情（仅顶栏） |
-| `preview/{recordId}` | PreviewScreen | `BuildHistoryRepository.observeById` | 详情（仅顶栏） |
 
 **三段式槽位嵌入布局**：所有页面经 `ui/components/MmaScreen.kt` 组装——
 `topBar`（MmaTopBar，顶级页仅标题、子页带返回箭头；**槽位可插拔**，传自定义 composable 即替换，
@@ -87,10 +83,10 @@ title/onBack 随之失效）+ `content`（页面内容，**必须消费 innerPad
 所有页面都是**无状态** Composable（参数进、事件出），
 因此 Paparazzi 可以直接渲染页面做截图回归，不需要数据库与导航环境。
 
-**单一数据源是数据库而非内存**：构建一经登记即落加密库，
-"构建中"页面被杀后重建仍能读到真实状态，不会出现假进度或转圈卡死。
+**单一数据源是加密数据库**：项目与导出运行记录一经登记即落加密库，
+页面重建后仍可读到真实状态，不出现假进度或转圈卡死。
 
-**构建终态守卫**：`BuildStatus` 终态为 SUCCESS/FAILED/CANCELLED；
+**导出终态守卫**：`ExportStatus` 终态为 SUCCESS/FAILED/CANCELLED；
 仓储层 `markSucceeded/markFailed/markCancelled` 均带终态检查——
 取消后迟到的协程无法把记录改写为成功或失败（用户点取消即真取消）。
 

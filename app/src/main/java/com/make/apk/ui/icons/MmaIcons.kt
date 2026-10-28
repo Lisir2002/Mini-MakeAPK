@@ -26,9 +26,18 @@ object MmaIcons {
     val InstallMobile: Int = R.drawable.ic_install_mobile
     val Folder: Int = R.drawable.ic_folder
     val Add: Int = R.drawable.ic_add
+    val Collapse: Int = R.drawable.ic_collapse
     val Projects: Int = R.drawable.ic_projects
     val Developing: Int = R.drawable.ic_developing
     val Person: Int = R.drawable.ic_person
+    /** 运行 / 预览入口（壳预览）。 */
+    val Play: Int = R.drawable.ic_play
+
+    // ── 项目类型（准星选择器四项，§9）──────────────────────────────────
+    val TypeUrl: Int = R.drawable.ic_type_url
+    val TypeHtml: Int = R.drawable.ic_type_html
+    val TypeVue: Int = R.drawable.ic_type_vue
+    val TypePhp: Int = R.drawable.ic_type_php
 }
 
 /**

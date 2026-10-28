@@ -7,8 +7,9 @@ import android.content.pm.ApplicationInfo
 import android.os.Bundle
 import com.make.apk.data.local.AppDatabase
 import com.make.apk.data.local.AppDatabaseFactory
-import com.make.apk.data.repository.BuildHistoryRepository
+import com.make.apk.data.repository.ExportRunRepository
 import com.make.apk.data.repository.LogRepository
+import com.make.apk.data.repository.ProjectRepository
 import com.make.apk.logging.LogConfig
 import com.make.apk.logging.LogFields
 import com.make.apk.logging.LogLevel
@@ -19,7 +20,7 @@ import java.io.File
 import kotlin.concurrent.thread
 
 /**
- * 应用入口：持有进程级单例（数据库 / 构建历史仓储 / 日志仓储）。
+ * 应用入口：持有进程级单例（数据库 / 项目与导出运行仓储 / 日志仓储）。
  *
  * 采用轻量手工注入而非引入 DI 框架：当前模块规模下单例足以覆盖，
  * 避免为 MVP 阶段引入 Hilt 及 KAPT/KSP 额外开销。后续若依赖图膨胀，
@@ -33,8 +34,14 @@ class MmaApplication : Application() {
     /** 惰性打开：首次真正访问数据库时才解密并建连，不拖慢冷启动。 */
     val database: AppDatabase by lazy { AppDatabaseFactory.create(this) }
 
-    val buildHistoryRepository: BuildHistoryRepository by lazy {
-        BuildHistoryRepository(database)
+    /** 项目仓储（稳定定义，§8.4）。 */
+    val projectRepository: ProjectRepository by lazy {
+        ProjectRepository(database)
+    }
+
+    /** 导出运行仓储（运行态，§8.4）。 */
+    val exportRunRepository: ExportRunRepository by lazy {
+        ExportRunRepository(database)
     }
 
     val logRepository: LogRepository by lazy { LogRepository(database) }

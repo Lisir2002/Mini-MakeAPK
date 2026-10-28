@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  SVG 来源：Material Icons "play_arrow"（Apache-2.0）路径数据转为 Android VectorDrawable。
+  24dp 网格， tint 由调用方（Compose Icon）注入，故底色用纯黑。
+  用途：项目列表「运行」入口 与 项目编辑页「预览」入口（见 ui/screens/ProjectsScreen.kt、ProjectEditScreen.kt）。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M8,5v14l11,-7z" />
+</vector>

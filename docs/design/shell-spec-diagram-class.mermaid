@@ -1,0 +1,209 @@
+classDiagram
+    direction LR
+
+    %% ── L1 运行时契约 ──
+    class WebRuntimeConfig {
+        +ProjectType projectType
+        +String apkName
+        +String packageName
+        +String versionName
+        +Int versionCode
+        +String? iconRef
+        +Int themeColor
+        +ProjectEntry entry
+        +WebSettings webSettings
+        +String isolationId
+    }
+
+    %% ── L2 壳契约 ──
+    class ShellSpec {
+        +Int specVersion
+        +ShellTheme theme
+        +ShellTopBar topBar
+        +ShellTopTabs topTabs
+        +ShellBottomBar bottomBar
+        +ShellDrawer drawer
+    }
+    class ShellTheme {
+        +Boolean useProjectThemeColor
+        +Int? themeColorOverride
+        +Boolean edgeToEdgeTopBar
+        +Boolean edgeToEdgeBottomBar
+        +Int resolveAccent(Int)
+    }
+    class ShellTopBar {
+        +Boolean enabled
+        +Boolean showTitle
+        +String? titleOverride
+        +Boolean showBackButton
+        +List~ShellMenuItem~ actions
+    }
+    class ShellTopTabs {
+        +Boolean enabled
+        +List~ShellMenuItem~ items
+        +Boolean swipeEnabled
+        +Boolean showSelectionIndicator
+        +ShellSelectionStyle selectionStyle
+    }
+    class ShellBottomBar {
+        +Boolean enabled
+        +List~ShellMenuItem~ items
+        +Boolean showLabels
+        +Int maxItems
+    }
+    class ShellDrawer {
+        +Boolean enabled
+        +List~ShellMenuItem~ items
+        +ShellDrawerSource contentSource
+        +String? webMenuUrl
+        +ShellDrawerWidth width
+        +Boolean pauseContentWhileOpen
+    }
+    class ShellMenuItem {
+        +String id
+        +String title
+        +String? iconRef
+        +ShellAction action
+        +Boolean visible
+        +Boolean selected
+    }
+    class ShellAction {
+        <<sealed>>
+    }
+    class NavigateUrl {
+        +String url
+        +Boolean openInNewTab
+    }
+    class NativeAction {
+        +ShellNativeAction kind
+    }
+    class InternalPageAction {
+        +String pageId
+    }
+    class UnknownAction {
+    }
+
+    %% ── L3 渲染器 ──
+    class ShellHost {
+        +ShellSpec spec
+        +WebRuntimeConfig config
+        +ShellRenderEnv env
+        +compose(spec, config, env)
+    }
+    class ShellRenderEnv {
+        +Int accentColor
+        +Boolean darkTheme
+        +ShellDrawerWidthMode drawerWidthMode
+    }
+    class ShellTopBarSection {
+        +compose(spec, env, onAction)
+    }
+    class ShellTopTabsSection {
+        +compose(spec, selectedIndex, onTabSelected)
+    }
+    class ShellBottomBarSection {
+        +compose(spec, selectedIndex, onTabSelected)
+    }
+    class ShellDrawerSection {
+        +compose(spec, env)
+    }
+    class ShellWebViewPool {
+        -Map~String, View~ views
+        +obtain(Context, String) View
+        +destroyAll()
+    }
+    class ShellPagerBridge {
+        +sync(pagerState, selectedIndex) Int
+    }
+    class ShellIconResolver {
+        <<interface>>
+        +resolve(String) Int?
+    }
+    class WebViewScreen {
+        +compose(config, modifier, webViewFactory, contentKey)
+    }
+
+    %% ── 编辑器侧 ──
+    class ShellSpecEditor {
+        <<object 纯函数>>
+        +addItem(spec, area, item) ShellSpec
+        +updateItem(spec, area, itemId, transform) ShellSpec
+        +removeItem(spec, area, itemId) ShellSpec
+        +moveItem(spec, area, itemId, delta) ShellSpec
+        +setAreaEnabled(spec, area, enabled) ShellSpec
+    }
+    class ShellSpecValidator {
+        <<object 纯函数>>
+        +validate(spec) Map
+    }
+    class ProjectEditViewModel {
+        -ProjectDirectory directory
+        -ShellSpecValidator validator
+        +onShellSpecChanged(spec)
+        +onShellItemAdded(area, item)
+        +onShellItemUpdated(area, itemId, item)
+        +onShellItemRemoved(area, itemId)
+        +onShellItemMoved(area, itemId, delta)
+        +save()
+    }
+    class ProjectEditUiState {
+        +ShellSpec shellSpec
+        +Map~ShellField, FieldMessage~ shellErrors
+        +Boolean dirty
+        +Boolean canSave
+    }
+    class ShellPreviewScreen {
+        +compose(state, onBack)
+    }
+    class ShellPreviewViewModel {
+        +StateFlow~ShellPreviewUiState~ uiState
+    }
+    class ProjectRepository {
+        +observeById(Long) Flow
+        +update(Project)
+    }
+    class Project {
+        +Long id
+        +ShellSpec shellSpec
+        +WebRuntimeConfig toRuntimeConfig()
+    }
+
+    %% ── 关系 ──
+    ShellSpec "1" *-- "1" ShellTheme
+    ShellSpec "1" *-- "1" ShellTopBar
+    ShellSpec "1" *-- "1" ShellTopTabs
+    ShellSpec "1" *-- "1" ShellBottomBar
+    ShellSpec "1" *-- "1" ShellDrawer
+    ShellTopBar "1" *-- "*" ShellMenuItem
+    ShellTopTabs "1" *-- "*" ShellMenuItem
+    ShellBottomBar "1" *-- "*" ShellMenuItem
+    ShellDrawer "1" *-- "*" ShellMenuItem
+    ShellMenuItem "1" --> "1" ShellAction
+    ShellAction <|-- NavigateUrl
+    ShellAction <|-- NativeAction
+    ShellAction <|-- InternalPageAction
+    ShellAction <|-- UnknownAction
+    ShellTheme ..> WebRuntimeConfig : resolveAccent 默认取 themeColor
+
+    ShellHost "1" --> "1" ShellSpec : 消费
+    ShellHost "1" --> "1" WebRuntimeConfig : 消费
+    ShellHost "1" --> "1" ShellRenderEnv : 注入
+    ShellHost "1" --> "*" ShellTopBarSection
+    ShellHost "1" --> "*" ShellTopTabsSection
+    ShellHost "1" --> "*" ShellBottomBarSection
+    ShellHost "1" --> "*" ShellDrawerSection
+    ShellHost "1" --> "*" ShellWebViewPool
+    ShellHost "1" --> "*" WebViewScreen : 内容区
+    ShellTopTabsSection --> ShellPagerBridge
+    ShellTopBarSection --> ShellIconResolver
+    ShellBottomBarSection --> ShellIconResolver
+    ShellDrawerSection --> ShellIconResolver
+
+    ProjectEditViewModel --> ShellSpecEditor
+    ProjectEditViewModel --> ShellSpecValidator
+    ProjectEditViewModel --> ProjectRepository
+    ProjectEditViewModel "1" --> "1" ProjectEditUiState
+    ShellPreviewViewModel --> ProjectRepository
+    ShellPreviewViewModel "1" --> "1" ProjectEditUiState : 复用 ShellPreviewUiState
+    Project "1" *-- "1" ShellSpec
+    Project ..> WebRuntimeConfig : toRuntimeConfig()（L1 不含壳）

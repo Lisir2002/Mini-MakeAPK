@@ -5,6 +5,17 @@ composeCompiler = "1.5.14"
 composeBom = "2024.09.00"
 paparazzi = "1.3.4"
 robolectric = "4.12.2"
+# androidx.test：Room MigrationTestHelper 在 Robolectric 下需要 ApplicationProvider / InstrumentationRegistry。
+# 版本红线：与 Robolectric 4.12.x 配套的 test core 1.5.0 / runner 1.5.2；再新版本要求更高 compileSdk，需同步升 AGP。
+androidxTestCore = "1.5.0"
+androidxTestRunner = "1.5.2"
+androidxTestRules = "1.5.0"
+# Espresso：Compose UI 测试（ui-test-android 的 EspressoLink）在**单元测试**里也需要它在 classpath 上。
+# 版本红线：3.5.1 与 androidx.test 1.5.x / Robolectric 4.12.x 配套，再高会要求更高 compileSdk。
+androidxTestEspresso = "3.5.1"
+# Hamcrest：junit 传递的 hamcrest-core 1.3 与 espresso 依赖的 hamcrest 2.2 抢
+# org.hamcrest.core.AllOf（方法签名不同，运行期会 NoSuchMethodError）。2.2 是 1.3 的超集。
+hamcrest = "2.2"
 coreKtx = "1.13.1"
 lifecycleRuntimeKtx = "2.8.4"
 activityCompose = "1.9.2"
@@ -34,6 +45,9 @@ lifecycleCompose = "2.8.4"
 coroutines = "1.7.3"
 # KSP：必须与 kotlin 版本严格匹配（1.9.24 → 1.9.24-1.0.20）
 ksp = "1.9.24-1.0.20"
+# JSON 序列化：WebRuntimeConfig 与导出模板壳共用资产（本地注入架构）。
+# 版本红线：须与 Kotlin 1.9.24 兼容——1.8.x 需 Kotlin 1.9.0+，1.8.0+ 起需 Kotlin 2.0，故锁 1.6.x。
+kotlinxSerialization = "1.6.3"
 # 磨砂玻璃：跨子树真模糊（Modifier.blur 只能模糊自身子树，跨节点需 Haze 的
 # hazeSource/hazeChild 捕获）。版本红线：0.7.3 是最后一个用 Kotlin 1.9.24
 # 编译的稳定版（CMP 1.6.11）；1.0.0+ 起 Kotlin 2.x 元数据，本项目 Kotlin
@@ -48,10 +62,20 @@ androidx-compose-bom = { group = "androidx.compose", name = "compose-bom", versi
 androidx-ui = { group = "androidx.compose.ui", name = "ui" }
 androidx-ui-graphics = { group = "androidx.compose.ui", name = "ui-graphics" }
 androidx-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling" }
+# 交互回归测试（点击路径）：compose-rule 在 Robolectric 上跑，无需模拟器。
+# 版本由 composeBom 统一管理（2024.09.00 → 1.7.0，与 foundation/material3 同批，Kotlin 1.9 元数据可读）。
+androidx-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
+androidx-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
 androidx-material3 = { group = "androidx.compose.material3", name = "material3" }
+androidx-foundation = { group = "androidx.compose.foundation", name = "foundation" }
 paparazzi = { group = "app.cash.paparazzi", name = "paparazzi", version.ref = "paparazzi" }
 robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "robolectric" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
+androidx-test-core = { group = "androidx.test", name = "core", version.ref = "androidxTestCore" }
+androidx-test-runner = { group = "androidx.test", name = "runner", version.ref = "androidxTestRunner" }
+androidx-test-rules = { group = "androidx.test", name = "rules", version.ref = "androidxTestRules" }
+androidx-test-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "androidxTestEspresso" }
+hamcrest = { group = "org.hamcrest", name = "hamcrest", version.ref = "hamcrest" }
 
 # ── 数据层依赖 ──────────────────────────────────────────────────────
 androidx-room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }
@@ -66,6 +90,10 @@ androidx-lifecycle-runtime-compose = { group = "androidx.lifecycle", name = "lif
 sqlcipher-android = { group = "net.zetetic", name = "sqlcipher-android", version.ref = "sqlcipher" }
 androidx-security-crypto = { group = "androidx.security", name = "security-crypto", version.ref = "securityCrypto" }
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
+# 单测专用：runTest / Dispatchers.setMain（ViewModel 单测需要主线程调度器）
+kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutines" }
+# 统一内核契约：Project 去 DB 字段后的可 JSON 序列化体（WebRuntimeConfig）与其导出壳共用
+kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerialization" }
 
 # ── 磨砂玻璃（Haze）────────────────────────────────────────────────
 # haze：核心 hazeSource/hazeChild；haze-materials：预置材质（thin/regular/thick）
@@ -79,3 +107,5 @@ android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 paparazzi = { id = "app.cash.paparazzi", version.ref = "paparazzi" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
+# kotlinx.serialization 编译器插件（版本须与 kotlin 严格一致 = 1.9.24）
+kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }

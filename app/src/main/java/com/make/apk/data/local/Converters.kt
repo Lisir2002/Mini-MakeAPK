@@ -1,9 +1,9 @@
 package com.make.apk.data.local
 
 import androidx.room.TypeConverter
-import com.make.apk.data.model.BuildEngine
-import com.make.apk.data.model.BuildInputType
-import com.make.apk.data.model.BuildStatus
+import com.make.apk.data.model.ExportStatus
+import com.make.apk.data.model.ProjectType
+import com.make.apk.data.model.VersionScheme
 
 /**
  * Room 类型转换器：枚举以 TEXT 落库。
@@ -13,23 +13,27 @@ import com.make.apk.data.model.BuildStatus
  */
 class Converters {
 
-    @TypeConverter
-    fun fromBuildStatus(value: BuildStatus?): String? = value?.name
+    // ── 统一内核（§2.3 / §2.4）──────────────────────────────────────
 
     @TypeConverter
-    fun toBuildStatus(value: String?): BuildStatus = safeEnum(value, BuildStatus.QUEUED)
+    fun fromProjectType(value: ProjectType?): String? = value?.name
+
+    /** 兜底 `URL`：迁移期旧数据的首个候选，语义最安全（仅加载远程页，不写盘）。 */
+    @TypeConverter
+    fun toProjectType(value: String?): ProjectType = safeEnum(value, ProjectType.URL)
 
     @TypeConverter
-    fun fromBuildInputType(value: BuildInputType?): String? = value?.name
+    fun fromVersionScheme(value: VersionScheme?): String? = value?.name
+
+    /** 兜底三段式（§2.6 默认 `THREE_SEGMENT` / `1.0.0`）。 */
+    @TypeConverter
+    fun toVersionScheme(value: String?): VersionScheme = safeEnum(value, VersionScheme.THREE_SEGMENT)
 
     @TypeConverter
-    fun toBuildInputType(value: String?): BuildInputType = safeEnum(value, BuildInputType.URL)
+    fun fromExportStatus(value: ExportStatus?): String? = value?.name
 
     @TypeConverter
-    fun fromBuildEngine(value: BuildEngine?): String? = value?.name
-
-    @TypeConverter
-    fun toBuildEngine(value: String?): BuildEngine = safeEnum(value, BuildEngine.DEVICE_WEBVIEW)
+    fun toExportStatus(value: String?): ExportStatus = safeEnum(value, ExportStatus.QUEUED)
 
     private inline fun <reified T : Enum<T>> safeEnum(value: String?, fallback: T): T =
         runCatching { value?.let { enumValueOf<T>(it) } }.getOrNull() ?: fallback

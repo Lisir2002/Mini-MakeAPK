@@ -123,7 +123,7 @@ configurations.all {
 | `androidx.room:room-ktx` | 2.6.1 | 协程 / `withTransaction` | — |
 | `androidx.room:room-compiler` | 2.6.1 | 注解处理（KSP） | 以 `ksp(...)` 引入 |
 | `androidx.room:room-paging` | 2.6.1 | DAO 直接返回 `PagingSource` | — |
-| `net.zetetic:sqlcipher-android` | 4.17.0 | 加密 SQLite 引擎 | 4.18+ 需 compileSdk ≥ 37，勿擅自升 |
+| `net.zetetic:sqlcipher-android` | 4.13.0 | 加密 SQLite 引擎 | 4.14+ 传递 `androidx.sqlite 2.6.x`（Kotlin 2.1 元数据）会编译失败，勿擅自升 |
 | `androidx.security:security-crypto` | 1.0.0 | Keystore 加密的口令存储 | — |
 | `androidx.paging:paging-runtime` | 3.3.0 | Paging3 运行时 | — |
 | `org.jetbrains.kotlinx:kotlinx-coroutines-android` | 1.7.3 | `Flow` / Dispatchers | — |
@@ -143,32 +143,109 @@ ksp {
 ## 4. 分层结构
 
 ```
-app/src/main/java/com/web2apk/app/
+app/src/main/java/com/make/apk/
 ├── MmaApplication.kt              # 进程级单例：database / repository
 └── data/
-    ├── model/BuildRecord.kt           # 领域模型 + 枚举（无 Room 注解，UI 可见）
+    ├── model/                      # 领域模型（无 Room 注解，UI 可见）
+    │   ├── Project.kt              # 项目（稳定定义：身份 + 配置）
+    │   ├── ExportRun.kt            # 导出运行（运行态：状态机 / 产物 / 耗时）
+    │   ├── LogEntry.kt             # 日志条目（随库加密，见 logging.md）
+    │   ├── ProjectEntry.kt         # 入口密封类：Url / Html / Archive
+    │   ├── ProjectType.kt          # 项目类型枚举（URL / HTML / ARCHIVE）
+    │   ├── VersionScheme.kt        # 版本号策略枚举
+    │   ├── WebRuntimeConfig.kt     # 统一内核渲染契约
+    │   └── WebSettings.kt          # Web 渲染设置
     ├── local/
-    │   ├── AppDatabase.kt             # RoomDatabase（v1，exportSchema=true）
-    │   ├── AppDatabaseFactory.kt      # ★ Room × SQLCipher 接线点 + PRAGMA 调优
-    │   ├── Converters.kt              # 枚举 ⇄ TEXT，未知值安全回退
-    │   ├── entity/BuildRecordEntity.kt# 表结构 + 索引
-    │   └── dao/BuildRecordDao.kt      # suspend 写 / Flow 读 / PagingSource
-    ├── security/SqlCipherPassphrase.kt# 口令生成 + Keystore 加密存储
-    ├── mapper/BuildRecordMapper.kt    # 实体 ⇄ 领域模型
-    └── repository/BuildHistoryRepository.kt  # 上层唯一出口
+    │   ├── AppDatabase.kt          # RoomDatabase（v4，exportSchema=true）
+    │   ├── AppDatabaseFactory.kt   # ★ Room × SQLCipher 接线点 + PRAGMA 调优 + MIGRATIONS 注册
+    │   ├── Converters.kt           # 枚举 ⇄ TEXT，未知值安全回退
+    │   ├── Migrations.kt           # MIGRATION_1_2 / MIGRATION_2_3 / MIGRATION_3_4
+    │   ├── entity/                 # 表结构 + 索引
+    │   │   ├── ProjectEntity.kt            # 表 projects
+    │   │   ├── ExportRunEntity.kt          # 表 export_runs
+    │   │   └── LogEntryEntity.kt           # 表 log_entries
+    │   └── dao/                    # suspend 写 / Flow 读 / PagingSource
+    │       ├── ProjectDao.kt
+    │       ├── ExportRunDao.kt
+    │       └── LogEntryDao.kt
+    ├── mapper/                     # 实体 ⇄ 领域模型
+    │   ├── ProjectMapper.kt
+    │   ├── ExportRunMapper.kt
+    │   └── LogEntryMapper.kt
+    ├── repository/                 # 上层唯一出口
+    │   ├── ProjectRepository.kt    # 项目：稳定定义
+    │   ├── ExportRunRepository.kt  # 导出运行：运行态
+    │   └── LogRepository.kt        # 日志：查询 / 清理 / 导出
+    ├── security/
+    │   └── SqlCipherPassphrase.kt  # 口令生成 + Keystore 加密存储
+    ├── classifier/
+    │   └── ArchiveClassifier.kt    # 资产包类型嗅探（§8.5 D-M2）
+    └── json/
+        └── RuntimeJson.kt          # 运行时 JSON 编解码（entry_json / webSettings_json）
 ```
+
+> **DB v4 现状**：legacy `build_records` 及其配套的 `BuildRecord` / `BuildRecordEntity` /
+> `BuildRecordDao` / `BuildRecordMapper` / `BuildHistoryRepository` **已全部退役并删除**；
+> 该表已被 **DB v4** 的 `MIGRATION_3_4`（`DROP TABLE IF EXISTS build_records`）移除，
+> 数据已于 v3 复制到 `projects` + `export_runs`（**零业务数据丢失**）。
+> 历史结构见 §5 的留档说明。
 
 **边界规则**：
 
-1. UI / ViewModel 只依赖 `data.model.BuildRecord` 与 `BuildHistoryRepository`。
+1. UI / ViewModel 只依赖 `data.model` 下的领域模型（`Project` / `ExportRun` / `LogEntry`）
+   与 `data.repository` 下的仓储（`ProjectRepository` / `ExportRunRepository` / `LogRepository`）。
 2. Room 注解、表名、索引**不得**越出 `data.local`。
-3. 仓储对外只暴露领域模型，实体在 `mapper` 层完成转换。
+3. 仓储对外只暴露领域模型，实体在 `data.mapper` 层完成转换。
 
 ---
 
 ## 5. 表结构与索引
 
-表 `build_records`（`BuildRecordEntity`）：
+当前实际表为 `projects` / `export_runs` / `log_entries`（DB v4）。
+legacy `build_records` 已在 **DB v4** 由 `MIGRATION_3_4`（`DROP TABLE IF EXISTS build_records`）删除；
+其数据已于 v3 复制到 `projects` + `export_runs`，**零业务数据丢失**。
+本节末尾保留其**历史结构留档**，仅供迁移审计追溯。
+
+### 5.1 项目表 `projects`（DB v3 引入）
+
+承载**稳定定义**（身份 + 配置），与运行态（`export_runs`）分离。
+
+| 列 | 类型 | 说明 |
+|----|------|------|
+| `id` | INTEGER (PK, autoGenerate) | — |
+| `createdAt` / `updatedAt` | INTEGER | epoch ms，`createdAt` **索引** |
+| `projectType` | TEXT | `URL` / `HTML` / `ARCHIVE`（保存后锁死） |
+| `apkName` / `packageName` | TEXT | 显示名 / applicationId（**应用层强制全局唯一**） |
+| `versionScheme` / `versionName` / `versionCode` | TEXT / TEXT / INTEGER | 版本号三要素 |
+| `iconRef` / `themeColor` | TEXT NULL / INTEGER | 图标引用 / ARGB 主题色 |
+| `entry_json` / `webSettings_json` | TEXT | 入口与 Web 渲染配置，JSON 存储 |
+| `isolationId` | TEXT | 本地多实例数据隔离目录后缀 |
+
+索引：`createdAt`（列表倒序，避免全表排序）、`packageName`（唯一性查询加速）。
+**刻意不加 UNIQUE 约束**——历史数据可能已含重复包名，加 UNIQUE 会让迁移直接失败；
+唯一性由应用层 `ProjectRepository.ensurePackageNameAvailable` 拦截，DB 只提供查询加速。
+
+### 5.2 导出运行表 `export_runs`（DB v3 引入）
+
+每次导出一条运行态记录，**从属于** `projects`（N:1，外键 `ON DELETE CASCADE`）。
+
+| 列 | 类型 | 说明 |
+|----|------|------|
+| `id` | INTEGER (PK, autoGenerate) | — |
+| `projectId` | INTEGER (FK→`projects.id`) | **索引首列** |
+| `createdAt` / `updatedAt` | INTEGER | epoch ms |
+| `status` | TEXT | `RUNNING`/`SUCCESS`/`FAILED`/`CANCELLED`，**复合索引首列** |
+| `outputApkPath` | TEXT NULL | 成功后的 APK 路径 |
+| `apkSizeBytes` / `durationMs` | INTEGER NULL | — |
+| `errorMessage` | TEXT NULL | — |
+
+索引：`(projectId, createdAt)`（单项目导出历史倒序）、`(status, createdAt)`（按状态筛选仍走有序索引扫描）。
+
+### 5.3 历史结构留档：表 `build_records`（v1，已于 v4 删除）
+
+> 以下为**已退役的历史结构**，仅供迁移审计追溯；对应
+> `BuildRecordEntity` / `BuildRecordDao` / `BuildRecordMapper` / `BuildRecord` / `BuildHistoryRepository`
+> 均已在阶段 5 删除，当前代码中**不再存在**。
 
 | 列 | 类型 | 说明 |
 |----|------|------|
@@ -184,7 +261,7 @@ app/src/main/java/com/web2apk/app/
 | `apkSizeBytes` / `durationMs` | INTEGER NULL | — |
 | `errorMessage` | TEXT NULL | — |
 
-索引：
+历史索引：
 
 ```kotlin
 indices = [
@@ -198,7 +275,7 @@ indices = [
 
 ---
 
-### 5.1 日志表 `log_entries`（DB v2）
+### 5.4 日志表 `log_entries`（DB v2 引入）
 
 日志层（见 [`logging.md`](logging.md)）的高价值类别也落在**同一个加密库**里，
 因此随库一同受 SQLCipher 保护，无需再为日志单独做加密。
@@ -212,10 +289,9 @@ indices = [
 | `traceId` / `sessionId` / `sequence` / `threadName` | TEXT/INTEGER | 关联与排序 |
 | `durationMs` / `success` | INTEGER NULL | **全量化维度提升为独立列**，便于 SQL 直接聚合 |
 
-> **迁移**：`AppDatabase` 已升至 `version = 2`，由
-> `AppDatabaseFactory.MIGRATION_1_2` 显式建表，**已移除**
-> `fallbackToDestructiveMigration()`。新增版本必须同时在
-> `AppDatabase.version` +1 并在 `MIGRATIONS` 数组登记。
+> **迁移**：`log_entries` 由 **DB v2** 的 `MIGRATION_1_2`（`Migrations.kt`）显式建表；
+> `AppDatabase` 当前为 `version = 4`，**已移除** `fallbackToDestructiveMigration()`。
+> 新增版本必须同时在 `AppDatabase.version` +1 并在 `AppDatabaseFactory.MIGRATIONS` 数组登记。
 > Room 会校验迁移后的 schema 与实体声明是否逐字一致，不一致会在打开时直接抛异常，
 > 所以迁移 SQL 必须与 KSP 导出的 `app/schemas/.../N.json` 对齐。
 
@@ -245,22 +321,24 @@ indices = [
 | **WAL 模式** | `SupportOpenHelperFactory(pass, null, enableWAL = true)` | 读不阻塞写，并发显著提升 |
 | `synchronous = NORMAL` | `PerformancePragmas.onOpen` | WAL 下已保证崩溃一致性，省去每次 fsync |
 | `temp_store = MEMORY` | `PerformancePragmas.onOpen` | 排序/临时表走内存，减少磁盘 I/O |
-| **批量单事务** | `repository.replaceAll` 用 `withTransaction` | 避免 N 次写 = N 次 fsync |
-| **覆盖索引** | `status + createdAt` | 筛选 + 排序均走索引 |
-| **按需分页** | Paging3 `PagingSource` | 长列表不一次性读入内存 |
+| **单条写即一事务** | 所有 DAO 写操作 `suspend`，Room 自动单事务 | 避免半写状态 |
+| **覆盖索引** | `export_runs(status, createdAt)` / `projects(createdAt)` | 筛选 + 排序均走索引 |
+| **按需分页** | Paging3 `PagingSource`（`LogEntryDao.pagingSource`） | 长列表不一次性读入内存 |
 | **写全 suspend** | 所有 `@Insert/@Update/@Query(写)` | 主线程零阻塞（配合 `Dispatchers.IO`） |
 | **读返回 Flow** | `observeAll` / `observeById` | 表变更自动推送，UI 免手动刷新 |
 | **惰性打开** | `by lazy` 于 `MmaApplication` | 不拖慢冷启动 |
-| **列级更新** | `updateStatus` 仅写状态列 | 避免整行回写 |
+| **后台建连** | `MmaApplication` 的 `mma-db-init` 线程 | 加密库打开不阻塞冷启动 |
 
 ---
 
 ## 8. 迁移策略
 
-- 当前 `version = 1`，无历史版本，配置 `fallbackToDestructiveMigration()`。
-- `exportSchema = true` → schema JSON 输出到 `app/schemas/`，**随代码提交**。
-- **发布真实版本前必须**：删除 `fallbackToDestructiveMigration()`，为每次版本变更
-  编写显式 `Migration(from, to)` 并在 `AppDatabaseFactory` 中 `addMigrations(...)`。
+- 当前 `version = 4`，迁移链 `MIGRATION_1_2` → `MIGRATION_2_3` → `MIGRATION_3_4`
+  均显式登记于 `AppDatabaseFactory.MIGRATIONS`（实现在 `data/local/Migrations.kt`）；**已移除** `fallbackToDestructiveMigration()`
+  （由 `Migration_3_4_Test` + 改写后 `Migration_2_3_Test` 三重校验兜底，覆盖 1→2→3→4 / 2→3→4 / 3→4 升级路径，数据零丢失）。
+- `exportSchema = true` → schema JSON 输出到 `app/schemas/`，**随代码提交**
+  （保留 `1.json`/`2.json`/`3.json` 审计，新增 `4.json`）。
+- 新增版本必须同时在 `AppDatabase.version` +1 并在 `MIGRATIONS` 数组登记。
 - 加密库迁移额外注意：口令不变；若更换引擎/口令派生方式，需写一次性数据搬迁。
 
 ---
@@ -269,25 +347,25 @@ indices = [
 
 ```kotlin
 // 取得仓储（任意 Context）
-val repo = context.requireMmaApplication().buildHistoryRepository
+val projectRepo = context.requireMmaApplication().projectRepository
+val exportRepo = context.requireMmaApplication().exportRunRepository
 
-// 登记一次构建
-val id = repo.start(
-    inputType = BuildInputType.URL,
-    sourceLabel = "example.com",
-    sourceRef = "https://example.com",
-    engine = BuildEngine.DEVICE_WEBVIEW,
+// 新建项目（用仓储的 newProject 工厂填充默认值，避免各处硬编码）
+val id = projectRepo.create(
+    ProjectRepository.newProject(
+        projectType = ProjectType.URL,
+        apkName = "Example",
+        packageName = "com.example.app",
+        entry = ProjectEntry.Url("https://example.com"),
+    ),
 )
 
-// 结束态
-repo.markSucceeded(id, outputApkPath = apkPath, apkSizeBytes = size)
-repo.markFailed(id, errorMessage = "构建超时")
+// 登记一次导出运行并标记终态
+val runId = exportRepo.start(id, ExportStatus.RUNNING)
+exportRepo.markSucceeded(runId, outputApkPath = apkPath, apkSizeBytes = size)
 
 // 观察（ViewModel）
-repo.observeAll().collect { records -> /* 更新 UI 状态 */ }
-
-// 长列表分页
-repo.pagedHistory().cachedIn(viewModelScope).collectAsLazyPagingItems()
+projectRepo.observeAll().collect { projects -> /* 更新 UI 状态 */ }
 ```
 
 **线程约定**：所有 `suspend` 写操作必须在 `Dispatchers.IO` 中调用；
@@ -297,10 +375,11 @@ repo.pagedHistory().cachedIn(viewModelScope).collectAsLazyPagingItems()
 
 ## 10. 测试
 
-- `app/src/test/java/com/web2apk/app/data/BuildRecordMapperTest.kt`
-  —— 纯 JVM（6 个用例），覆盖：实体⇄领域无损往返、枚举转换器往返、未知值安全回退、终态判定。
-- 既有 Paparazzi 截图回归（8 个用例）仍全部通过，未受数据层改动影响。
-- 运行：`./gradlew testDebugUnitTest`（当前共 **14 个用例，全绿**）
+- `app/src/test/java/com/make/apk/data/Migration_2_3_Test.kt` / `Migration_3_4_Test.kt`
+  —— 三重校验（Room 真实迁移 + 运行期 `onValidateSchema` 强校验 + 与 KSP 导出 `N.json` 逐字比对），
+  覆盖 1→2→3→4 / 2→3→4 / 3→4 升级路径与零数据丢失断言。
+- 既有 Paparazzi 截图回归（**47 张快照**）全部通过，未受阶段 5 改动影响。
+- 运行：`./gradlew testDebugUnitTest`（当前共 **344 个用例，全绿**）
 
 > 尚未覆盖（建议在真机/Instrumented 测试中补充）：SQLCipher 实际打开与加解密、
 > DAO 查询语义、事务回滚。这些需要 Android 运行环境（Room 内存库或 Instrumentation）。

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  项目类型准星选择器 ·「Vue」：框架标志的 V 形层叠（自绘路径，24dp 网格，非官方商标复刻）。
+  tint 由调用方（Compose Icon）注入，故底色用纯黑。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M2,3L7.2,3L12,11.4L16.8,3L22,3L12,20.6L2,3z" />
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M7.2,3L4.6,3L12,15.2L19.4,3L16.8,3L12,10.4L7.2,3z" />
+</vector>

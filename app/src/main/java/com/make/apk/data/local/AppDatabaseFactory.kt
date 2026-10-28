@@ -4,7 +4,6 @@ import android.content.Context
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
-import androidx.sqlite.db.SupportSQLiteDatabase
 import com.make.apk.data.security.SqlCipherPassphrase
 import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
 
@@ -14,7 +13,7 @@ import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
  * 关键点：SQLCipher 的 [SupportOpenHelperFactory] 直接实现了
  * `androidx.sqlite.db.SupportSQLiteOpenHelper.Factory`，因此可以直接交给
  * `Room.databaseBuilder(...).openHelperFactory(...)`，**无需任何手写桥接层**
- * （这正是它与 WCDB 等引擎的关键差异：WCDB 的官方适配层只实现旧版
+ * （这正是它与 WCDB 等引擎的关键差异：WCDB 的官方适配层只支持旧版
  * `android.arch.persistence.db` 接口，与 AndroidX Room 2.x 不兼容）。
  *
  * 性能与稳健性：
@@ -27,10 +26,17 @@ object AppDatabaseFactory {
      * 显式迁移链。**新增版本必须在此登记**，并让 [AppDatabase] 的 `version` 同步 +1。
      *
      * Room 会在打开时校验迁移后的 schema 与实体声明是否完全一致；
-     * 不一致会直接抛 `IllegalStateException`，所以这里的 SQL 必须与
+     * 不一致会直接抛 `IllegalStateException`，所以迁移 SQL 必须与
      * `app/schemas/.../N.json`（KSP 导出）逐字对齐。
+     *
+     * 迁移实现见 [MIGRATIONS]（`Migrations.kt`）。
      */
-    val MIGRATIONS: Array<Migration> = arrayOf(MIGRATION_1_2)
+    val MIGRATIONS: Array<Migration> = arrayOf(
+        MIGRATION_1_2,
+        MIGRATION_2_3,
+        MIGRATION_3_4,
+        MIGRATION_4_5,
+    )
 
     fun create(context: Context): AppDatabase {
         val appContext = context.applicationContext
@@ -47,47 +53,17 @@ object AppDatabaseFactory {
             .openHelperFactory(openHelperFactory)
             .addCallback(PerformancePragmas)
             .addMigrations(*MIGRATIONS)
-            // 自愈（2026-10-26 定位 rc3/diag1 闪退根因后加固）：schema 版本/迁移不匹配时
-            // 删库重建，避免 Room 直接抛 IllegalStateException 闪退。加密库打不开（口令失配/
-            // 旧库损坏）时本项不覆盖 openHelper 打开阶段的异常，由 Repository 读 Flow 的
-            // catch 兜底降级为空态——两层共同保证"数据库任何故障都不杀进程"。
-            .fallbackToDestructiveMigration()
+            // 阶段 5：显式迁移链 1→2→3→4 已由 Migration_3_4_Test 覆盖全升级路径
+            // （1→4 / 2→4 / 3→4 均通过 Room onValidateSchema 强校验，数据零丢失），
+            // 按 PROJECT_BRIEF §7 移除自愈式破坏性迁移回退。
+            // 三层兜底仍保证"数据库任何故障都不杀进程"：
+            // 1) 迁移链任一环节出错 → Room 抛异常（等同线上闪退等价复现，由测试门禁拦截）；
+            // 2) 加密库打不开（口令失配/旧库损坏）→ Repository 读 Flow 的 catch 兜底降级空态；
+            // 3) 口令获取失败 → SqlCipherPassphrase 降级内存态随机口令并删无法解锁的旧库。
+            //
+            // 【回退开关】若 QA 发现移除后某升级路径无兜底闪退且无解，在 .build() 前
+            // 调用 Room 自带的「自愈式破坏性迁移回退」并标注原因（当前已按 §7 移除）。
             .build()
-    }
-}
-
-/**
- * v1 → v2：新增日志表 `log_entries`（全类别日志，随库加密）。
- *
- * 索引命名遵循 Room 约定：`index_<表名>_<列1>_<列2>`。
- */
-private val MIGRATION_1_2 = object : Migration(1, 2) {
-    override fun migrate(db: SupportSQLiteDatabase) {
-        db.execSQL(
-            """
-            CREATE TABLE IF NOT EXISTS `log_entries` (
-                `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-                `timestampMs` INTEGER NOT NULL,
-                `level` TEXT NOT NULL,
-                `category` TEXT NOT NULL,
-                `event` TEXT NOT NULL,
-                `message` TEXT,
-                `fieldsJson` TEXT,
-                `stackTrace` TEXT,
-                `traceId` TEXT NOT NULL,
-                `sessionId` TEXT NOT NULL,
-                `sequence` INTEGER NOT NULL,
-                `threadName` TEXT NOT NULL,
-                `durationMs` INTEGER,
-                `success` INTEGER
-            )
-            """.trimIndent(),
-        )
-        db.execSQL("CREATE INDEX IF NOT EXISTS `index_log_entries_timestampMs` ON `log_entries` (`timestampMs`)")
-        db.execSQL(
-            "CREATE INDEX IF NOT EXISTS `index_log_entries_category_timestampMs` ON `log_entries` (`category`, `timestampMs`)",
-        )
-        db.execSQL("CREATE INDEX IF NOT EXISTS `index_log_entries_event` ON `log_entries` (`event`)")
     }
 }
 
@@ -98,7 +74,7 @@ private val MIGRATION_1_2 = object : Migration(1, 2) {
  * - `temp_store = MEMORY`：排序/临时表走内存，减少磁盘 I/O。
  */
 private val PerformancePragmas = object : RoomDatabase.Callback() {
-    override fun onOpen(db: SupportSQLiteDatabase) {
+    override fun onOpen(db: androidx.sqlite.db.SupportSQLiteDatabase) {
         super.onOpen(db)
         db.execSQL("PRAGMA synchronous = NORMAL")
         db.execSQL("PRAGMA temp_store = MEMORY")

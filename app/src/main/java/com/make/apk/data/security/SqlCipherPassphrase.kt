@@ -34,7 +34,7 @@ object SqlCipherPassphrase {
      * 取得（必要时先生成）数据库口令。需在后台线程调用（首次生成涉及 Keystore 与文件 I/O）。
      *
      * **启动链防御（2026-10-26 rc3 装机仍闪退后的加固）**：本方法在
-     * `MmaNavHost` 组合期经 `app.buildHistoryRepository` 被同步触发，
+     * 数据库首次打开（`AppDatabaseFactory.create` 经 `MmaApplication.database` 惰性触发）时调用，
      * Keystore 故障（国产 ROM 上 `MasterKeys.getOrCreate` 偶发失败为已知案例）
      * 会直接杀死进程——表现为打开即闪退、无 MMAFile 目录、无外部可见日志。
      * 故安全路径失败时降级为**内存态随机口令**（不落盘）：口令丢失等价于

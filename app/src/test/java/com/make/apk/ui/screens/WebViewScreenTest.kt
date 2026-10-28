@@ -2,6 +2,11 @@ package com.make.apk.ui.screens
 
 import android.widget.FrameLayout
 import app.cash.paparazzi.Paparazzi
+import com.make.apk.data.model.ProjectEntry
+import com.make.apk.data.model.ProjectType
+import com.make.apk.data.model.VersionScheme
+import com.make.apk.data.model.WebRuntimeConfig
+import com.make.apk.data.model.WebSettings
 import com.make.apk.ui.theme.MmaTheme
 import org.junit.Rule
 import org.junit.Test
@@ -25,9 +30,24 @@ class WebViewScreenTest {
     fun shellLight() = paparazzi.snapshot {
         MmaTheme(darkTheme = false) {
             WebViewScreen(
-                url = "https://example.com",
+                config = SAMPLE_CONFIG,
                 webViewFactory = { FrameLayout(it) },
             )
         }
+    }
+
+    private companion object {
+        val SAMPLE_CONFIG = WebRuntimeConfig(
+            projectType = ProjectType.URL,
+            apkName = "示例 App",
+            packageName = "com.example.sample",
+            versionScheme = VersionScheme.THREE_SEGMENT,
+            versionName = "1.0.0",
+            versionCode = 1,
+            themeColor = 0xFFE39E97.toInt(),
+            entry = ProjectEntry.Url("https://example.com"),
+            webSettings = WebSettings(),
+            isolationId = "webapp_preview",
+        )
     }
 }

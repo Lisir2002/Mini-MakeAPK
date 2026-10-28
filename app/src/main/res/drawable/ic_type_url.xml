@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  项目类型准星选择器 ·「网址」：地球（圆环 + 经纬线，自绘路径，24dp 网格）。
+  圆环用 evenOdd 挖空；tint 由调用方（Compose Icon）注入，故底色用纯黑。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FF000000"
+        android:fillType="evenOdd"
+        android:pathData="M12,2a10,10 0 1,0 0,20a10,10 0 1,0 0,-20zM12,4.5a7.5,7.5 0 1,1 0,15a7.5,7.5 0 1,1 0,-15z" />
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M3.5,11h17v1.5h-17z" />
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M11,3.5h1.5v17h-1.5z" />
+</vector>

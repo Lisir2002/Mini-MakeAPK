@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  SVG 来源：Material Icons "expand_more"（Apache-2.0）路径数据转为 Android VectorDrawable。
+  24dp 网格，tint 由调用方注入，底色纯黑。
+  编辑页「收起 / 展开」切换图标：展开态旋转 180° 指向「收起」。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M16.59,8.59L12,13.17 7.41,8.59 6,10l6,6 6,-6z" />
+</vector>

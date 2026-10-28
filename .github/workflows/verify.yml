@@ -41,6 +41,17 @@ jobs:
       - name: 截图回归比对（与已提交基线逐像素比较）
         run: ./gradlew verifyPaparazziDebug --no-daemon
 
+      # 方向 1 一致性门禁：预览（app）vs 导出（template）逐像素比对。
+      # 两端消费同一份 ShellHost + 同一份 ShellSpec，预期像素完全一致（均差 ≤ 2.0/255）。
+      # 依赖上一步 Paparazzi 在 app / template 两模块生成的快照。
+      - name: 预览 vs 导出 像素对比（一致性门禁）
+        run: python3 scripts/gitops/compare_preview_export.py
+
+      # 注入壳契约校验：确保编译期注入 template 的 shell_spec.json 始终合法，
+      # 避免坏壳写进导出 APK（与 inject_shell_spec.py 的校验逻辑同源）。
+      - name: 校验注入的壳契约（shell_spec.json）
+        run: python3 scripts/gitops/inject_shell_spec.py --print
+
       - name: 上传测试与截图报告
         if: always()
         uses: actions/upload-artifact@v4

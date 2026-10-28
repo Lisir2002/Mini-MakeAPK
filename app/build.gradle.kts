@@ -3,6 +3,8 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.paparazzi)
     alias(libs.plugins.ksp)
+    // JSON 序列化编译器插件：为 WebRuntimeConfig / ProjectEntry / WebSettings 生成 @Serializable 编解码
+    alias(libs.plugins.kotlin.serialization)
 }
 
 // ── Release 签名（环境变量驱动，密钥不落地）──────────────────────
@@ -38,8 +40,8 @@ android {
         //   版本号不带 +N 后缀（2026-10-25 起，用户确认）。
         // versionCode：Android 安装唯一性要求的内部整数，单调递增，但不进版本串/tag；
         //   发布 tag = v<versionName>。递增规则与发版流程见 docs/VERSIONING.md。
-        versionCode = 7
-        versionName = "0.0.0.1-rc4"
+        versionCode = 8
+        versionName = "0.0.0.1-rc5"
     }
 
     signingConfigs {
@@ -97,12 +99,20 @@ android {
             isIncludeAndroidResources = true
         }
     }
+
+    // MigrationTestHelper 依赖 android.app.Instrumentation 与 assets 中的 schema JSON，
+    // 二者在 Robolectric 单元测试环境下均不具备，故迁移测试改用「Room 自身执行迁移 +
+    // 运行期 onValidateSchema 强校验 + 与 app/schemas 下 KSP 导出 JSON 逐字比对」的等价路径
+    // （见 app/src/test/java/com/make/apk/data/Migration_2_3_Test.kt）。
+    // 迁移所需依赖：room-runtime + androidx.sqlite（已由 implementation 提供）。
 }
 
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
+    // 顶栏 tab 滑动切页（阶段 6.4）：HorizontalPager 落在 foundation 内（Compose 1.6+）
+    implementation(libs.androidx.foundation)
     // Compose BOM 统一管理 ui/material3 等版本（禁止零散写版本号）
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.ui)
@@ -135,6 +145,10 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.androidx.paging.runtime)
 
+    // ── 统一内核契约：WebRuntimeConfig JSON 序列化 ─────────────────────
+    // 本地渲染器与导出模板壳共用同一份 runtime-config.json（本地注入架构，无云端）。
+    implementation(libs.kotlinx.serialization.json)
+
     // ── 页面骨架：导航 + ViewModel ───────────────────────────────────
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
@@ -145,10 +159,32 @@ dependencies {
     implementation(libs.haze.materials)
 
     // 截图回归测试（Paparazzi，纯 JVM，无需模拟器）
-    testImplementation(libs.junit)
+    testImplementation(libs.junit) {
+        // 去掉 junit 传递的 hamcrest-core 1.3：它与 espresso 依赖的 hamcrest 2.2
+        // 提供同名类 org.hamcrest.core.AllOf 且签名不同，会让 Compose UI 测试在
+        // 静态初始化阶段抛 NoSuchMethodError。hamcrest 2.2 是 1.3 的超集，去掉无损失。
+        exclude(group = "org.hamcrest", module = "hamcrest-core")
+    }
+    testImplementation(libs.hamcrest)
     testImplementation(libs.paparazzi)
+    // 交互回归测试：Compose UI 测试（跑在 Robolectric 上，覆盖 Paparazzi 够不到的点击路径，
+    // 如列表页删除的二次确认「确认才删 / 取消不删」）。
+    testImplementation(libs.androidx.ui.test.junit4)
+    // compose-rule 需要一个空壳 Activity 承载组合，故 debug 变体追加测试用 manifest
+    debugImplementation(libs.androidx.ui.test.manifest)
+    // `ui-test-android` 的 EspressoLink 静态初始化会碰到 org.hamcrest.Matchers / Espresso，
+    // 故单测 classpath 也必须有 espresso-core（只补依赖，不引入任何 Espresso 用法）。
+    testImplementation(libs.androidx.test.espresso.core)
     // 启动路径集成测试（Robolectric：真跑 Application/Activity 生命周期，覆盖 Paparazzi 盲区）
     testImplementation(libs.robolectric)
+    // Room 迁移测试：让 Room 真实执行 v2→v3 迁移并做运行期 schema 强校验（§8.4）
+    // 注：未使用官方 MigrationTestHelper——它依赖 Instrumentation 与 assets 中的 schema JSON，
+    //     在 Robolectric 单元测试环境下均不可用（详见 Migration_2_3_Test.kt 头注释）。
+    testImplementation(libs.androidx.test.core)
+    testImplementation(libs.androidx.test.runner)
+    testImplementation(libs.androidx.test.rules)
+    // ViewModel 单测：runTest + Dispatchers.setMain（viewModelScope 需要主线程调度器）
+    testImplementation(libs.kotlinx.coroutines.test)
 }
 
 // Room 编译期配置：导出 schema 便于版本迁移审计（输出到 app/schemas/）
