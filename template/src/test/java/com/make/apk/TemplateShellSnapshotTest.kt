@@ -57,9 +57,10 @@ class TemplateShellSnapshotTest {
 
         /** 读取编译期注入的壳契约（与 TemplateActivity.rememberInjectedShellSpec 同源）。 */
         fun loadInjectedSpec(): ShellSpec {
-            val userDir = checkNotNull(System.getProperty("user.dir")) { "user.dir 未设置" }
-            val repoRoot = File(userDir).parentFile
-            val jsonFile = repoRoot.resolve("template/src/main/res/raw/shell_spec.json")
+            val start = File(checkNotNull(System.getProperty("user.dir")) { "user.dir 未设置" })
+            val root = generateSequence(start) { it.parentFile }
+                .first { it.isDirectory && File(it, "settings.gradle.kts").exists() }
+            val jsonFile = root.resolve("template/src/main/res/raw/shell_spec.json")
             return Json { ignoreUnknownKeys = true }.decodeFromString(jsonFile.readText())
         }
     }
