@@ -3,15 +3,10 @@ package com.make.apk.ui.editor
 import android.webkit.WebSettings as AndroidWebSettings
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.background
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -30,8 +25,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.make.apk.data.model.WebSettings
 import com.make.apk.ui.components.CuteCard
@@ -287,49 +280,7 @@ private fun UserAgentRow(
 }
 
 // token-gate: allow: 用户可选主题色预设，属用户数据而非设计令牌（设计语言允许用户自定义主题色）。
-// 色板与设计语言对齐：默认项=主色蓝，废弃的旧珊瑚粉默认项已移除（黑名单门禁拦截）。
-private val THEME_PRESETS: List<Int> = listOf(
-    0xFF2563EB.toInt(), // 蓝（默认，设计语言主色）
-    0xFF0EA5E9.toInt(), // 天蓝
-    0xFF16A34A.toInt(), // 绿
-    0xFFD97706.toInt(), // 琥珀
-    0xFFDC2626.toInt(), // 红
-    0xFF14171A.toInt(), // 石墨
-)
-
-/** 主题色预设色板：选中项以主色描边标识（不引入额外图标依赖）。 */
-@Composable
-private fun ThemeColorSwatches(
-    selected: Int,
-    onSelected: (Int) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(Spacing.space3),
-    ) {
-        THEME_PRESETS.forEach { color ->
-            val isSelected = color == selected
-            // 选中态：外圈主色 + 内嵌色块（避免引入 border 修饰符依赖，圆环即选中指示）。
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent)
-                    .clickable { onSelected(color) }
-                    .padding(2.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .clip(CircleShape)
-                        .background(Color(color)),
-                )
-            }
-        }
-    }
-}
+// 色板已提取为共享组件 ThemeColorSwatches（新建页与编辑页共用，防两处漂移）。
 
 /** UA 选择模式。 */
 private enum class UaMode { DEFAULT, DESKTOP, CUSTOM }

@@ -1,12 +1,16 @@
 package com.make.apk.ui.navigation
 
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -22,6 +26,8 @@ import androidx.navigation.navArgument
 import com.make.apk.logging.LogFields
 import com.make.apk.logging.MmaLogger
 import com.make.apk.requireMmaApplication
+import com.make.apk.storage.IconStore
+import kotlinx.coroutines.launch
 import com.make.apk.ui.components.MmaBottomBar
 import com.make.apk.ui.screens.AddProjectScreen
 import com.make.apk.ui.screens.DevelopingScreen
@@ -150,6 +156,24 @@ fun MmaNavHost(
                 factory = remember(app) { AddProjectViewModelFactory(app.projectRepository) },
             )
             val state by vm.uiState.collectAsStateWithLifecycle()
+            val iconStore = remember(app) { IconStore(app) }
+            val scope = rememberCoroutineScope()
+
+            // 图标选择：系统 Photo Picker（无需存储权限），选中后拷入应用私有目录。
+            val pickIconLauncher = rememberLauncherForActivityResult(
+                ActivityResultContracts.PickVisualMedia(),
+            ) { uri ->
+                if (uri == null) return@rememberLauncherForActivityResult // 用户取消，静默即可
+                scope.launch {
+                    val path = iconStore.copyToIconsDir(uri)
+                    if (path != null) {
+                        vm.onIconChanged(path)
+                    } else {
+                        MmaLogger.error("icon_pick_failed", message = "图标拷贝失败")
+                        Toast.makeText(context, "图标读取失败，请重试", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
 
             LaunchedEffect(Unit) {
                 vm.events.collect { event ->
@@ -181,13 +205,13 @@ fun MmaNavHost(
                 onVersionSchemeChanged = vm::onVersionSchemeChanged,
                 onVersionNameChanged = vm::onVersionNameChanged,
                 onVersionCodeChanged = vm::onVersionCodeChanged,
-                // 图标选择器阶段 3 未接入：记审计日志 + Toast，签名已预留给后续阶段
+                onApplySuggestionApkName = vm::applySuggestionApkName,
+                onApplySuggestionPackageName = vm::applySuggestionPackageName,
+                onThemeColorChanged = vm::onThemeColorChanged,
                 onPickIcon = {
-                    MmaLogger.operation(
-                        "add_project_icon_not_ready",
-                        message = "图标选择占位被点击",
+                    pickIconLauncher.launch(
+                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
                     )
-                    Toast.makeText(context, "图标选择还在开发中，敬请期待", Toast.LENGTH_SHORT).show()
                 },
                 onSave = vm::save,
             )

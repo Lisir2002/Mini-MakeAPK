@@ -1,5 +1,6 @@
 package com.make.apk.ui.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -8,14 +9,24 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.dp
 import com.make.apk.data.model.ProjectDefaults
 import com.make.apk.data.model.ProjectType
 import com.make.apk.data.model.VersionScheme
@@ -28,21 +39,25 @@ import com.make.apk.ui.editor.ProjectSourceSection
 import com.make.apk.ui.editor.ProjectTextField
 import com.make.apk.ui.editor.ProjectTypeSelector
 import com.make.apk.ui.editor.SectionCard
+import com.make.apk.ui.editor.ThemeColorSwatches
 import com.make.apk.ui.editor.VersionSchemeChips
 import com.make.apk.ui.theme.Spacing
 import com.make.apk.ui.viewmodel.AddProjectUiState
 
 /**
- * 新建项目页（`add`，§4.1 / §9）——**页面无状态**（状态进、事件出）。
+ * 新建项目页（`add`，§4.1 / §9）——**表单无状态**（状态进、事件出）。
  *
  * 布局：准星选择器 → 来源输入区 → 基本信息表单（整页可滚动）。
  *
  * 跨文件共享约定：
- * - **零内部业务状态**：只有 `rememberScrollState()`，因此 Paparazzi 可直接喂任意
- *   [AddProjectUiState] 出图，无需 ViewModel / 数据库 / 导航；
+ * - **零内部表单状态**：只有滚动状态与「放弃确认」对话框的纯 UI 状态，
+ *   因此 Paparazzi 可直接喂任意 [AddProjectUiState] 出图，无需 ViewModel / 数据库 / 导航；
  * - **零校验判断**：所有提示都从 `state.errors / warnings` 按 [AddField] 取，
  *   文案唯一来源是 `ProjectValidator`，本页面不拼任何校验语句；
- * - 顶栏右侧「保存」是**唯一**保存入口（§4.1 只定义顶栏保存，不另加底部按钮）。
+ * - 顶栏右侧「保存」是**唯一**保存入口（§4.1 只定义顶栏保存，不另加底部按钮），
+ *   `saving` 时按钮内显示进度圈防重复提交。
+ * - **放弃修改确认**：`dirty` 时（无论系统返回还是顶栏返回箭头）先弹确认，
+ *   确认后才真正退出——表单填了一半被静默丢弃是不可接受的。
  *
  * 流程子页：有返回箭头、**不传 bottomBar**。
  */
@@ -58,20 +73,40 @@ fun AddProjectScreen(
     onVersionSchemeChanged: (VersionScheme) -> Unit,
     onVersionNameChanged: (String) -> Unit,
     onVersionCodeChanged: (String) -> Unit,
+    onApplySuggestionApkName: () -> Unit,
+    onApplySuggestionPackageName: () -> Unit,
+    onThemeColorChanged: (Int) -> Unit,
     onPickIcon: () -> Unit,
     onSave: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // 「放弃修改？」确认框：纯 UI 状态（不进 UiState——它不属于表单数据）。
+    var showDiscardDialog by remember { mutableStateOf(false) }
+
+    // 确认退出动作：对话框与系统返回/顶栏返回共用。
+    val requestBack: () -> Unit = { if (state.dirty) showDiscardDialog = true else onBack() }
+
+    // 系统返回手势/按键同样走确认（dirty 才拦截）。
+    BackHandler(enabled = state.dirty) { showDiscardDialog = true }
+
     MmaScreen(
         title = "新建项目",
-        onBack = onBack,
+        onBack = requestBack,
         modifier = modifier,
         actions = {
             TextButton(
                 onClick = onSave,
                 enabled = state.canSave,
             ) {
-                Text("保存")
+                if (state.saving) {
+                    // 保存中：进度圈替代文字（同一槽位，避免双击重复提交）
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(SAVE_PROGRESS_SIZE),
+                        strokeWidth = SAVE_PROGRESS_STROKE,
+                    )
+                } else {
+                    Text("保存")
+                }
             }
         },
     ) { innerPadding ->
@@ -115,6 +150,7 @@ fun AddProjectScreen(
 
             // ── 基本信息（§4.1 第 2 项）──────────────────────────────
             SectionCard(title = "基本信息") {
+                // 身份区：图标 + 图标说明（点击可换）+ 主题色板
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(Spacing.space4),
@@ -126,13 +162,37 @@ fun AddProjectScreen(
                         iconRef = state.iconRef,
                         onClick = onPickIcon,
                     )
-                    TextButton(onClick = onPickIcon) {
-                        Text("选择图标")
+                    Column(verticalArrangement = Arrangement.spacedBy(Spacing.space1)) {
+                        Text(
+                            text = "应用图标",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        Text(
+                            text = if (state.iconRef == null) ICON_CUSTOMIZE_HINT else ICON_CHANGE_HINT,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
+                }
+                TextButton(onClick = onPickIcon) {
+                    Text("选择图标")
                 }
                 messageOf(state, AddField.ICON)?.let { message ->
                     FieldMessageText(message = message)
                 }
+
+                // 主题色：占位图标底色 + 导出壳的品牌色，新建时即可确定
+                Text(
+                    text = "主题色",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                ThemeColorSwatches(
+                    selected = state.themeColor,
+                    onSelected = onThemeColorChanged,
+                    modifier = Modifier.fillMaxWidth(),
+                )
 
                 ProjectTextField(
                     value = state.apkName,
@@ -142,6 +202,13 @@ fun AddProjectScreen(
                     message = messageOf(state, AddField.APK_NAME),
                     modifier = Modifier.fillMaxWidth(),
                 )
+                state.apkNameSuggestion?.let { suggestion ->
+                    SuggestionChipRow(
+                        label = APK_NAME_LABEL,
+                        suggestion = suggestion,
+                        onApply = onApplySuggestionApkName,
+                    )
+                }
 
                 ProjectTextField(
                     value = state.packageName,
@@ -151,6 +218,13 @@ fun AddProjectScreen(
                     message = messageOf(state, AddField.PACKAGE_NAME),
                     modifier = Modifier.fillMaxWidth(),
                 )
+                state.packageNameSuggestion?.let { suggestion ->
+                    SuggestionChipRow(
+                        label = PACKAGE_NAME_LABEL,
+                        suggestion = suggestion,
+                        onApply = onApplySuggestionPackageName,
+                    )
+                }
 
                 VersionSchemeChips(
                     scheme = state.versionScheme,
@@ -181,6 +255,60 @@ fun AddProjectScreen(
             Spacer(modifier = Modifier.height(Spacing.space6))
         }
     }
+
+    if (showDiscardDialog) {
+        DiscardChangesDialog(
+            onDismiss = { showDiscardDialog = false },
+            onConfirm = {
+                showDiscardDialog = false
+                onBack()
+            },
+        )
+    }
+}
+
+/**
+ * 字段建议采纳行：**自动建议已算出但用户未采用时**，给一键采纳入口。
+ *
+ * 数据链路由 ViewModel 维护（`applySuggestionApkName` / `applySuggestionPackageName`），
+ * 本组件只负责展示与转发——建议与当前值相同时不展示（没有可采纳的差异）。
+ */
+@Composable
+private fun SuggestionChipRow(
+    label: String,
+    suggestion: String,
+    onApply: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    if (suggestion.isBlank()) return
+    AssistChip(
+        onClick = onApply,
+        modifier = modifier,
+        label = { Text("采用${label}建议：$suggestion") },
+    )
+}
+
+/** 「放弃修改？」确认对话框（返回意图唯一确认出口，文案不与校验器耦合）。 */
+@Composable
+private fun DiscardChangesDialog(
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("放弃新建项目？") },
+        text = { Text("已填写的内容不会被保存。") },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text("放弃", color = MaterialTheme.colorScheme.error)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("继续编辑")
+            }
+        },
+    )
 }
 
 /**
@@ -206,3 +334,15 @@ private const val VERSION_NAME_LABEL: String = "版本号"
 
 /** 内部版本号输入框标签。 */
 private const val VERSION_CODE_LABEL: String = "内部版本号"
+
+/** 未设置图标时的引导文案。 */
+private const val ICON_CUSTOMIZE_HINT: String = "点击图标或下方按钮选择"
+
+/** 已设置图标时的更换文案。 */
+private const val ICON_CHANGE_HINT: String = "点击更换"
+
+/** 保存中进度圈尺寸（按钮内行内尺寸，经门禁白名单 16dp）。 */
+private val SAVE_PROGRESS_SIZE = 16.dp
+
+/** 保存中进度圈描边宽。 */
+private val SAVE_PROGRESS_STROKE = 2.dp

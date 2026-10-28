@@ -1,5 +1,7 @@
 package com.make.apk.ui.editor
 
+import android.graphics.BitmapFactory
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -7,10 +9,15 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -18,28 +25,28 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.make.apk.data.model.ProjectDefaults
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * 项目图标（§2.6：默认占位 = 主题色底 + 应用名首字母）。
  *
- * 阶段 3 无论 [iconRef] 是否为空都渲染占位——图标选择器尚未接入（顶栏/来源区的
- * 「选择图标」当前只给 Toast 提示），因此占位同时也是**解码失败的 fallback**：
- * 后续接入解码后，`iconRef` 非空时解码成功才换图，失败仍回落这里。
+ * 渲染规则：
+ * - [iconRef] 非空且指向可解码的本地文件（见 [com.make.apk.storage.IconStore]）→
+ *   渲染用户选择的真实图标（等比裁切铺满）；
+ * - 文件不存在 / 解码失败 → 回落占位（**占位同时是解码失败的 fallback**，
+ *   保证任何项目都有一个看得过去的图标）。
  *
- * TODO(后续阶段)：`iconRef != null` 时按 Uri / asset 解码为 `ImageBitmap` 并渲染；
- * 解码失败继续走占位，保证任何项目都有一个看得过去的图标。
- *
- * 前景色按背景亮度取黑/白（WCAG 对比度兜底）：主题色可由用户在编辑页改，
+ * 前景色按背景亮度取黑/白（WCAG 对比度兜底）：主题色可由用户在新建/编辑页改，
  * 固定一种前景色会出现"浅底白字"这类读不清的组合。
  *
  * @param apkName 应用名（取首字母；空名显示 "?"）。
  * @param themeColor ARGB 主题色（默认取 [ProjectDefaults.DEFAULT_THEME_COLOR]）。
- * @param iconRef 图标引用；阶段 3 不改变渲染结果。
+ * @param iconRef 图标文件路径（[IconStore] 拷贝产物）；null 表示使用默认占位。
  * @param size 边长（列表行 40dp、添加页身份区 56dp）。
  * @param onClick 非空时可点击（如"选择图标"入口）。
  */
 @Composable
-@Suppress("UNUSED_PARAMETER") // iconRef 本阶段只做预留：接入解码前渲染结果恒为占位
 fun ProjectIcon(
     apkName: String,
     themeColor: Int,
@@ -50,6 +57,13 @@ fun ProjectIcon(
 ) {
     val background = Color(themeColor)
     val label = iconPlaceholderLabelOf(apkName)
+
+    // 异步解码：首帧占位（与快照基线一致），文件可解码后换真图。
+    val bitmap by produceState<ImageBitmap?>(initialValue = null, key1 = iconRef) {
+        value = withContext(Dispatchers.IO) { ProjectIconDecoder.decode(iconRef) }
+    }
+    val image = bitmap
+
     val semanticsModifier = Modifier.semantics(mergeDescendants = true) {
         contentDescription = "项目图标：$label"
         if (onClick != null) role = Role.Button
@@ -69,11 +83,35 @@ fun ProjectIcon(
             .background(background),
         contentAlignment = Alignment.Center,
     ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.titleLarge,
-            color = contentColorOn(background),
-        )
+        if (image != null) {
+            Image(
+                bitmap = image,
+                contentDescription = null, // 整体语义已由外层播报
+                modifier = Modifier.size(size),
+                contentScale = ContentScale.Crop,
+            )
+        } else {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.titleLarge,
+                color = contentColorOn(background),
+            )
+        }
+    }
+}
+
+/**
+ * 图标文件解码器（独立对象便于单测：不挂 Compose 状态）。
+ */
+internal object ProjectIconDecoder {
+
+    /** 解码本地图标文件；路径空 / 文件不存在 / 解码失败一律返回 null（回落占位）。 */
+    fun decode(iconRef: String?): ImageBitmap? {
+        val path = iconRef?.trim().orEmpty()
+        if (path.isEmpty()) return null
+        val file = java.io.File(path)
+        if (!file.isFile) return null
+        return runCatching { BitmapFactory.decodeFile(path)?.asImageBitmap() }.getOrNull()
     }
 }
 

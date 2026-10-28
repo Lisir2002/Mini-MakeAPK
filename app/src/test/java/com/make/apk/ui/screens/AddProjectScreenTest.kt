@@ -121,6 +121,23 @@ class AddProjectScreenTest {
         )
     }
 
+    // 建议采纳 + 主题色选择：自动建议以 chip 呈现、主题色选中态外圈高亮（新交互钉基线）
+    @Test
+    fun light_suggestions_and_color() = paparazzi.snapshot {
+        addProjectBody(
+            state = initialState().copy(
+                urlInput = "https://news.example.com/home",
+                apkName = "我的新闻站",
+                packageName = "com.example.news",
+                apkNameSuggestion = "Example News",
+                packageNameSuggestion = "com.example.newsapp",
+                apkNameEdited = true,
+                packageNameEdited = true,
+                themeColor = 0xFF0EA5E9.toInt(),
+            ),
+        )
+    }
+
     // ── 准星几何专项（选中中间项，检验居中/邻居 peek/准星叠放）──────────
 
     @Test
@@ -148,6 +165,9 @@ class AddProjectScreenTest {
             onVersionSchemeChanged = {},
             onVersionNameChanged = {},
             onVersionCodeChanged = {},
+            onApplySuggestionApkName = {},
+            onApplySuggestionPackageName = {},
+            onThemeColorChanged = {},
             onPickIcon = {},
             onSave = {},
         )
