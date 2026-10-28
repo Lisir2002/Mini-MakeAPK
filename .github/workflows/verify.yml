@@ -43,9 +43,12 @@ jobs:
 
       # 方向 1 一致性门禁：预览（app）vs 导出（template）逐像素比对。
       # 两端消费同一份 ShellHost + 同一份 ShellSpec，预期像素完全一致（均差 ≤ 2.0/255）。
-      # 依赖上一步 Paparazzi 在 app / template 两模块生成的快照。
+      # 依赖上一步 Paparazzi 在 app / template 两模块生成的快照；Pillow 需显式安装
+      # （GitHub ubuntu-latest runner 默认未预装，脚本依赖 PIL 做像素差计算）。
       - name: 预览 vs 导出 像素对比（一致性门禁）
-        run: python3 scripts/gitops/compare_preview_export.py
+        run: |
+          python3 -m pip install --quiet pillow || pip install --quiet pillow
+          python3 scripts/gitops/compare_preview_export.py
 
       # 注入壳契约校验：确保编译期注入 template 的 shell_spec.json 始终合法，
       # 避免坏壳写进导出 APK（与 inject_shell_spec.py 的校验逻辑同源）。
