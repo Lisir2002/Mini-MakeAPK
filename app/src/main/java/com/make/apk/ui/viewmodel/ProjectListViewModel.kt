@@ -5,11 +5,13 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.make.apk.data.model.Project
 import com.make.apk.data.repository.ProjectRepository
+import com.make.apk.logging.LogFields
 import com.make.apk.logging.MmaLogger
 import com.make.apk.ui.editor.ProjectDirectory
 import com.make.apk.ui.editor.RepositoryProjectDirectory
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -39,6 +41,24 @@ class ProjectListViewModel(
                 started = SharingStarted.WhileSubscribed(5_000),
                 initialValue = 0,
             )
+
+    /**
+     * 下拉刷新（rc11）：显式重读一次项目流。
+     *
+     * 列表本身由 `Flow` 驱动（表变更自动推送）；此处的语义是**用户主动要求对账**——
+     * 挂起到重查完成再返回，让下拉指示器覆盖真实的重读时长。
+     */
+    suspend fun refresh() {
+        runCatching { directory.observeAllByCreatedAt().first() }
+            .onSuccess {
+                MmaLogger.operation(
+                    event = "projects_refreshed",
+                    message = "项目列表下拉刷新",
+                    fields = mapOf(LogFields.SUCCESS to true),
+                )
+            }
+            .onFailure { throwable -> MmaLogger.error("projects_refresh_failed", throwable) }
+    }
 
     /**
      * 删除项目。

@@ -27,6 +27,7 @@ import com.make.apk.ui.editor.EditIdentityCard
 import com.make.apk.ui.editor.EditTabRow
 import com.make.apk.ui.editor.FieldMessage
 import com.make.apk.ui.editor.HighSettingsTab
+import com.make.apk.ui.editor.LoadingProgressCard
 import com.make.apk.ui.editor.ProjectCodeTab
 import com.make.apk.ui.editor.ShellEditorTab
 import com.make.apk.ui.editor.WebSettingsTab
@@ -65,7 +66,7 @@ fun ProjectEditScreen(
     onVersionNameChanged: (String) -> Unit,
     onVersionCodeChanged: (String) -> Unit,
     onEntryUrlChanged: (String) -> Unit,
-    onEntryHtmlChanged: (String) -> Unit,
+    onEntryHtmlChanged: (String) -> Unit = {},
     onEntryFileChanged: (String) -> Unit,
     onThemeColorChanged: (Int) -> Unit,
     onPickIcon: (() -> Unit)? = null,
@@ -78,6 +79,12 @@ fun ProjectEditScreen(
     onUserAgentChanged: (String?) -> Unit,
     onShowLoadingProgressChanged: (Boolean) -> Unit = {},
     onLoadingProgressPositionChanged: (ProgressPosition) -> Unit = {},
+    /** 打开文件（rc11：文件目录树 → 独立编辑器页；NavHost 接线导航）。 */
+    onOpenFile: (String) -> Unit = {},
+    /** 新增附加文件（文件目录树）。 */
+    onFileAdded: (String) -> Unit = {},
+    /** 删除附加文件（文件目录树）。 */
+    onFileDeleted: (String) -> Unit = {},
     onToggleCollapse: (Boolean) -> Unit,
     onTabSelected: (EditTab) -> Unit,
     onDelete: () -> Unit,
@@ -192,6 +199,7 @@ fun ProjectEditScreen(
                     }
 
                     // 「项目代码」：HTML 类专属（EditTabRow 已按类型过滤，此处防御兜底）。
+                    // rc11：只显示文件目录树，点击文件进入独立编辑器页（onOpenFile 由 NavHost 接线）。
                     EditTab.CODE -> if (state.projectType == ProjectType.HTML) {
                         Box(
                             modifier = Modifier
@@ -200,9 +208,11 @@ fun ProjectEditScreen(
                                 .verticalScroll(rememberScrollState()),
                         ) {
                             ProjectCodeTab(
-                                entryHtml = state.entryHtml,
-                                entryHtmlMessage = messageOf(state, EditField.ENTRY_HTML),
-                                onEntryHtmlChanged = onEntryHtmlChanged,
+                                entryFile = state.entryFile.trim().ifBlank { "index.html" },
+                                fileNames = listOf(state.entryFile.trim()) + state.projectFiles.map { it.name },
+                                onOpenFile = onOpenFile,
+                                onFileAdded = onFileAdded,
+                                onFileDeleted = onFileDeleted,
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(horizontal = Spacing.space5, vertical = Spacing.space4),
@@ -216,13 +226,25 @@ fun ProjectEditScreen(
                             .weight(1f)
                             .verticalScroll(rememberScrollState()),
                     ) {
-                        ShellEditorTab(
-                            shellSpec = state.shellSpec,
-                            onShellSpecChanged = onShellSpecChanged,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = Spacing.space5, vertical = Spacing.space4),
-                        )
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            ShellEditorTab(
+                                shellSpec = state.shellSpec,
+                                onShellSpecChanged = onShellSpecChanged,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = Spacing.space5, vertical = Spacing.space4),
+                            )
+                            // 功能加载进度条：rc11 起挂在进阶配置（壳的可见部件，与壳同屏配置）。
+                            LoadingProgressCard(
+                                showLoadingProgress = state.webSettings.showLoadingProgress,
+                                loadingProgressPosition = state.webSettings.loadingProgressPosition,
+                                onShowLoadingProgressChanged = onShowLoadingProgressChanged,
+                                onLoadingProgressPositionChanged = onLoadingProgressPositionChanged,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = Spacing.space5, vertical = Spacing.space4),
+                            )
+                        }
                     }
 
                     EditTab.EXPORT -> Box(
@@ -236,10 +258,6 @@ fun ProjectEditScreen(
                             engineLabel = state.engineLabel,
                             isolationId = state.isolationId,
                             onDelete = onDelete,
-                            showLoadingProgress = state.webSettings.showLoadingProgress,
-                            loadingProgressPosition = state.webSettings.loadingProgressPosition,
-                            onShowLoadingProgressChanged = onShowLoadingProgressChanged,
-                            onLoadingProgressPositionChanged = onLoadingProgressPositionChanged,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(horizontal = Spacing.space5, vertical = Spacing.space4),

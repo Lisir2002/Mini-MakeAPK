@@ -15,9 +15,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.make.apk.data.model.WebSettings
 import com.make.apk.ui.components.CuteCard
-import com.make.apk.ui.components.MmaDropdownField
 import com.make.apk.ui.components.MmaOption
 import com.make.apk.ui.components.MmaSegmentedChoice
+import com.make.apk.ui.components.MmaSelectField
+import com.make.apk.ui.components.MmaSelectOption
 import com.make.apk.ui.components.MmaSwitchRow
 import com.make.apk.ui.theme.Spacing
 
@@ -28,7 +29,7 @@ import com.make.apk.ui.theme.Spacing
  *
  * - 开关 → [MmaSwitchRow]（自绘轨道滑块 + 弹簧位移）；
  * - 互斥选项（打开方式 / UA）→ [MmaSegmentedChoice]（分段容器，选中整片填充）；
- * - 缓存模式 → [MmaDropdownField]（分段式弹出菜单，选中项脱离 run）；
+ * - 缓存模式 → [MmaSelectField]（选择卡面板，每项带说明，rc11 重写）；
  * - 主题色 → [ThemeColorSwatches]（与新建页共用，防两处漂移）。
  *
  * 原生 `Switch` / `RadioButton` / `ExposedDropdownMenuBox` 一律不再使用。
@@ -78,14 +79,11 @@ fun WebSettingsTab(
                 onCheckedChange = onThirdPartyCookiesChanged,
             )
 
-            // 缓存模式：自绘下拉（原生 ExposedDropdownMenuBox 已弃用）
-            MmaDropdownField(
+            // 缓存模式：选择卡面板（rc11 重写——每项带说明，选择不再是猜谜）
+            MmaSelectField(
                 label = CACHE_MODE_LABEL,
-                selectedLabel = CACHE_MODE_OPTIONS
-                    .firstOrNull { it.first == webSettings.cacheMode }
-                    ?.second
-                    ?: CACHE_MODE_OPTIONS.first().second,
-                options = CACHE_MODE_OPTIONS.map { (value, text) -> MmaOption(value, text) },
+                options = CACHE_MODE_OPTIONS,
+                selectedValue = webSettings.cacheMode,
                 onSelected = onCacheModeChanged,
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -165,12 +163,12 @@ private enum class UaMode { DEFAULT, DESKTOP, CUSTOM }
 private const val DESKTOP_USER_AGENT: String =
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 
-/** 缓存模式选项：值取自 [AndroidWebSettings] 伴生常量（§2.4）。 */
-private val CACHE_MODE_OPTIONS: List<Pair<Int, String>> = listOf(
-    AndroidWebSettings.LOAD_DEFAULT to "默认",
-    AndroidWebSettings.LOAD_CACHE_ELSE_NETWORK to "优先缓存",
-    AndroidWebSettings.LOAD_NO_CACHE to "不缓存",
-    AndroidWebSettings.LOAD_CACHE_ONLY to "仅缓存",
+/** 缓存模式选项：每项带说明（rc11 重写，选择面板整卡呈现）。 */
+private val CACHE_MODE_OPTIONS: List<MmaSelectOption<Int>> = listOf(
+    MmaSelectOption(AndroidWebSettings.LOAD_DEFAULT, "默认", "正常联网加载，按 HTTP 约定使用缓存"),
+    MmaSelectOption(AndroidWebSettings.LOAD_CACHE_ELSE_NETWORK, "优先缓存", "有缓存先用缓存，仅无缓存时联网（弱网更流畅）"),
+    MmaSelectOption(AndroidWebSettings.LOAD_NO_CACHE, "不缓存", "每次联网取最新内容，不用本地缓存"),
+    MmaSelectOption(AndroidWebSettings.LOAD_CACHE_ONLY, "仅缓存", "只读本地缓存，完全离线运行（断网可用）"),
 )
 
 private const val OPEN_MODE_LABEL: String = "应用内打开方式"

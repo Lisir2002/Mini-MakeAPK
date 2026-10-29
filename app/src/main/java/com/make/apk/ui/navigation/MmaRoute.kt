@@ -40,9 +40,24 @@ sealed class MmaRoute(val route: String) {
         fun create(projectId: Long): String = "project/$projectId/run"
     }
 
+    /**
+     * 文件编辑器 / 查看器（流程子页，全屏无底栏，rc11）。
+     *
+     * 路由形如 `project/42/file?name=css/style.css`——文件名作 query 参数
+     * （路径含 `/`，path 参数会与段结构打架）。**未编码的中文/空格由 Navigation
+     * 自动处理**；create 侧仍做 URL 编码兜底。
+     */
+    data object ProjectFileEditor : MmaRoute("project/{$ARG_PROJECT_ID}/file?${ARG_FILE_NAME}={${ARG_FILE_NAME}}") {
+        fun create(projectId: Long, fileName: String): String =
+            "project/$projectId/file?$ARG_FILE_NAME=${android.net.Uri.encode(fileName)}"
+    }
+
     companion object {
         /** 项目 id 路由参数名。 */
         const val ARG_PROJECT_ID = "projectId"
+
+        /** 文件名路由参数名（文件编辑器）。 */
+        const val ARG_FILE_NAME = "fileName"
 
         /** 新建成功回传的项目 id（放在上一个 backStackEntry 的 savedStateHandle）。 */
         const val RESULT_CREATED_PROJECT_ID = "result_created_project_id"

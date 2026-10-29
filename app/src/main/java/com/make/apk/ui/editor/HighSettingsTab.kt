@@ -12,12 +12,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import com.make.apk.data.model.ProgressPosition
 import com.make.apk.ui.components.CuteCard
 import com.make.apk.ui.components.MmaDialog
-import com.make.apk.ui.components.MmaOption
-import com.make.apk.ui.components.MmaSegmentedChoice
-import com.make.apk.ui.components.MmaSwitchRow
 import com.make.apk.ui.components.MmaTextButton
 import com.make.apk.ui.screens.DELETE_CONFIRM_TEXT
 import com.make.apk.ui.screens.DELETE_CONFIRM_TITLE
@@ -42,14 +38,6 @@ fun HighSettingsTab(
     isolationId: String,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
-    /** 是否显示功能加载进度条（进阶设置开关）。 */
-    showLoadingProgress: Boolean = false,
-    /** 加载进度条位置（仅开关开启时生效）。 */
-    loadingProgressPosition: ProgressPosition = ProgressPosition.TOP,
-    /** 开关变化。 */
-    onShowLoadingProgressChanged: (Boolean) -> Unit = {},
-    /** 位置变化（顶部 / 底部）。 */
-    onLoadingProgressPositionChanged: (ProgressPosition) -> Unit = {},
 ) {
     var showDeleteConfirm by remember { mutableStateOf(false) }
 
@@ -59,35 +47,6 @@ fun HighSettingsTab(
     ) {
         ReadOnlyInfoCard(label = "渲染引擎", value = engineLabel.ifBlank { "—" })
         ReadOnlyInfoCard(label = "本地隔离目录", value = isolationId.ifBlank { "—" })
-
-        // 功能加载进度条：开关 + 位置（顶部/底部）。导出壳同源消费，开启即对生成 APK 生效。
-        CuteCard(modifier = Modifier.fillMaxWidth()) {
-            Column(
-                modifier = Modifier.padding(Spacing.space4),
-                verticalArrangement = Arrangement.spacedBy(Spacing.space3),
-            ) {
-                Text(
-                    text = "功能加载进度条",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                MmaSwitchRow(
-                    label = "显示加载进度条",
-                    description = "网页加载时显示进度，加载完成自动隐藏",
-                    checked = showLoadingProgress,
-                    onCheckedChange = onShowLoadingProgressChanged,
-                )
-                if (showLoadingProgress) {
-                    MmaSegmentedChoice(
-                        label = "进度条位置",
-                        options = PROGRESS_POSITION_OPTIONS,
-                        selectedValue = loadingProgressPosition,
-                        onSelected = onLoadingProgressPositionChanged,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
-            }
-        }
 
         // 导出格式 / 签名 占位
         CuteCard(modifier = Modifier.fillMaxWidth()) {
@@ -169,9 +128,3 @@ private fun ReadOnlyInfoCard(label: String, value: String, modifier: Modifier = 
         }
     }
 }
-
-/** 加载进度条位置选项（值即 [ProgressPosition]）。 */
-private val PROGRESS_POSITION_OPTIONS: List<MmaOption<ProgressPosition>> = listOf(
-    MmaOption(ProgressPosition.TOP, "顶部"),
-    MmaOption(ProgressPosition.BOTTOM, "底部"),
-)

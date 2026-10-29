@@ -20,6 +20,7 @@ import androidx.compose.ui.draw.clip
 import com.make.apk.data.model.ShellAction
 import com.make.apk.data.model.ShellIconKeys
 import com.make.apk.data.model.ShellMenuItem
+import com.make.apk.data.model.ShellPresets
 import com.make.apk.ui.components.CuteButton
 import com.make.apk.ui.components.MmaDialog
 import com.make.apk.ui.components.MmaDropdownField
@@ -46,13 +47,13 @@ import kotlin.random.Random
  * | 无显隐开关 | `ShellMenuItem.visible` 字段已建模但编辑器不暴露 | 条目行内 [MmaSwitch] 直接切 |
  * | 四个文字按钮挤一行 | "编辑 ↑ ↓ 删除"横向压扁，点不准 | 条目改**卡片式两行**，操作区右对齐矢量图标按钮 |
  *
- * ## 排版决策
+ * ## rc11 强化（预置壳交互 / 扩展槽位 / 包容性）
  *
- * 一行塞下"图标 + 标题 + 地址 + 开关 + 四个动作"在 360dp 屏上必然挤压，
- * 故条目改为两行卡片：第一行信息 + 显隐，第二行操作区右对齐。
- *
- * 删除只从列表移除（保留不可见语义未用，直接删配置）；重排用稳定
- * [ShellMenuItem.id] 锚定，不依赖下标，避免重排后选中态漂移。
+ * - **槽位计数**：标签实时显示条目数（`标签（n）`），槽位占用一目了然；
+ * - **上限提示**：[maxItems] 非 null 时超限给出可见提醒（超出部分渲染层会截断）；
+ * - **URL 包容性**：确认时无协议地址自动补 `https://`（输入 `example.com` 即可用），
+ *   只有显式写了其它协议（如 `ftp://`）才拦；
+ * - **快速填充**：空槽位提供「一键添加常用导航」模板（同源预置文案与图标键）。
  */
 @Composable
 internal fun ShellItemListEditor(
@@ -60,6 +61,10 @@ internal fun ShellItemListEditor(
     items: List<ShellMenuItem>,
     onItems: (List<ShellMenuItem>) -> Unit,
     modifier: Modifier = Modifier,
+    /** 槽位上限（null = 不限；超出仅提示，不阻止编辑）。 */
+    maxItems: Int? = null,
+    /** 空槽位时是否显示「快速填充」模板按钮。 */
+    showQuickFill: Boolean = false,
 ) {
     var editingItem by remember { mutableStateOf<ShellMenuItem?>(null) }
     var dialogOpen by remember { mutableStateOf(false) }
@@ -70,7 +75,7 @@ internal fun ShellItemListEditor(
         verticalArrangement = Arrangement.spacedBy(Spacing.space2),
     ) {
         Text(
-            text = label,
+            text = if (items.isEmpty()) label else "$label（${items.size}）",
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurface,
         )
@@ -96,6 +101,20 @@ internal fun ShellItemListEditor(
                 text = EMPTY_HINT,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (showQuickFill) {
+                CuteButton(
+                    text = QUICK_FILL_LABEL,
+                    onClick = { onItems(items + quickFillItems()) },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        }
+        if (maxItems != null && items.size > maxItems) {
+            Text(
+                text = "$OVER_LIMIT_PREFIX${items.size - maxItems}$OVER_LIMIT_SUFFIX",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
             )
         }
         CuteButton(
@@ -259,7 +278,7 @@ private fun ShellItemDialog(
     var visible by remember { mutableStateOf(initial?.visible ?: true) }
 
     val titleError = title.isBlank()
-    val urlError = url.isNotBlank() && !isHttpUrl(url)
+    val urlError = url.isNotBlank() && hasUnsupportedScheme(url)
 
     MmaDialog(
         onDismissRequest = onDismiss,
@@ -271,7 +290,7 @@ private fun ShellItemDialog(
                     id = initial?.id ?: newItemId(),
                     title = title.trim(),
                     iconRef = iconKey,
-                    action = ShellAction.NavigateUrl(url.trim()),
+                    action = ShellAction.NavigateUrl(normalizeUrl(url.trim())),
                     visible = visible,
                     selected = initial?.selected ?: false,
                 ),
@@ -327,9 +346,44 @@ private fun ShellItemDialog(
     )
 }
 
-/** 地址是否为 http/https（渲染层当前仅支持网页地址，见 §审计说明）。 */
-private fun isHttpUrl(value: String): Boolean =
-    value.startsWith("http://") || value.startsWith("https://")
+/** 地址是否写了**不被支持的协议**（http/https 之外仍要拦；无协议不拦——确认时自动补 https）。 */
+private fun hasUnsupportedScheme(value: String): Boolean {
+    val scheme = value.substringBefore("://", missingDelimiterValue = "")
+    return scheme.isNotBlank() && scheme.lowercase() !in SUPPORTED_SCHEMES
+}
+
+/** 确认前规范化地址：无协议自动补 https://（包容性：`example.com` 即可用）。 */
+private fun normalizeUrl(value: String): String = when {
+    value.isBlank() -> value
+    hasUnsupportedScheme(value) -> value
+    value.startsWith("http://") || value.startsWith("https://") -> value
+    else -> "https://$value"
+}
+
+/** 渲染层当前支持的地址协议。 */
+private val SUPPORTED_SCHEMES: Set<String> = setOf("http", "https")
+
+/** 快速填充：常用导航三件套（标题 / 图标与预置经典款同源，地址用保留示例域）。 */
+private fun quickFillItems(): List<ShellMenuItem> = listOf(
+    ShellMenuItem(
+        id = newItemId(),
+        title = "首页",
+        iconRef = ShellIconKeys.HOME,
+        action = ShellAction.NavigateUrl(ShellPresets.EXAMPLE_URL),
+    ),
+    ShellMenuItem(
+        id = newItemId(),
+        title = "发现",
+        iconRef = ShellIconKeys.DISCOVER,
+        action = ShellAction.NavigateUrl(ShellPresets.EXAMPLE_URL_SECOND),
+    ),
+    ShellMenuItem(
+        id = newItemId(),
+        title = "我的",
+        iconRef = ShellIconKeys.PROFILE,
+        action = ShellAction.NavigateUrl(ShellPresets.EXAMPLE_URL_THIRD),
+    ),
+)
 
 /**
  * 新条目 id：时间戳（36 进制）+ 4 位随机后缀。
@@ -368,6 +422,9 @@ private const val RADIX_HEX: Int = 16
 private const val ID_SUFFIX_LENGTH: Int = 4
 private const val UNNAMED_ITEM: String = "(未命名)"
 private const val EMPTY_HINT: String = "暂无条目，点击下方「添加条目」。"
+private const val QUICK_FILL_LABEL: String = "一键添加常用导航（首页 / 发现 / 我的）"
+private const val OVER_LIMIT_PREFIX: String = "已超出槽位上限 "
+private const val OVER_LIMIT_SUFFIX: String = " 项，超出部分不会渲染。"
 private const val DELETE_TITLE: String = "删除条目"
 private const val DELETE_CONFIRM: String = "删除"
 private const val TITLE_REQUIRED: String = "标题不能为空"

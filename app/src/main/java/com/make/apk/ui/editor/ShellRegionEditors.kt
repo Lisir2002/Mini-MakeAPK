@@ -71,6 +71,8 @@ internal fun TopTabsEditor(
             label = "分页标签",
             items = topTabs.items,
             onItems = { onTopTabs(topTabs.copy(items = it)) },
+            // 空槽位快速填充（rc11 交互强化）。
+            showQuickFill = true,
         )
         MmaSwitchRow(
             label = "允许左右滑动切页",
@@ -110,6 +112,9 @@ internal fun BottomBarEditor(
             label = "底栏条目",
             items = bottomBar.items,
             onItems = { onBottomBar(bottomBar.copy(items = it)) },
+            // 槽位上限提示 + 空槽位快速填充（rc11 扩展槽位强化）。
+            maxItems = bottomBar.maxItems,
+            showQuickFill = true,
         )
         MmaSwitchRow(
             label = "显示文字标签",

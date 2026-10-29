@@ -2,6 +2,7 @@ package com.make.apk.ui.viewmodel
 
 import com.make.apk.data.model.ExportRun
 import com.make.apk.data.model.ProjectDefaults
+import com.make.apk.data.model.ProjectFile
 import com.make.apk.data.model.ProjectType
 import com.make.apk.data.model.ShellSpec
 import com.make.apk.data.model.VersionScheme
@@ -32,8 +33,10 @@ data class ProjectEditUiState(
     val entryUrl: String = "",
     /** 入口（HTML 类）：入口文件名（首屏加载文件；空 = 默认 index.html）。 */
     val entryFile: String = "",
-    /** 入口（HTML 类）：入口文件源码（「项目代码」页编辑；空保存时兜底默认模板）。 */
+    /** 入口（HTML 类）：入口文件源码（编辑器页维护；空保存时兜底默认模板）。 */
     val entryHtml: String = "",
+    /** 附加文件集（rc11，不含入口文件；文件目录树 + 编辑器消费）。 */
+    val projectFiles: List<ProjectFile> = emptyList(),
     /** 应用名称输入。 */
     val apkName: String = "",
     /** 包名输入。 */

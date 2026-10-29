@@ -41,6 +41,7 @@ import com.make.apk.ui.screens.DevelopingScreen
 import com.make.apk.ui.screens.LogViewerScreen
 import com.make.apk.ui.screens.ProfileScreen
 import com.make.apk.ui.screens.ProjectEditScreen
+import com.make.apk.ui.screens.ProjectFileEditorScreen
 import com.make.apk.ui.screens.ProjectsScreen
 import com.make.apk.ui.screens.ShellPreviewScreen
 import com.make.apk.ui.viewmodel.AddProjectEvent
@@ -49,6 +50,8 @@ import com.make.apk.ui.viewmodel.AddProjectViewModelFactory
 import com.make.apk.ui.viewmodel.ProjectEditEvent
 import com.make.apk.ui.viewmodel.ProjectEditViewModel
 import com.make.apk.ui.viewmodel.ProjectEditViewModelFactory
+import com.make.apk.ui.viewmodel.ProjectFileEditorViewModel
+import com.make.apk.ui.viewmodel.ProjectFileEditorViewModelFactory
 import com.make.apk.ui.viewmodel.ProjectListViewModel
 import com.make.apk.ui.viewmodel.ProjectListViewModelFactory
 import com.make.apk.ui.viewmodel.ShellPreviewEvent
@@ -134,6 +137,8 @@ fun MmaNavHost(
                 },
                 // 「运行」进入壳预览（阶段 6.2）。
                 onRunProject = { id -> navController.navigate(MmaRoute.ProjectRun.create(id)) },
+                // 下拉刷新（rc11）：重读项目流。
+                onRefresh = { listVm.refresh() },
             )
         }
 
@@ -342,6 +347,12 @@ fun MmaNavHost(
                     onUserAgentChanged = vm::onUserAgentChanged,
                     onShowLoadingProgressChanged = vm::onShowLoadingProgressChanged,
                     onLoadingProgressPositionChanged = vm::onLoadingProgressPositionChanged,
+                    // 文件目录树（rc11）：打开 / 新增 / 删除附加文件。
+                    onOpenFile = { name ->
+                        navController.navigate(MmaRoute.ProjectFileEditor.create(projectId, name))
+                    },
+                    onFileAdded = vm::onProjectFileAdded,
+                    onFileDeleted = vm::onProjectFileDeleted,
                     onToggleCollapse = vm::onCollapsedChanged,
                     onTabSelected = vm::onTabSelected,
                     onDelete = vm::delete,
@@ -403,6 +414,46 @@ fun MmaNavHost(
                     modifier = Modifier.align(Alignment.BottomCenter),
                 )
             }
+        }
+
+        // ── 文件编辑器 / 查看器（流程子页：全屏无底栏，rc11）────────────
+        composable(
+            route = MmaRoute.ProjectFileEditor.route,
+            arguments = listOf(
+                navArgument(MmaRoute.ARG_PROJECT_ID) { type = NavType.LongType },
+                navArgument(MmaRoute.ARG_FILE_NAME) {
+                    type = NavType.StringType
+                    defaultValue = ""
+                },
+            ),
+        ) { entry ->
+            val projectId = entry.arguments?.getLong(MmaRoute.ARG_PROJECT_ID) ?: 0L
+            val fileName = entry.arguments?.getString(MmaRoute.ARG_FILE_NAME).orEmpty()
+            if (projectId <= 0L || fileName.isEmpty()) {
+                MmaLogger.error("file_editor_invalid_args", message = "非法的文件编辑参数")
+                LaunchedEffect(Unit) { navController.popBackStack() }
+                return@composable
+            }
+            val vm: ProjectFileEditorViewModel = viewModel(
+                factory = remember(app, projectId, fileName) {
+                    ProjectFileEditorViewModelFactory(projectId, fileName, app.projectRepository)
+                },
+            )
+            val state by vm.uiState.collectAsStateWithLifecycle()
+            LaunchedEffect(Unit) {
+                vm.saved.collect {
+                    // 保存成功：返回项目代码页（文件列表随库流自动刷新）。
+                    navController.popBackStack()
+                }
+            }
+            ProjectFileEditorScreen(
+                fileName = fileName,
+                content = state.content,
+                loading = state.loading,
+                notFound = state.notFound,
+                onBack = { navController.popBackStack() },
+                onSave = vm::save,
+            )
         }
 
     }

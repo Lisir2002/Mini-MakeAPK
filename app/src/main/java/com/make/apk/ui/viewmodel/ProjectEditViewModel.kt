@@ -8,6 +8,7 @@ import com.make.apk.data.model.ExportRun
 import com.make.apk.data.model.Project
 import com.make.apk.data.model.ProjectDefaults
 import com.make.apk.data.model.ProjectEntry
+import com.make.apk.data.model.ProjectFile
 import com.make.apk.data.model.ProjectType
 import com.make.apk.data.model.ProgressPosition
 import com.make.apk.data.model.ShellSpec
@@ -141,6 +142,7 @@ class ProjectEditViewModel(
             entryFile = (project.entry as? ProjectEntry.BundledHtml)?.entryFile
                 ?: ProjectEntry.BundledHtml.DEFAULT_ENTRY_FILE,
             entryHtml = (project.entry as? ProjectEntry.BundledHtml)?.html ?: "",
+            projectFiles = (project.entry as? ProjectEntry.BundledHtml)?.files ?: emptyList(),
             // 壳契约只读展示：读到即用，不参与 dirty 语义（本轮无壳配置写路径）。
             shellSpec = project.shellSpec,
             dirty = false,
@@ -223,6 +225,26 @@ class ProjectEditViewModel(
     fun onEntryFileChanged(name: String) {
         _uiState.value = _uiState.value.copy(entryFile = name, dirty = true)
         revalidate()
+    }
+
+    /** 新增附加文件（rc11：文件目录树；重名 / 与入口同名静默忽略——UI 已前置校验）。 */
+    fun onProjectFileAdded(name: String) {
+        val trimmed = name.trim().trimStart('/')
+        val current = _uiState.value
+        if (trimmed.isEmpty()) return
+        if (current.entryFile == trimmed || current.projectFiles.any { it.name == trimmed }) return
+        _uiState.value = current.copy(
+            projectFiles = current.projectFiles + ProjectFile(trimmed, ""),
+            dirty = true,
+        )
+    }
+
+    /** 删除附加文件（入口文件不可删，调用方已拦；防御性再拦一次）。 */
+    fun onProjectFileDeleted(name: String) {
+        _uiState.value = _uiState.value.copy(
+            projectFiles = _uiState.value.projectFiles.filterNot { it.name == name },
+            dirty = true,
+        )
     }
 
     /** 主题色变化（**不影响** webSettings）。 */
@@ -311,6 +333,7 @@ class ProjectEditViewModel(
             ProjectType.HTML -> ProjectEntry.BundledHtml(
                 html = state.entryHtml.trim().ifBlank { ProjectEntry.BundledHtml.DEFAULT_TEMPLATE },
                 entryFile = state.entryFile.trim().ifBlank { ProjectEntry.BundledHtml.DEFAULT_ENTRY_FILE },
+                files = state.projectFiles,
             )
             ProjectType.VUE, ProjectType.PHP, null -> base.entry
         }

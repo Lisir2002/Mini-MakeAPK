@@ -1,12 +1,15 @@
 package com.make.apk.ui.screens
 
 import android.content.Context
+import android.graphics.Color
 import android.net.Uri
 import android.os.Build
 import android.view.View
 import android.webkit.CookieManager
+import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -71,6 +74,11 @@ fun WebViewScreen(
                 // 新一次加载：进度归零，避免复用旧 WebView 时残留上一页满格进度。
                 progress.value = 0
                 applyRuntime(view, config)
+                // 虚拟文件集（HTML 多文件项目）：入口 HTML 经虚拟域名 baseURL 加载，
+                // 相对路径资源由客户端拦截供给——css/js 文件无需内联即可生效。
+                val files = (config.entry as? ProjectEntry.BundledHtml)
+                    ?.files?.associate { it.name to it.content } ?: emptyMap()
+                view.setTag(TAG_FILES_KEY, files)
                 loadEntry(view, config.entry)
             },
         )
@@ -198,11 +206,56 @@ private class InAppWebViewClient(private val onError: ((String) -> Unit)?) : Web
         onError?.invoke(message)
     }
 
+    /**
+     * 渲染进程崩溃兜底：系统默认行为是宿主 Activity 被直接杀掉（体验为"应用闪退"）；
+     * 返回 true 表示已处理，改为给用户一条可见提示（白屏根因之一：渲染进程被系统回收）。
+     */
+    override fun onRenderProcessGone(view: WebView, detail: RenderProcessGoneDetail): Boolean {
+        reportError("渲染进程异常退出，请重新进入页面")
+        return true
+    }
+
+    /**
+     * HTML 多文件项目的虚拟文件供给：入口以 [VIRTUAL_HOST] 为 baseURL 加载后，
+     * 页面里的相对路径资源（`css/style.css` / `js/app.js` 等）会请求到虚拟域名，
+     * 在此按文件名就地返回内容——附加文件无需内联、无需服务器即可生效。
+     */
+    override fun shouldInterceptRequest(
+        view: WebView,
+        request: WebResourceRequest,
+    ): WebResourceResponse? {
+        val files = view.getTag(TAG_FILES_KEY) as? Map<*, *> ?: return null
+        val host = request.url.host ?: return null
+        if (!host.equals(VIRTUAL_HOST, ignoreCase = true)) return null
+        val path = request.url.path?.trimStart('/') ?: return null
+        if (path.isEmpty()) return null
+        val name = runCatching { java.net.URLDecoder.decode(path, "UTF-8") }.getOrNull() ?: path
+        val content = files[name] as? String ?: return null
+        return WebResourceResponse(mimeOf(name), "utf-8", content.byteInputStream())
+    }
+
     /** 是否由本 WebView 自行加载（留在应用内）；未知 / 外部协议返回 false 走拦截。 */
     private fun isInAppScheme(scheme: String?): Boolean = when (scheme?.lowercase()) {
         "http", "https", "file", "data", "about", "javascript", "blob", "content" -> true
         else -> false
     }
+}
+
+/** 依据扩展名推断虚拟文件的 MIME（未知类型回落 text/plain）。 */
+private fun mimeOf(name: String): String = when (name.substringAfterLast('.', "").lowercase()) {
+    "html", "htm" -> "text/html"
+    "css" -> "text/css"
+    "js", "mjs" -> "application/javascript"
+    "json" -> "application/json"
+    "svg" -> "image/svg+xml"
+    "png" -> "image/png"
+    "jpg", "jpeg" -> "image/jpeg"
+    "gif" -> "image/gif"
+    "webp" -> "image/webp"
+    "ico" -> "image/x-icon"
+    "txt", "md" -> "text/plain"
+    "xml" -> "application/xml"
+    else -> "text/plain"
 }
 
 /** 应用 WebSettings 与第三方 Cookie 开关（本地与导出共用同一套配置）。 */
@@ -213,6 +266,14 @@ private fun applyRuntime(view: WebView, config: WebRuntimeConfig) {
     view.settings.loadWithOverviewMode = true
     view.settings.useWideViewPort = true
     view.settings.cacheMode = web.cacheMode
+    // 图片显式开启（个别 ROM 裁剪默认值），显示效果兜底。
+    view.settings.loadsImagesAutomatically = true
+    // Archive 项目走 file:// 入口加载，显式放开文件访问（Android R+ 默认关闭）。
+    view.settings.allowFileAccess = true
+    // 显示效果：滚动条画在内容之上（不留右侧白轨）；WebView 背景透明，
+    // 首帧由 Compose 的页面底色透出——暗色主题不再闪白屏。
+    view.setBackgroundColor(Color.TRANSPARENT)
+    view.scrollBarStyle = View.SCROLLBARS_INSIDE_OVERLAY
     // 混合内容：HTTPS 页内嵌 HTTP 资源（图片/脚本/iframe）默认被系统拦截 → 整页白屏。
     // 这是"很多网站加载一下就白屏"的根因，强制放行以兼容真实站点。
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
@@ -235,9 +296,14 @@ private fun loadEntry(view: WebView, entry: ProjectEntry) {
         is ProjectEntry.Url ->
             view.loadUrl(entry.url)
         is ProjectEntry.BundledHtml ->
-            // 内联 HTML：baseURL 传 null —— 单文件网页应用无需相对资源解析，
-            // 内联 <style>/<script> 直接生效；避免伪造同域 base 导致相对链接跳到不存在主机而白屏。
-            view.loadDataWithBaseURL(null, entry.html, "text/html", "utf-8", null)
+            // 内联 HTML：无附加文件时 baseURL 传 null（单文件网页应用无需相对资源解析，
+            // 内联 <style>/<script> 直接生效；避免伪造同域 base 导致相对链接跳到不存在主机）；
+            // 有附加文件时改用虚拟域名 baseURL——相对路径资源由客户端拦截供给（见 InAppWebViewClient）。
+            if (view.getTag(TAG_FILES_KEY) is Map<*, *> && (view.getTag(TAG_FILES_KEY) as Map<*, *>).isNotEmpty()) {
+                view.loadDataWithBaseURL(VIRTUAL_BASE_URL, entry.html, "text/html", "utf-8", null)
+            } else {
+                view.loadDataWithBaseURL(null, entry.html, "text/html", "utf-8", null)
+            }
         is ProjectEntry.Archive -> {
             // 本地注入：资产已解包到 assetRef 目录，直接以 file:// 加载解包后的入口。
             // 解包 / 重签管线在导出阶段实现（见 §11 本地注入架构）；此处为预览态默认加载 index.html。
@@ -245,6 +311,12 @@ private fun loadEntry(view: WebView, entry: ProjectEntry) {
         }
     }
 }
+
+/** HTML 多文件项目的虚拟域名（仅本地拦截消费，不发起真实网络请求）。 */
+private const val VIRTUAL_HOST: String = "mma.local"
+
+/** HTML 多文件项目的虚拟 baseURL（相对路径由此解析）。 */
+private const val VIRTUAL_BASE_URL: String = "https://mma.local/"
 
 /** 用于去重判等，避免重组时重复 reload（与 Compose 内部 tag 机制隔离，使用独立整型 key）。 */
 private const val TAG_RUNTIME_KEY = 0x7E110000
@@ -257,3 +329,6 @@ private const val TAG_CLIENT_KEY = 0x7E110002
 
 /** 用于去重判等，避免重复装配 WebChromeClient（进度客户端无状态，装一次即可）。 */
 private const val TAG_CHROME_KEY = 0x7E110003
+
+/** 当前虚拟文件集（name → content），随每次加载刷新，供拦截器读取。 */
+private const val TAG_FILES_KEY = 0x7E110004

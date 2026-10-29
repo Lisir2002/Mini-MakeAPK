@@ -45,6 +45,9 @@ object MmaIcons {
 
     // ── 步进器（自绘数字步进器，与 Add 成对）──────────────────────────
     val Minus: Int = R.drawable.ic_minus
+
+    // ── 文件（项目代码页文件树 / 文件页）─────────────────────────────
+    val File: Int = R.drawable.ic_file
 }
 
 /**

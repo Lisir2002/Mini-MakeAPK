@@ -92,6 +92,7 @@ android {
                 "**/ProfileScreen.kt",
                 "**/ProjectsScreen.kt",
                 "**/ProjectEditScreen.kt",
+                "**/ProjectFileEditorScreen.kt",
                 "**/ShellPreviewScreen.kt",
                 "**/*Activity*.kt",
             ),
