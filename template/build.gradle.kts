@@ -87,6 +87,7 @@ android {
                 //（它们依赖导航/ViewModel/app 主题，模板不引入）：
                 "**/AddProjectScreen.kt",
                 "**/DevelopingScreen.kt",
+                "**/LogViewerScreen.kt",
                 "**/ProfileItem.kt",
                 "**/ProfileScreen.kt",
                 "**/ProjectsScreen.kt",
