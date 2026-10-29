@@ -67,6 +67,8 @@ import com.make.apk.data.model.ShellTopTabs
  * @param selectedDrawerItemId 当前选中的抽屉菜单项 id（null = 无高亮，抽屉是动作列表而非分页导航）。
  * @param drawerOpen 抽屉是否展开（受控）。
  * @param onBack 返回回调；null = 不显示返回按钮。
+ * @param onResetToEntry 回入口回调（宿主决定如何复位到入口根 tab）；null = 不显示回入口按钮。
+ *   仅在 `spec.topTabs` 开启且有可见 tab 时生效（与「回入口」的语义一致：入口即顶栏 tab 之一）。
  * @param onShellAction 顶栏动作回调（宿主决定怎么执行，如 `NavigateUrl` 交给 WebView 加载）。
  * @param onTopTabSelected 顶栏 tab 选中回调。
  * @param onBottomBarSelected 底栏 tab 选中回调。
@@ -95,6 +97,7 @@ fun ShellHost(
     selectedDrawerItemId: String? = null,
     drawerOpen: Boolean = false,
     onBack: (() -> Unit)? = null,
+    onResetToEntry: (() -> Unit)? = null,
     onShellAction: (ShellMenuItem) -> Unit = {},
     onTopTabSelected: (ShellMenuItem) -> Unit = {},
     onBottomBarSelected: (ShellMenuItem) -> Unit = {},
@@ -116,6 +119,13 @@ fun ShellHost(
 
     // 可见 tab 条目：tab 区与 pager 共用同一份顺序（隐藏条目既不成 tab 也不成页）。
     val visibleTopTabs = visibleTopTabItems(spec.topTabs)
+
+    // 回入口按钮：仅在顶栏 tab 区开启且存在可见 tab 时可见（入口即顶栏 tab 之一）。
+    // 宿主若不传 onResetToEntry，或契约里没有 topTabs，则不渲染该按钮。
+    val resetEntry: (() -> Unit)? = onResetToEntry?.takeIf {
+        spec.topTabs.enabled && visibleTopTabs.isNotEmpty()
+    }
+
     val effectiveTopTabId = resolveTopTabSelectedId(visibleTopTabs, selectedTopTabId)
     // 选中态下标基于**可见条目列表**反查：隐藏条目不会让选中态错位。
     val selectedTopTabIndex = visibleTopTabs.indexOfFirst { it.id == effectiveTopTabId }
@@ -135,6 +145,7 @@ fun ShellHost(
                     onBack = onBack,
                     onShellAction = onShellAction,
                     onOpenDrawer = openDrawer,
+                    onResetToEntry = resetEntry,
                 )
             }
             if (spec.topTabs.enabled) {

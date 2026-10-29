@@ -144,6 +144,8 @@ class ProjectEditScreenInteractionTest {
                     onTabSelected = { uiState.value = uiState.value.copy(selectedTab = it) },
                     onDelete = onDelete,
                     onSave = {},
+                    onEntryUrlChanged = {},
+                    onEntryHtmlChanged = {},
                 )
             }
         }

@@ -30,6 +30,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
@@ -268,6 +269,7 @@ private fun <T> MmaDropdownMenu(
         Column(
             modifier = Modifier
                 .width(menuWidth)
+                .shadow(elevation = LocalMmaDesign.current.elevation.elevation1, shape = ControlShapes.group)
                 .clip(ControlShapes.group)
                 .background(colorScheme.surfaceVariant)
                 .padding(control.menuGroupGap),
@@ -306,14 +308,16 @@ private fun <T> MmaDropdownItem(
     val control = LocalMmaDesign.current.control
     val colorScheme = MaterialTheme.colorScheme
     val typography = MaterialTheme.typography
-    val contentColor = if (isSelected) colorScheme.onPrimaryContainer else colorScheme.onSurface
+    // M3E 规范：选中态用**第三强调色**（tertiaryContainer），避免与触发器（primary）抢视觉；
+    // 而非原生下拉那样只换文字色或套 primaryContainer。
+    val contentColor = if (isSelected) colorScheme.onTertiaryContainer else colorScheme.onSurface
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .height(control.menuItemHeight)
             .clip(shape)
-            .background(if (isSelected) colorScheme.primaryContainer else Color.Transparent)
+            .background(if (isSelected) colorScheme.tertiaryContainer else Color.Transparent)
             .clickableNoRipple(onClick = onClick)
             .padding(horizontal = control.menuItemPaddingH)
             .semantics { role = Role.Button },

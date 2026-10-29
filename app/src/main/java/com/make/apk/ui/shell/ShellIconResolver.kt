@@ -49,6 +49,9 @@ object MmaShellIconResolver : ShellIconResolver {
     /** 抽屉入口键（同属壳 chrome，不是用户可配置条目）。 */
     const val KEY_MENU: String = "menu"
 
+    /** 回入口键（壳 chrome，指向被标记为入口根的 tab）。 */
+    const val KEY_HOME: String = ShellIconKeys.HOME
+
     /** 逻辑键 → drawable 资源 id（唯一映射表）。 */
     private val ICONS: Map<String, Int> = mapOf(
         ShellIconKeys.REFRESH to R.drawable.ic_refresh,
@@ -58,6 +61,7 @@ object MmaShellIconResolver : ShellIconResolver {
         ShellIconKeys.PROFILE to R.drawable.ic_person,
         KEY_BACK to R.drawable.ic_arrow_back,
         KEY_MENU to R.drawable.ic_menu,
+        KEY_HOME to R.drawable.ic_home,
     )
 
     /** 无图标时的兜底图标（动作按钮至少给一个可点图形，不出现"空按钮"）。 */

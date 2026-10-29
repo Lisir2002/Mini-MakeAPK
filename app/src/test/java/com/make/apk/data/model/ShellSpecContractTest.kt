@@ -206,6 +206,51 @@ class ShellSpecContractTest {
     }
 
     @Test
+    fun entryTabItem_withoutMarker_returnsFirstVisibleItem() {
+        // 老数据 / 未显式标记入口时，首项即入口（向后兼容）。
+        val tabs = ShellPresets.TABBED.spec.topTabs
+        assertEquals(tabs.items.first().id, tabs.entryTabItem()?.id)
+    }
+
+    @Test
+    fun entryTabItem_withMarker_returnsMarkedItem() {
+        val items = listOf(
+            ShellMenuItem(id = "a", title = "A", action = ShellAction.NavigateUrl("https://example.com/a")),
+            ShellMenuItem(id = "b", title = "B", action = ShellAction.NavigateUrl("https://example.com/b"), isEntry = true),
+            ShellMenuItem(id = "c", title = "C", action = ShellAction.NavigateUrl("https://example.com/c")),
+        )
+        val topTabs = ShellTopTabs(enabled = true, items = items)
+        assertEquals("b", topTabs.entryTabItem()?.id)
+    }
+
+    @Test
+    fun entryTabItem_skipsHiddenItems() {
+        val items = listOf(
+            ShellMenuItem(id = "a", title = "A", action = ShellAction.NavigateUrl("https://example.com/a"), visible = false),
+            ShellMenuItem(id = "b", title = "B", action = ShellAction.NavigateUrl("https://example.com/b")),
+        )
+        val topTabs = ShellTopTabs(enabled = true, items = items)
+        assertEquals("b", topTabs.entryTabItem()?.id)
+    }
+
+    @Test
+    fun entryTabItem_noVisibleItems_returnsNull() {
+        val topTabs = ShellTopTabs(enabled = true, items = listOf(
+            ShellMenuItem(id = "a", title = "A", action = ShellAction.NavigateUrl("https://example.com/a"), visible = false),
+        ))
+        assertEquals(null, topTabs.entryTabItem())
+    }
+
+    @Test
+    fun isEntry_serializesWithDefaultFalse() {
+        // 新增字段必须带默认值：老数据反序列化后仍可被 entryTabItem 正确解析。
+        val raw = """{"specVersion":1,"topTabs":{"enabled":true,"items":[{"id":"a","title":"A","action":{"type":"url","url":"https://example.com"}}]}}"""
+        val decoded = RuntimeJson.decodeShellSpec(raw)
+        assertFalse(decoded.topTabs.items.first().isEntry)
+        assertEquals("a", decoded.topTabs.entryTabItem()?.id)
+    }
+
+    @Test
     fun actionSurrogate_encodesDiscriminatedTypeField() {
         val json = RuntimeJson.encodeShellSpec(
             ShellSpec(

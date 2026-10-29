@@ -13,7 +13,9 @@ import com.make.apk.ui.editor.FieldMessage
  * 编辑页 UI 状态（§2.6）。
  *
  * 与添加页的差别：
- * - 入口 / 项目类型 / 隔离 id **只读**（保存后锁死，§2.6）；
+ * - **入口**：URL / HTML 两类现在允许在编辑页修改（§优化·第四点，放开原 §6.2 锁死）；
+ *   资产包（VUE/PHP）入口因存档拾取尚未实现，仍只读。
+ * - 项目类型 / 隔离 id 仍**只读**（保存后锁死，§2.6）；
  * - 多一个"外部推送"概念：库里的值变化时，若用户没改过表单（[dirty] 为 false）
  *   才覆盖用户输入，避免把用户正在输入的内容冲掉。
  */
@@ -24,8 +26,12 @@ data class ProjectEditUiState(
     val projectNotFound: Boolean = false,
     /** 项目类型（只读）。 */
     val projectType: ProjectType? = null,
-    /** 入口引用（只读）。 */
+    /** 入口引用（只读展示；VUE/PHP 资产包用此显示，URL/HTML 改用下方可编辑字段）。 */
     val entryRef: String = "",
+    /** 入口（URL 类）：可编辑网址。 */
+    val entryUrl: String = "",
+    /** 入口（HTML 类）：可编辑 HTML 源码。 */
+    val entryHtml: String = "",
     /** 应用名称输入。 */
     val apkName: String = "",
     /** 包名输入。 */

@@ -105,7 +105,7 @@ sequenceDiagram
 ## 6. 发版流程（Release）
 
 > 版本格式、递增规则与 RC 机制见 [`VERSIONING.md`](VERSIONING.md)。
-> 当前（即将发布）：`versionName = "0.0.0.1-rc8"`、`versionCode = 11` → tag `v0.0.0.1-rc8`。
+> 当前（即将发布）：`versionName = "0.0.0.1-rc9"`、`versionCode = 12` → tag `v0.0.0.1-rc9`。
 
 > **授权闸门**：正式版发版**必须取得用户授权**（明确确认或提前通知）。未授权时按
 > 顺延下一版本发 RC（`0.0.0.1-rc1` → `0.0.0.1-rc2` …），流程与本表完全相同，

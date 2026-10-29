@@ -15,6 +15,7 @@ import com.make.apk.data.model.ShellAction
 import com.make.apk.data.model.ShellMenuItem
 import com.make.apk.data.model.ShellTopTabs
 import com.make.apk.data.model.WebRuntimeConfig
+import com.make.apk.data.model.entryTabItem
 import com.make.apk.ui.shell.ShellHost
 import com.make.apk.ui.shell.visibleTopTabItems
 import com.make.apk.ui.viewmodel.ShellPreviewUiState
@@ -64,6 +65,8 @@ fun ShellPreviewScreen(
             !state.previewable -> PreviewNotice(text = state.unsupportedMessage ?: PREVIEW_UNSUPPORTED_TEXT)
             else -> {
                 val config = state.runtimeConfig
+                // 回入口：预览侧与模板运行时保持对称——选中入口 tab（壳内 WebView 自带页内历史）。
+                val entryTabItem = state.shellSpec.topTabs.entryTabItem()
                 ShellHost(
                     spec = state.shellSpec,
                     projectThemeColor = state.themeColor,
@@ -73,6 +76,7 @@ fun ShellPreviewScreen(
                     selectedDrawerItemId = state.selectedDrawerItemId,
                     drawerOpen = state.drawerOpen,
                     onBack = onBack,
+                    onResetToEntry = entryTabItem?.let { { onTopTabSelected(it) } },
                     onShellAction = onShellAction,
                     onTopTabSelected = onTopTabSelected,
                     onBottomBarSelected = onBottomItemSelected,

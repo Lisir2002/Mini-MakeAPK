@@ -154,6 +154,8 @@ data class ShellMenuItem(
     val visible: Boolean = true,
     /** 默认选中（tab 类区域生效；渲染期以运行态为准）。 */
     val selected: Boolean = false,
+    /** 是否为入口根（tab 类区域生效）：标记后该 tab 即「回入口」的目标页与栈根；默认首项即入口。 */
+    val isEntry: Boolean = false,
 )
 
 /**
@@ -465,6 +467,7 @@ classDiagram
         +ShellAction action
         +Boolean visible
         +Boolean selected
+        +Boolean isEntry
     }
     class ShellAction {
         <<sealed>>
@@ -741,6 +744,44 @@ ModalDrawer(
 
 **关键约束**：`ShellRenderer` **不得直接依赖 app 的 `MmaDesign` / `MaterialTheme` 具体色值**，
 只接受 `ShellRenderEnv`（强调色 + 尺寸档位 + 是否深色）注入 —— 这是 §5.2 "module 化"的前提。
+
+---
+
+## 3.6 tab↔入口联动（EntryRoot + 回入口）
+
+> 落地状态：**已实现（rc9，`ShellSpec.isEntry` + `ShellHost.onResetToEntry` + `:template` 运行时）**。
+> 本节描述契约与运行时的协同规则，便于后续导出壳沿用同一套语义。
+
+### 3.6.1 三个概念
+
+| 概念 | 定义 | 来源 |
+|---|---|---|
+| **EntryRoot（入口根）** | 某 tab 的"首页"——其 `ShellAction.NavigateUrl.url`（为空则回落项目自身 `entry`）。每个顶栏 tab 各自持有。 | `tabEntryUrl(baseEntryUrl, tab)` |
+| **入口 tab（Entry Tab）** | 被 `isEntry = true` 标记的 tab；无显式标记时回落**首个可见 tab**（向后兼容老数据）。 | `ShellTopTabs.entryTabItem()` |
+| **回入口（Reset To Entry）** | 把当前视图复位到入口 tab 的入口根。两种触发：① 顶栏 home 图标按钮；② 重选当前已选中 tab。 | `ShellHost.onResetToEntry` |
+
+### 3.6.2 契约变更（向后兼容）
+
+- `ShellMenuItem` 新增 `val isEntry: Boolean = false`：带默认值，**老数据反序列化不炸**（CURRENT_SPEC_VERSION 仍为 1）。
+- `ShellTopTabs.entryTabItem(): ShellMenuItem?`（纯 Kotlin 扩展，零 `android.*`）：首个 `isEntry=true` 可见项，否则首个可见项，否则 null。
+- 顶级栏 `ShellTopBarSection` 新增 `onResetToEntry` 回调 → 渲染 home 图标按钮（`ic_home`，**SVG，非 emoji**）；仅当 `spec.topTabs.enabled && 有可见 tab` 时由 `ShellHost` 注入，否则不渲染（保证"未配顶栏 tab 的项目不会出现该按钮"）。
+
+### 3.6.3 运行时（集中式路由 + 每 tab 独立栈）
+
+`:template` 的 `TemplateApp` 持有运行态（**不回写 spec**，守住§8.2 不变量）：
+
+- **TabStack**：`Map<tabId, List<URL>>`，每顶栏 tab 一条独立 URL 后退栈，栈顶 = 当前显示；首屏初始化为各自入口根。切换 tab 保留各自栈（互不干扰）。
+- **RouterContract**（`handleAction`）：
+  - `ShellAction.NavigateUrl(url)` → 命中某 tab 目标 URL 则切到该 tab（`routeToTab`）；否则压入当前 tab 栈。
+  - `ShellAction.InternalPage` → 复位到入口根（`resetToEntry`）。
+  - `ShellAction.Native.REFRESH` → 重载当前 tab 栈顶；其余 `Native` 种类本期仅记录不执行（与 §8.1 一致，不崩）。
+  - `ShellAction.Unknown` → 忽略。
+- **resetToEntry**：跳转入口 tab 并将其栈复位到入口根；其他 tab 栈保留。
+
+### 3.6.4 预览==导出对称
+
+- `ShellPreviewScreen` 同样透传 `onResetToEntry`（选中入口 tab），与 `:template` 共用同一 `ShellHost` 渲染入口按钮；
+- 预览侧因 WebView 自带页内历史，回入口以"选中入口 tab"实现（等价于入口根）；导出壳若采用同款 TabStack 则行为完全一致。
 
 ---
 

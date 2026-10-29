@@ -207,13 +207,17 @@ class ProjectEditViewModelContractTest {
 
     @Test
     fun lockedFields_exposeNoMutationApi() {
+        // 锁死项：projectType / isolationId / 存档入口（VUE/PHP 资产包拾取未实现）。
+        // 放开项（决策 D2，rc9）：入口 URL/HTML 提供修改 API。
         val names = ProjectEditViewModel::class.java.methods.map { it.name }
-        listOf("ProjectType", "Entry", "Isolation").forEach { token ->
+        listOf("ProjectType", "Isolation", "Archive").forEach { token ->
             assertFalse(
                 "编辑页不应提供与 $token 相关的修改方法",
                 names.any { it.contains(token, ignoreCase = true) },
             )
         }
+        assertTrue(names.any { it == "onEntryUrlChanged" })
+        assertTrue(names.any { it == "onEntryHtmlChanged" })
     }
 
     // ── 不存在的 id ─────────────────────────────────────────────────────

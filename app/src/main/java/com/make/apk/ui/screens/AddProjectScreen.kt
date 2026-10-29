@@ -14,6 +14,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -42,6 +43,7 @@ import com.make.apk.ui.editor.ProjectTypeSelector
 import com.make.apk.ui.editor.SectionCard
 import com.make.apk.ui.editor.ThemeColorSwatches
 import com.make.apk.ui.editor.VersionSchemeChips
+import com.make.apk.ui.icons.MmaIcon
 import com.make.apk.ui.icons.MmaIcons
 import com.make.apk.ui.theme.Spacing
 import com.make.apk.ui.viewmodel.AddProjectUiState
@@ -81,6 +83,8 @@ fun AddProjectScreen(
     onPickIcon: () -> Unit,
     onSave: () -> Unit,
     modifier: Modifier = Modifier,
+    /** 预览入口（保存成功后提供，进入壳预览 `project/{id}/run`）；null 时不显示。 */
+    onPreview: ((Long) -> Unit)? = null,
 ) {
     // 「放弃修改？」确认框：纯 UI 状态（不进 UiState——它不属于表单数据）。
     var showDiscardDialog by remember { mutableStateOf(false) }
@@ -96,6 +100,16 @@ fun AddProjectScreen(
         onBack = requestBack,
         modifier = modifier,
         actions = {
+            // 保存成功后留驻编辑页：给出一键预览入口（§优化：保存不再强制退出页面）。
+            if (state.savedProjectId != null && onPreview != null) {
+                IconButton(onClick = { onPreview(state.savedProjectId) }) {
+                    MmaIcon(
+                        iconRes = MmaIcons.Play,
+                        contentDescription = "预览注入壳",
+                        tint = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
+            }
             // 自绘文字按钮：原生 TextButton 的内边距与涟漪与自绘顶栏不同皮肤。
             MmaTextButton(
                 label = "保存",

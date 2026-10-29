@@ -40,6 +40,8 @@ import com.make.apk.data.model.ShellTopBar
  * @param onOpenDrawer 抽屉入口（汉堡按钮）回调；null = 不显示抽屉入口。
  *   由 [com.make.apk.data.model.ShellDrawer.enabled] 决定宿主是否传入，
  *   因此"没有配置抽屉的项目，预览里也绝不会出现汉堡按钮"。
+ * @param onResetToEntry 回入口（home 图标）回调；null = 不显示该按钮。
+ *   由宿主在「顶栏 tab 区开启」时传入，点击即跳转/复位到入口根 tab。
  */
 @Composable
 fun ShellTopBarSection(
@@ -50,6 +52,7 @@ fun ShellTopBarSection(
     onBack: (() -> Unit)?,
     onShellAction: (ShellMenuItem) -> Unit,
     onOpenDrawer: (() -> Unit)? = null,
+    onResetToEntry: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     Surface(
@@ -80,6 +83,17 @@ fun ShellTopBarSection(
                     contentDescription = "返回",
                     tint = env.accent,
                     onClick = onBack,
+                )
+                Spacer(modifier = Modifier.width(env.spaceXs))
+            }
+            if (onResetToEntry != null) {
+                // 回入口：仅当宿主传入时显示（宿主在顶栏 tab 区开启时才传），
+                // 与「返回」「抽屉」并列构成左侧导航簇。
+                ShellIconButton(
+                    iconRes = iconResolver.resolve(MmaShellIconResolver.KEY_HOME),
+                    contentDescription = "回入口",
+                    tint = env.accent,
+                    onClick = onResetToEntry,
                 )
                 Spacer(modifier = Modifier.width(env.spaceXs))
             }

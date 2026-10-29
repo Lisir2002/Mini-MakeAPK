@@ -41,6 +41,10 @@ fun EditIdentityCard(
     versionCode: String,
     projectType: ProjectType?,
     entryRef: String,
+    entryUrl: String,
+    entryHtml: String,
+    entryUrlMessage: FieldMessage?,
+    entryHtmlMessage: FieldMessage?,
     themeColor: Int,
     iconRef: String?,
     apkNameMessage: FieldMessage?,
@@ -52,6 +56,8 @@ fun EditIdentityCard(
     onVersionSchemeChanged: (VersionScheme) -> Unit,
     onVersionNameChanged: (String) -> Unit,
     onVersionCodeChanged: (String) -> Unit,
+    onEntryUrlChanged: (String) -> Unit,
+    onEntryHtmlChanged: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     CuteCard(modifier = modifier.fillMaxWidth()) {
@@ -90,7 +96,7 @@ fun EditIdentityCard(
                 }
             }
 
-            // 只读：项目类型 + 入口（锁死）
+            // 只读：项目类型（锁死）；资产包入口（VUE/PHP）因存档拾取尚未实现，亦只读。
             Row(
                 horizontalArrangement = Arrangement.spacedBy(Spacing.space3),
             ) {
@@ -99,11 +105,37 @@ fun EditIdentityCard(
                     value = projectType?.let { displayLabelOf(it) } ?: "—",
                     modifier = Modifier.weight(1f),
                 )
-                LockedField(
-                    label = ENTRY_LABEL,
-                    value = entryRef.ifBlank { "—" },
-                    modifier = Modifier.weight(1f),
+                if (projectType == ProjectType.VUE || projectType == ProjectType.PHP) {
+                    LockedField(
+                        label = ENTRY_LABEL,
+                        value = entryRef.ifBlank { "—" },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            }
+
+            // 入口（URL/HTML 可编辑，§优化·第四点：放开原 §6.2 锁死）。
+            when (projectType) {
+                ProjectType.URL -> ProjectTextField(
+                    value = entryUrl,
+                    onValueChange = onEntryUrlChanged,
+                    label = ENTRY_URL_LABEL,
+                    placeholder = ENTRY_URL_PLACEHOLDER,
+                    message = entryUrlMessage,
+                    keyboardType = KeyboardType.Uri,
+                    modifier = Modifier.fillMaxWidth(),
                 )
+                ProjectType.HTML -> ProjectTextField(
+                    value = entryHtml,
+                    onValueChange = onEntryHtmlChanged,
+                    label = ENTRY_HTML_LABEL,
+                    placeholder = ENTRY_HTML_PLACEHOLDER,
+                    message = entryHtmlMessage,
+                    singleLine = false,
+                    minLines = ENTRY_HTML_MIN_LINES,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                ProjectType.VUE, ProjectType.PHP, null -> Unit
             }
 
             // 版本
@@ -174,3 +206,18 @@ private const val VERSION_CODE_LABEL: String = "内部版本号"
 private const val VERSION_CODE_PLACEHOLDER: String = "1"
 private const val TYPE_LABEL: String = "项目类型"
 private const val ENTRY_LABEL: String = "入口"
+
+/** 入口（URL）输入框标签。 */
+private const val ENTRY_URL_LABEL: String = "入口网址"
+
+/** 入口（URL）占位提示。 */
+private const val ENTRY_URL_PLACEHOLDER: String = "https://example.com"
+
+/** 入口（HTML）输入框标签。 */
+private const val ENTRY_HTML_LABEL: String = "入口 HTML"
+
+/** 入口（HTML）占位提示。 */
+private const val ENTRY_HTML_PLACEHOLDER: String = "<html>…</html>"
+
+/** 入口（HTML）最小行数（多行粘贴区）。 */
+private const val ENTRY_HTML_MIN_LINES: Int = 6

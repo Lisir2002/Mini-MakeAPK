@@ -8,6 +8,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.offset
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -29,6 +30,12 @@ import com.make.apk.requireMmaApplication
 import com.make.apk.storage.IconStore
 import kotlinx.coroutines.launch
 import com.make.apk.ui.components.MmaBottomBar
+import com.make.apk.ui.components.MmaNoticeCategory
+import com.make.apk.ui.components.MmaNoticeData
+import com.make.apk.ui.components.MmaNoticeHost
+import com.make.apk.ui.components.MmaNoticeHostState
+import com.make.apk.ui.theme.LocalMmaDesign
+import com.make.apk.ui.theme.Spacing
 import com.make.apk.ui.screens.AddProjectScreen
 import com.make.apk.ui.screens.DevelopingScreen
 import com.make.apk.ui.screens.ProfileScreen
@@ -158,6 +165,8 @@ fun MmaNavHost(
             val state by vm.uiState.collectAsStateWithLifecycle()
             val iconStore = remember(app) { IconStore(app) }
             val scope = rememberCoroutineScope()
+            // 保存通知宿主（顶栏居中气泡，3s 自动消失 / 点击即隐藏；§优化：保存不再强制退出页面）。
+            val addNoticeHost = remember { MmaNoticeHostState() }
 
             // 图标选择：系统 Photo Picker（无需存储权限），选中后拷入应用私有目录。
             val pickIconLauncher = rememberLauncherForActivityResult(
@@ -178,43 +187,50 @@ fun MmaNavHost(
             LaunchedEffect(Unit) {
                 vm.events.collect { event ->
                     when (event) {
-                        is AddProjectEvent.Saved -> {
-                            navController.previousBackStackEntry?.savedStateHandle?.set(
-                                MmaRoute.RESULT_CREATED_PROJECT_ID,
-                                event.projectId,
-                            )
-                            navController.popBackStack()
-                        }
+                        // 保存成功：顶栏居中气泡提示，**留驻编辑页**（用户手动返回）；
+                        // 不再 popBackStack 强制离开（§优化：简化操作步骤）。
+                        is AddProjectEvent.Saved -> addNoticeHost.show(
+                            MmaNoticeData(MmaNoticeCategory.Success, "已保存项目"),
+                        )
                         // 失败：字段级原因已由 errors 落在输入框下方；这里补一次轻提示
-                        // （包名占用等非字段异常也要让用户看见"确实点了但没保存成功"）
-                        is AddProjectEvent.SaveFailed -> Toast
-                            .makeText(context, event.message, Toast.LENGTH_SHORT)
-                            .show()
+                        // （包名占用等非字段异常也要让用户看见"确实点了但没保存成功"）。
+                        is AddProjectEvent.SaveFailed -> addNoticeHost.show(
+                            MmaNoticeData(MmaNoticeCategory.Error, event.message),
+                        )
                     }
                 }
             }
 
-            AddProjectScreen(
-                state = state,
-                onBack = { navController.popBackStack() },
-                onProjectTypeSelected = vm::onProjectTypeSelected,
-                onUrlChanged = vm::onUrlChanged,
-                onHtmlChanged = vm::onHtmlChanged,
-                onApkNameChanged = vm::onApkNameChanged,
-                onPackageNameChanged = vm::onPackageNameChanged,
-                onVersionSchemeChanged = vm::onVersionSchemeChanged,
-                onVersionNameChanged = vm::onVersionNameChanged,
-                onVersionCodeChanged = vm::onVersionCodeChanged,
-                onApplySuggestionApkName = vm::applySuggestionApkName,
-                onApplySuggestionPackageName = vm::applySuggestionPackageName,
-                onThemeColorChanged = vm::onThemeColorChanged,
-                onPickIcon = {
-                    pickIconLauncher.launch(
-                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
-                    )
-                },
-                onSave = vm::save,
-            )
+            Box(modifier = Modifier.fillMaxSize()) {
+                AddProjectScreen(
+                    state = state,
+                    onBack = { navController.popBackStack() },
+                    onProjectTypeSelected = vm::onProjectTypeSelected,
+                    onUrlChanged = vm::onUrlChanged,
+                    onHtmlChanged = vm::onHtmlChanged,
+                    onApkNameChanged = vm::onApkNameChanged,
+                    onPackageNameChanged = vm::onPackageNameChanged,
+                    onVersionSchemeChanged = vm::onVersionSchemeChanged,
+                    onVersionNameChanged = vm::onVersionNameChanged,
+                    onVersionCodeChanged = vm::onVersionCodeChanged,
+                    onApplySuggestionApkName = vm::applySuggestionApkName,
+                    onApplySuggestionPackageName = vm::applySuggestionPackageName,
+                    onThemeColorChanged = vm::onThemeColorChanged,
+                    onPickIcon = {
+                        pickIconLauncher.launch(
+                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                        )
+                    },
+                    onSave = vm::save,
+                    onPreview = { id -> navController.navigate(MmaRoute.ProjectRun.create(id)) },
+                )
+                MmaNoticeHost(
+                    hostState = addNoticeHost,
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .offset(y = LocalMmaDesign.current.chrome.topBarHeight + Spacing.space2),
+                )
+            }
         }
 
         // ── 项目编辑（流程子页：无底栏）────────────────────────────────
@@ -238,21 +254,20 @@ fun MmaNavHost(
                 },
             )
             val state by vm.uiState.collectAsStateWithLifecycle()
-            // 保存失败用 Snackbar 可见（MmaScreen 的 Scaffold 未内置 host，故在此叠加一层 host）。
-            val snackbarHostState = remember { SnackbarHostState() }
+            // 保存通知宿主（顶栏居中气泡；§优化：保存成功留驻编辑页，不再强制离开）。
+            val editNoticeHost = remember { MmaNoticeHostState() }
             LaunchedEffect(Unit) {
                 vm.events.collect { event ->
                     when (event) {
-                        is ProjectEditEvent.Saved -> {
-                            navController.previousBackStackEntry?.savedStateHandle?.set(
-                                MmaRoute.RESULT_UPDATED_PROJECT_ID,
-                                event.projectId,
-                            )
-                            navController.popBackStack()
-                        }
-                        is ProjectEditEvent.SaveFailed -> {
-                            snackbarHostState.showSnackbar(event.message)
-                        }
+                        // 保存成功：顶栏居中气泡提示，**留驻编辑页**（用户手动返回）。
+                        is ProjectEditEvent.Saved -> editNoticeHost.show(
+                            MmaNoticeData(MmaNoticeCategory.Success, "已保存"),
+                        )
+                        // 保存失败：气泡提示（替代原 Snackbar）。
+                        is ProjectEditEvent.SaveFailed -> editNoticeHost.show(
+                            MmaNoticeData(MmaNoticeCategory.Error, event.message),
+                        )
+                        // 删除成功：离开编辑页回到列表。
                         is ProjectEditEvent.Deleted -> {
                             navController.popBackStack()
                         }
@@ -268,6 +283,8 @@ fun MmaNavHost(
                     onVersionSchemeChanged = vm::onVersionSchemeChanged,
                     onVersionNameChanged = vm::onVersionNameChanged,
                     onVersionCodeChanged = vm::onVersionCodeChanged,
+                    onEntryUrlChanged = vm::onEntryUrlChanged,
+                    onEntryHtmlChanged = vm::onEntryHtmlChanged,
                     onThemeColorChanged = vm::onThemeColorChanged,
                     onShellSpecChanged = vm::onShellSpecChanged,
                     onJavascriptEnabledChanged = vm::onJavascriptEnabledChanged,
@@ -283,9 +300,11 @@ fun MmaNavHost(
                     // 「预览」进入壳预览（阶段 6.2）。
                     onPreview = { navController.navigate(MmaRoute.ProjectRun.create(projectId)) },
                 )
-                SnackbarHost(
-                    hostState = snackbarHostState,
-                    modifier = Modifier.align(Alignment.BottomCenter),
+                MmaNoticeHost(
+                    hostState = editNoticeHost,
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .offset(y = LocalMmaDesign.current.chrome.topBarHeight + Spacing.space2),
                 )
             }
         }

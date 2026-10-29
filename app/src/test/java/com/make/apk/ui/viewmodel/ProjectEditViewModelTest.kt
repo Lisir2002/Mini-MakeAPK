@@ -290,10 +290,15 @@ class ProjectEditViewModelTest {
 
     @Test
     fun lockedFields_haveNoMutationApi() {
-        // 编译期保证：编辑页 VM 不提供 projectType / entry / isolationId 的修改方法。
+        // 编译期保证：编辑页 VM 不提供 projectType / isolationId 的修改方法。
+        // 入口自 rc9 起 URL/HTML 可改（决策 D2，放开 §6.2 锁定），但存档入口（VUE/PHP）
+        // 仍锁死——不得出现存档级修改方法（资产包拾取尚未实现）。
         val names = ProjectEditViewModel::class.java.methods.map { it.name }
         assertFalse(names.any { it.contains("ProjectType", ignoreCase = true) })
-        assertFalse(names.any { it.contains("Entry", ignoreCase = true) })
         assertFalse(names.any { it.contains("Isolation", ignoreCase = true) })
+        assertFalse(names.any { it.contains("Archive", ignoreCase = true) })
+        // 放开契约面：入口 URL/HTML 的修改 API 必须存在。
+        assertTrue(names.any { it == "onEntryUrlChanged" })
+        assertTrue(names.any { it == "onEntryHtmlChanged" })
     }
 }

@@ -102,6 +102,8 @@ class ProjectEditScreenTest {
             onTabSelected = {},
             onDelete = {},
             onSave = {},
+            onEntryUrlChanged = {},
+            onEntryHtmlChanged = {},
         )
     }
 

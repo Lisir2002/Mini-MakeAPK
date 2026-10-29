@@ -32,7 +32,8 @@
           "url": "https://example.com"
         },
         "visible": true,
-        "selected": true
+        "selected": true,
+        "isEntry": true
       },
       {
         "id": "itm_tabbed_discover",

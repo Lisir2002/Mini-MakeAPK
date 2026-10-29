@@ -58,6 +58,12 @@ enum class EditField {
 
     /** 图标引用。 */
     ICON,
+
+    /** 入口：远程网址（编辑页现在允许修改 URL 入口，见 §优化·第四点）。 */
+    ENTRY_URL,
+
+    /** 入口：内置 HTML（编辑页现在允许修改 HTML 入口，见 §优化·第四点）。 */
+    ENTRY_HTML,
 }
 
 /**

@@ -63,6 +63,13 @@ data class AddProjectUiState(
      * 因此 `onProjectTypeSelected` 只在"此前已有选中项"时才置 true。
      */
     val dirty: Boolean = false,
+    /**
+     * 最近一次保存成功写入的项目 id；null 表示尚未保存或保存失败。
+     *
+     * 用于保存后**留驻编辑页**时给出「预览」入口（§优化：保存不再强制退出页面）。
+     * 重新编辑（任意 onXxxChanged）会再次置脏，但不清空此值——已落库的项目随时可预览。
+     */
+    val savedProjectId: Long? = null,
 ) {
     /** 是否允许保存：无错误、项目类型已定、入口有效。 */
     val canSave: Boolean

@@ -96,6 +96,8 @@ data class ShellMenuItem(
     val visible: Boolean = true,
     /** 默认选中（tab 类区域生效；渲染期以运行态为准）。 */
     val selected: Boolean = false,
+    /** 是否为入口根（tab 类区域生效）：标记后该 tab 即「回入口」的目标页与栈根。 */
+    val isEntry: Boolean = false,
 )
 
 /**
@@ -229,4 +231,15 @@ enum class ShellDrawerWidthMode {
 
     /** 自定义（[ShellDrawerWidth.customDp]）。 */
     CUSTOM,
+}
+
+/**
+ * 入口 tab（栈根）：首个 `isEntry = true` 的可见项；否则首个可见项；无可见项则 null。
+ *
+ * 「回入口」按钮 / [ShellAction.InternalPage] 都指向此处；无显式标记时回落首项，
+ * 与"默认首项即入口"的直觉一致（向后兼容：老数据全为 false，仍取首项）。
+ */
+fun ShellTopTabs.entryTabItem(): ShellMenuItem? {
+    val visible = items.filter { it.visible }
+    return visible.firstOrNull { it.isEntry } ?: visible.firstOrNull()
 }

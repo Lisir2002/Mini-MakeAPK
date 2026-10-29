@@ -7,6 +7,7 @@ import com.make.apk.data.model.DuplicatePackageNameException
 import com.make.apk.data.model.ExportRun
 import com.make.apk.data.model.Project
 import com.make.apk.data.model.ProjectDefaults
+import com.make.apk.data.model.ProjectEntry
 import com.make.apk.data.model.ProjectType
 import com.make.apk.data.model.ShellSpec
 import com.make.apk.data.model.VersionScheme
@@ -34,8 +35,12 @@ import kotlinx.coroutines.launch
 /**
  * 编辑项目 ViewModel（§2.6）。
  *
- * 锁死项（编译期杜绝误改）：`projectType` / `entry` / `isolationId` / `createdAt` / `id`
- * **不提供任何修改 API**——想改只能新建项目（§2.6 的硬约束）。
+ * 锁死项（编译期杜绝误改）：`projectType` / `isolationId` / `createdAt` / `id`
+ * **不提供任何修改 API**——想改类型只能新建项目（§2.6 的硬约束）。
+ *
+ * 入口（[ProjectEntry]）：原设计保存后锁死（§6.2），§优化·第四点已放开——
+ * **URL / HTML 两类现在允许在编辑页修改**（[onEntryUrlChanged] / [onEntryHtmlChanged]），
+ * 资产包（VUE/PHP）入口因存档拾取尚未实现，仍沿用库中原值。
  *
  * 外部推送策略：订阅仓储的项目流；库里值变化时，
  * 仅当用户**没有改过表单**（[ProjectEditUiState.dirty] 为 false）才覆盖用户输入，
@@ -130,6 +135,9 @@ class ProjectEditViewModel(
             themeColor = project.themeColor,
             isolationId = project.isolationId,
             engineLabel = engineLabelOf(project.projectType),
+            // 入口（URL/HTML）回填到可编辑字段（§优化·第四点：编辑页可改入口）。
+            entryUrl = (project.entry as? ProjectEntry.Url)?.url ?: "",
+            entryHtml = (project.entry as? ProjectEntry.BundledHtml)?.html ?: "",
             // 壳契约只读展示：读到即用，不参与 dirty 语义（本轮无壳配置写路径）。
             shellSpec = project.shellSpec,
             dirty = false,
@@ -181,6 +189,26 @@ class ProjectEditViewModel(
     /** 图标引用变化。 */
     fun onIconChanged(iconRef: String?) {
         _uiState.value = _uiState.value.copy(iconRef = iconRef, dirty = true)
+        revalidate()
+    }
+
+    /**
+     * 入口（URL 类）变化（§优化·第四点：放开原 §6.2 锁死）。
+     *
+     * 仅当项目类型为 [ProjectType.URL] 时有意义；其他类型不会调用此方法。
+     */
+    fun onEntryUrlChanged(url: String) {
+        _uiState.value = _uiState.value.copy(entryUrl = url, dirty = true)
+        revalidate()
+    }
+
+    /**
+     * 入口（HTML 类）变化（§优化·第四点：放开原 §6.2 锁死）。
+     *
+     * 仅当项目类型为 [ProjectType.HTML] 时有意义。
+     */
+    fun onEntryHtmlChanged(html: String) {
+        _uiState.value = _uiState.value.copy(entryHtml = html, dirty = true)
         revalidate()
     }
 
@@ -254,6 +282,12 @@ class ProjectEditViewModel(
 
         val base = loaded ?: return
         val versionCode = state.versionCode.trim().toIntOrNull() ?: return
+        // 入口重建（§优化·第四点）：URL/HTML 用编辑页最新值；资产包（VUE/PHP）沿用库中原值。
+        val entry = when (state.projectType) {
+            ProjectType.URL -> ProjectEntry.Url(state.entryUrl.trim())
+            ProjectType.HTML -> ProjectEntry.BundledHtml(state.entryHtml.trim())
+            ProjectType.VUE, ProjectType.PHP, null -> base.entry
+        }
         val updated = base.copy(
             apkName = state.apkName.trim(),
             packageName = state.packageName.trim(),
@@ -262,6 +296,7 @@ class ProjectEditViewModel(
             versionCode = versionCode,
             iconRef = state.iconRef,
             themeColor = state.themeColor,
+            entry = entry,
             webSettings = state.webSettings,
             shellSpec = state.shellSpec,
         )
@@ -355,6 +390,15 @@ class ProjectEditViewModel(
         val iconVerdict = validator.validateIconRef(state.iconRef)
         iconVerdict.error?.let { errors[EditField.ICON] = it }
         iconVerdict.warning?.let { warnings[EditField.ICON] = it }
+
+        // 入口（URL/HTML 现在可编辑，§优化·第四点）：按类型校验，错误挂到对应字段。
+        when (state.projectType) {
+            ProjectType.URL -> validator.validateEntryUrl(state.entryUrl)
+                .error?.let { errors[EditField.ENTRY_URL] = it }
+            ProjectType.HTML -> validator.validateEntryHtml(state.entryHtml)
+                .error?.let { errors[EditField.ENTRY_HTML] = it }
+            ProjectType.VUE, ProjectType.PHP, null -> Unit
+        }
 
         _uiState.value = _uiState.value.copy(errors = errors, warnings = warnings)
     }

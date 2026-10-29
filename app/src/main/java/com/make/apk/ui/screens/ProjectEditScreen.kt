@@ -61,6 +61,8 @@ fun ProjectEditScreen(
     onVersionSchemeChanged: (VersionScheme) -> Unit,
     onVersionNameChanged: (String) -> Unit,
     onVersionCodeChanged: (String) -> Unit,
+    onEntryUrlChanged: (String) -> Unit,
+    onEntryHtmlChanged: (String) -> Unit,
     onThemeColorChanged: (Int) -> Unit,
     onShellSpecChanged: (ShellSpec) -> Unit,
     onJavascriptEnabledChanged: (Boolean) -> Unit,
@@ -127,6 +129,10 @@ fun ProjectEditScreen(
                         versionCode = state.versionCode,
                         projectType = state.projectType,
                         entryRef = state.entryRef,
+                        entryUrl = state.entryUrl,
+                        entryHtml = state.entryHtml,
+                        entryUrlMessage = messageOf(state, EditField.ENTRY_URL),
+                        entryHtmlMessage = messageOf(state, EditField.ENTRY_HTML),
                         themeColor = state.themeColor,
                         iconRef = state.iconRef,
                         apkNameMessage = messageOf(state, EditField.APK_NAME),
@@ -138,6 +144,8 @@ fun ProjectEditScreen(
                         onVersionSchemeChanged = onVersionSchemeChanged,
                         onVersionNameChanged = onVersionNameChanged,
                         onVersionCodeChanged = onVersionCodeChanged,
+                        onEntryUrlChanged = onEntryUrlChanged,
+                        onEntryHtmlChanged = onEntryHtmlChanged,
                     )
                 }
             }

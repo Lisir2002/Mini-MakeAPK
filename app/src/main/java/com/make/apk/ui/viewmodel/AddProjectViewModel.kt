@@ -20,6 +20,7 @@ import com.make.apk.ui.editor.FileArchiveProbe
 import com.make.apk.ui.editor.ProjectDirectory
 import com.make.apk.ui.editor.ProjectValidator
 import com.make.apk.ui.editor.RepositoryProjectDirectory
+import com.make.apk.data.strategy.ProjectTypeStrategy
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
@@ -214,7 +215,11 @@ class AddProjectViewModel(
                         message = "新建项目",
                         fields = mapOf(LogFields.SUCCESS to true, "project_id" to id),
                     )
-                    _uiState.value = _uiState.value.copy(saving = false)
+                    _uiState.value = _uiState.value.copy(
+                        saving = false,
+                        savedProjectId = id,
+                        dirty = false,
+                    )
                     eventChannel.send(AddProjectEvent.Saved(id))
                 }
                 .onFailure { throwable ->
@@ -266,14 +271,15 @@ class AddProjectViewModel(
         )
     }
 
-    /** 按项目类型构造入口引用；缺必要输入时返回 null。 */
-    private fun buildEntry(state: AddProjectUiState, type: ProjectType): ProjectEntry? = when (type) {
-        ProjectType.URL -> state.urlInput.trim().takeIf { it.isNotBlank() }?.let(ProjectEntry::Url)
-        ProjectType.HTML -> state.htmlInput.trim().takeIf { it.isNotBlank() }?.let(ProjectEntry::BundledHtml)
-        ProjectType.VUE, ProjectType.PHP ->
-            state.archivePath?.trim()?.takeIf { it.isNotBlank() }
-                ?.let { path -> ProjectEntry.Archive(assetRef = path, kind = state.archiveKind) }
-    }
+    /** 按项目类型构造入口引用；缺必要输入时返回 null（委托 [ProjectTypeStrategy] 统一分派）。 */
+    private fun buildEntry(state: AddProjectUiState, type: ProjectType): ProjectEntry? =
+        ProjectTypeStrategy.buildEntry(
+            type = type,
+            urlInput = state.urlInput,
+            htmlInput = state.htmlInput,
+            archivePath = state.archivePath,
+            archiveKind = state.archiveKind,
+        )
 
     /** 重算自动建议；用户手动改过的字段不再被自动覆盖。 */
     private fun refreshSuggestions() {
@@ -337,19 +343,26 @@ class AddProjectViewModel(
         iconVerdict.warning?.let { warnings[AddField.ICON] = it }
 
         when (state.projectType) {
-            ProjectType.URL -> validator.validateEntryUrl(state.urlInput)
-                .error?.let { errors[AddField.ENTRY_URL] = it }
-            ProjectType.HTML -> validator.validateEntryHtml(state.htmlInput)
-                .error?.let { errors[AddField.ENTRY_HTML] = it }
-            ProjectType.VUE, ProjectType.PHP -> {
-                val probeResult = state.archivePath
-                    ?.trim()
-                    ?.takeIf { it.isNotEmpty() }
-                    ?.let { archiveProbe.probe(it) }
-                validator.validateEntryArchive(state.archivePath, probeResult)
-                    .error?.let { errors[AddField.ENTRY_ARCHIVE] = it }
-            }
             null -> Unit
+            else -> {
+                // 资产包探测仅 VUE/PHP 需要；其余类型传 null（委托 ProjectTypeStrategy 分派）。
+                val probeResult = if (state.projectType == ProjectType.VUE || state.projectType == ProjectType.PHP) {
+                    state.archivePath
+                        ?.trim()
+                        ?.takeIf { it.isNotEmpty() }
+                        ?.let { archiveProbe.probe(it) }
+                } else {
+                    null
+                }
+                ProjectTypeStrategy.validateEntry(
+                    type = state.projectType,
+                    validator = validator,
+                    urlInput = state.urlInput,
+                    htmlInput = state.htmlInput,
+                    archivePath = state.archivePath,
+                    probeResult = probeResult,
+                ).error?.let { errors[ProjectTypeStrategy.entryField(state.projectType)] = it }
+            }
         }
 
         _uiState.value = _uiState.value.copy(errors = errors, warnings = warnings)
