@@ -89,7 +89,7 @@ fun CodeEditorCore(
             lineCount = lineCount,
             lineTops = lineTops,
             textStyle = codeStyle,
-            modifier = Modifier.width(44.dp),
+            modifier = Modifier.width(48.dp),
         )
         BasicTextField(
             value = value,
