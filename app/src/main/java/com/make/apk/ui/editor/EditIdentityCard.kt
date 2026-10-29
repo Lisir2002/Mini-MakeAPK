@@ -16,6 +16,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import com.make.apk.data.model.ProjectType
 import com.make.apk.data.model.VersionScheme
 import com.make.apk.ui.components.CuteCard
+import com.make.apk.ui.components.MmaTextButton
 import com.make.apk.ui.theme.Spacing
 
 /**
@@ -59,6 +60,8 @@ fun EditIdentityCard(
     onVersionCodeChanged: (String) -> Unit,
     onEntryUrlChanged: (String) -> Unit,
     onEntryFileChanged: (String) -> Unit,
+    /** 选择/更换图标（用户上传自己的图片）；null = 不可点击。 */
+    onPickIcon: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     CuteCard(modifier = modifier.fillMaxWidth()) {
@@ -66,7 +69,7 @@ fun EditIdentityCard(
             modifier = Modifier.padding(Spacing.space4),
             verticalArrangement = Arrangement.spacedBy(Spacing.space3),
         ) {
-            // 图标 + 名称/包名（并排）
+            // 图标 + 名称/包名（并排）；图标可点击上传用户自己的图片（非形状预览）
             Row(
                 horizontalArrangement = Arrangement.spacedBy(Spacing.space3),
                 verticalAlignment = Alignment.CenterVertically,
@@ -75,6 +78,7 @@ fun EditIdentityCard(
                     apkName = apkName,
                     themeColor = themeColor,
                     iconRef = iconRef,
+                    onClick = onPickIcon,
                 )
                 Column(
                     modifier = Modifier.weight(1f),
@@ -97,13 +101,13 @@ fun EditIdentityCard(
                 }
             }
 
-            // rc9 应用图标自定义：三种主流启动器遮罩形状预览
-            IconShapePreviewRow(
-                apkName = apkName,
-                themeColor = themeColor,
-                iconRef = iconRef,
-                modifier = Modifier.fillMaxWidth(),
-            )
+            // 应用图标：点击图标或下方按钮上传用户自己的图片（替换默认占位）。
+            if (onPickIcon != null) {
+                MmaTextButton(
+                    label = if (iconRef == null) ICON_PICK_LABEL else ICON_CHANGE_LABEL,
+                    onClick = onPickIcon,
+                )
+            }
 
             // 只读：项目类型（锁死）；资产包入口（VUE/PHP）因存档拾取尚未实现，亦只读。
             Row(
@@ -229,3 +233,9 @@ private const val ENTRY_FILE_PLACEHOLDER: String = "index.html"
 
 /** 入口文件输入框中性提示（留空默认 index.html）。 */
 private const val ENTRY_FILE_HINT: String = "网页应用首屏加载的文件，留空默认 index.html"
+
+/** 未设置图标时「选择图标」按钮文案。 */
+private const val ICON_PICK_LABEL: String = "选择图标"
+
+/** 已设置图标时「更换图标」按钮文案。 */
+private const val ICON_CHANGE_LABEL: String = "更换图标"

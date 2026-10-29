@@ -271,7 +271,12 @@ private fun <T> MmaDropdownMenu(
                 .width(menuWidth)
                 .shadow(elevation = LocalMmaDesign.current.elevation.elevation1, shape = ControlShapes.group)
                 .clip(ControlShapes.group)
-                .background(colorScheme.surfaceVariant)
+                .background(colorScheme.surfaceContainerLow)
+                .border(
+                    width = control.dividerHeight,
+                    color = colorScheme.outlineVariant,
+                    shape = ControlShapes.group,
+                )
                 .padding(control.menuGroupGap),
             verticalArrangement = Arrangement.spacedBy(control.menuGroupGap),
         ) {

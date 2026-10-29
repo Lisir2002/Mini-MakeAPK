@@ -77,10 +77,13 @@ class ShellPreviewViewModel(
         }
     }
 
-    /** 把项目落进状态：URL 项目可预览，其余类型给出可见提示。 */
+    /** 把项目落进状态：URL / 内置 HTML 可预览；资产包等需解包的暂不支持。 */
     private fun applyProject(project: Project) {
         val entry = project.entry
-        if (entry !is ProjectEntry.Url) {
+        // 预览隔离：URL 直连、HTML 内联均可在内置 WebView 中本地渲染，故开放预览；
+        // Archive 等需资产解包管线的类型暂不支持（主程序侧无法等价呈现）。
+        val previewableEntry = entry is ProjectEntry.Url || entry is ProjectEntry.BundledHtml
+        if (!previewableEntry) {
             _uiState.value = _uiState.value.copy(
                 loading = false,
                 projectNotFound = false,
@@ -92,6 +95,8 @@ class ShellPreviewViewModel(
             )
             return
         }
+        // 入口地址仅 URL 形态有；HTML 内联无 url，回落空串（不影响 content 区渲染）。
+        val entryUrl = (entry as? ProjectEntry.Url)?.url ?: ""
         // **同源不变式（预览 == 导出）**：渲染的壳恒为项目自己存的 spec，
         // 不做任何"未配置就套经典款"的兜底 —— 一旦兜底，用户在预览里看到的
         // （带顶底栏的经典款）与导出后真机上的（四区全关的纯网页）就不是同一个东西，
@@ -106,8 +111,8 @@ class ShellPreviewViewModel(
                     themeColor = project.themeColor,
                     runtimeConfig = project.toRuntimeConfig(),
                     unsupportedMessage = null,
-                    currentUrl = entry.url,
-                    isExampleContent = isExampleUrl(entry.url),
+                    currentUrl = entryUrl,
+                    isExampleContent = isExampleUrl(entryUrl),
                     shellSpec = project.shellSpec,
                 ),
             ),
@@ -227,12 +232,12 @@ class ShellPreviewViewModel(
 
     companion object {
         /**
-         * 非 URL 项目的可见提示。
+         * 非可预览项目的可见提示。
          *
-         * 预览当前只支持 URL 项目：`BundledHtml` / `Archive` 的内容区需要真实的
-         * 资产解包管线（阶段 5 导出阶段实现），主程序侧无法等价呈现。
+         * 预览隔离：URL（直连）与内置 HTML（内联渲染）均可在内置 WebView 本地呈现，故开放；
+         * `Archive` 等需资产解包管线的类型主程序侧无法等价呈现，仍走此提示。
          */
-        const val UNSUPPORTED_ENTRY_MESSAGE: String = "当前仅支持 URL 项目预览"
+        const val UNSUPPORTED_ENTRY_MESSAGE: String = "当前仅支持 URL 与 HTML 项目预览"
 
         /** 示例地址判定（`example.com` / `example.org` / `example.net` 保留域）。 */
         fun isExampleUrl(url: String): Boolean {

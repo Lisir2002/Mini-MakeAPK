@@ -36,7 +36,6 @@ import com.make.apk.ui.components.MmaTextButton
 import com.make.apk.ui.editor.AddField
 import com.make.apk.ui.editor.FieldMessage
 import com.make.apk.ui.editor.FieldMessageText
-import com.make.apk.ui.editor.IconShapePreviewRow
 import com.make.apk.ui.editor.ProjectIcon
 import com.make.apk.ui.editor.ProjectSourceSection
 import com.make.apk.ui.editor.ProjectTextField
@@ -198,13 +197,6 @@ fun AddProjectScreen(
                 MmaTextButton(
                     label = ICON_PICK_LABEL,
                     onClick = onPickIcon,
-                )
-                // rc9 应用图标自定义：三种主流启动器遮罩形状预览（保存前即可见裁切效果）
-                IconShapePreviewRow(
-                    apkName = state.apkName,
-                    themeColor = state.themeColor,
-                    iconRef = state.iconRef,
-                    modifier = Modifier.fillMaxWidth(),
                 )
                 messageOf(state, AddField.ICON)?.let { message ->
                     FieldMessageText(message = message)

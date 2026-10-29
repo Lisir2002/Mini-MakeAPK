@@ -3,6 +3,7 @@ package com.make.apk.ui.viewmodel
 import com.make.apk.data.model.Project
 import com.make.apk.data.model.ProjectEntry
 import com.make.apk.data.model.ProjectType
+import com.make.apk.data.model.ArchiveKind
 import com.make.apk.data.model.ShellMenuItem
 import com.make.apk.data.model.ShellPresets
 import com.make.apk.data.model.ShellDrawer
@@ -29,9 +30,10 @@ import org.junit.Test
  * 壳预览 ViewModel 单测（阶段 6.2）。
  *
  * 覆盖三条关键行为：
- * 1. **非 URL 项目明确拦截**：给出可见提示，不崩、不静默；
- * 2. **切换预置子模板不重载 WebView**：`runtimeConfig` 对象保持同一引用；
- * 3. **壳动作落到内容区**：`NavigateUrl` 替换入口地址，示例地址被标记。
+ * 1. **URL 与 HTML 项目均可预览**：给出 runtimeConfig，不崩、不静默；
+ * 2. **资产包（Archive）等不支持入口明确拦截**：给出可见提示，不崩、不静默；
+ * 3. **切换预置子模板不重载 WebView**：`runtimeConfig` 对象保持同一引用；
+ * 4. **壳动作落到内容区**：`NavigateUrl` 替换入口地址，示例地址被标记。
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class ShellPreviewViewModelTest {
@@ -66,8 +68,22 @@ class ShellPreviewViewModelTest {
     }
 
     @Test
-    fun nonUrlProject_isBlockedWithVisibleMessage() = runTest(dispatcher) {
+    fun bundledHtmlProject_isPreviewable() = runTest(dispatcher) {
         directory.put(htmlProject())
+        val vm = ShellPreviewViewModel(projectId = 1L, directory = directory)
+        advanceUntilIdle()
+
+        val state = vm.uiState.value
+        assertFalse(state.loading)
+        assertFalse(state.projectNotFound)
+        assertTrue(state.previewable)
+        assertNull(state.unsupportedMessage)
+        assertNotNull(state.runtimeConfig)
+    }
+
+    @Test
+    fun unsupportedArchive_isBlockedWithVisibleMessage() = runTest(dispatcher) {
+        directory.put(archiveProject())
         val vm = ShellPreviewViewModel(projectId = 1L, directory = directory)
         advanceUntilIdle()
 
@@ -243,6 +259,11 @@ class ShellPreviewViewModelTest {
     private fun htmlProject(): Project = baseProject().copy(
         projectType = ProjectType.HTML,
         entry = ProjectEntry.BundledHtml("<html></html>"),
+    )
+
+    private fun archiveProject(): Project = baseProject().copy(
+        projectType = ProjectType.HTML,
+        entry = ProjectEntry.Archive("assets/demo.zip", ArchiveKind.VUE),
     )
 
     private fun baseProject(): Project = Project(

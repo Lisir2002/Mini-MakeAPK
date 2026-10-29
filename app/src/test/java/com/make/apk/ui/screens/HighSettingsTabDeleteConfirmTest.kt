@@ -1,9 +1,13 @@
 package com.make.apk.ui.screens
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.junit4.createComposeRule
 import com.make.apk.ui.editor.HighSettingsTab
 import com.make.apk.ui.theme.MmaTheme
@@ -42,7 +46,7 @@ class HighSettingsTabDeleteConfirmTest {
         setContent(onDelete = { deleted += 1L })
 
         // 此时弹窗未开，「删除项目」文案唯一指向触发按钮。
-        composeRule.onNodeWithText("删除项目").performClick()
+        composeRule.onNodeWithText("删除项目").performScrollTo().performClick()
 
         composeRule.onNodeWithText("确认删除").assertExists()
         composeRule.onNodeWithText("取消").assertExists()
@@ -54,7 +58,7 @@ class HighSettingsTabDeleteConfirmTest {
         val deleted = mutableListOf<Long>()
         setContent(onDelete = { deleted += 1L })
 
-        composeRule.onNodeWithText("删除项目").performClick()
+        composeRule.onNodeWithText("删除项目").performScrollTo().performClick()
         composeRule.onNodeWithText("确认删除").performClick()
 
         assertEquals("确认后必须删除，且只触发一次", listOf(1L), deleted)
@@ -66,7 +70,7 @@ class HighSettingsTabDeleteConfirmTest {
         val deleted = mutableListOf<Long>()
         setContent(onDelete = { deleted += 1L })
 
-        composeRule.onNodeWithText("删除项目").performClick()
+        composeRule.onNodeWithText("删除项目").performScrollTo().performClick()
         composeRule.onNodeWithText("取消").performClick()
 
         assertTrue("取消后不得删除", deleted.isEmpty())
@@ -78,7 +82,14 @@ class HighSettingsTabDeleteConfirmTest {
     private fun setContent(onDelete: () -> Unit) {
         composeRule.setContent {
             MmaTheme {
-                Box(modifier = androidx.compose.ui.Modifier.fillMaxSize()) {
+            Box(modifier = androidx.compose.ui.Modifier.fillMaxSize()) {
+                // 真实 App 中 HighSettingsTab 始终处于可滚动的编辑页容器内；此处对齐该环境，
+                // 使底部「删除项目」按钮可被 performClick 自动滚动入视，避免高度增长后点击落空。
+                Column(
+                    modifier = androidx.compose.ui.Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState()),
+                ) {
                     HighSettingsTab(
                         apkName = "示例网址",
                         engineLabel = "设备端即时封装（WebView）",
@@ -86,6 +97,7 @@ class HighSettingsTabDeleteConfirmTest {
                         onDelete = onDelete,
                     )
                 }
+            }
             }
         }
     }

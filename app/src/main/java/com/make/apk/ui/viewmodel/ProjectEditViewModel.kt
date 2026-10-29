@@ -9,6 +9,7 @@ import com.make.apk.data.model.Project
 import com.make.apk.data.model.ProjectDefaults
 import com.make.apk.data.model.ProjectEntry
 import com.make.apk.data.model.ProjectType
+import com.make.apk.data.model.ProgressPosition
 import com.make.apk.data.model.ShellSpec
 import com.make.apk.data.model.VersionScheme
 import com.make.apk.data.model.WebSettings
@@ -264,6 +265,14 @@ class ProjectEditViewModel(
     /** 自定义 User-Agent（null 表示沿用系统默认）。 */
     fun onUserAgentChanged(userAgent: String?) =
         updateWebSettings { it.copy(userAgent = userAgent) }
+
+    /** 功能加载进度条开关。 */
+    fun onShowLoadingProgressChanged(enabled: Boolean) =
+        updateWebSettings { it.copy(showLoadingProgress = enabled) }
+
+    /** 功能加载进度条位置（顶部 / 底部）。 */
+    fun onLoadingProgressPositionChanged(position: ProgressPosition) =
+        updateWebSettings { it.copy(loadingProgressPosition = position) }
 
     // ── 页面态（不落库）────────────────────────────────────────────────
 

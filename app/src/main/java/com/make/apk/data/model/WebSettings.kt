@@ -3,6 +3,21 @@ package com.make.apk.data.model
 import kotlinx.serialization.Serializable
 
 /**
+ * 加载进度条位置（序列化枚举，与 [WebSettings] 同契约）。
+ *
+ * 仅用于「进阶设置 · 功能加载进度条」：进度条可贴顶栏下方（TOP）或贴底栏上方（BOTTOM），
+ * 由用户自行选择，避免遮挡关键内容。
+ */
+@Serializable
+enum class ProgressPosition {
+    /** 顶部：贴内容区上沿。 */
+    TOP,
+
+    /** 底部：贴内容区下沿。 */
+    BOTTOM,
+}
+
+/**
  * Web 渲染配置（见 §2.4）。
  *
  * 本地渲染器（[com.make.apk.ui.screens.WebViewScreen]）与导出模板壳**共用**同一份配置，
@@ -27,6 +42,15 @@ data class WebSettings(
      * 应用内打开方式：true=自有域用 WebView 内嵌；false=外链改用 Custom Tabs 跳出。
      */
     val fitToApp: Boolean = true,
+    /**
+     * 是否显示功能加载进度条（进阶设置开关，默认关）。
+     * 开启后由渲染内核驱动，进度条贴顶/贴底显示（见 [loadingProgressPosition]）。
+     */
+    val showLoadingProgress: Boolean = false,
+    /**
+     * 加载进度条位置（[ProgressPosition]）：仅当 [showLoadingProgress] 为 true 时生效。
+     */
+    val loadingProgressPosition: ProgressPosition = ProgressPosition.TOP,
 ) {
     /** 缓存模式常量：值与 [android.webkit.WebSettings] 同名常量一致，故可直接赋给 `settings.cacheMode`。 */
     companion object {

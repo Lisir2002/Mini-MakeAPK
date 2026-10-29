@@ -17,6 +17,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import com.make.apk.data.model.ProjectType
+import com.make.apk.data.model.ProgressPosition
 import com.make.apk.data.model.ShellSpec
 import com.make.apk.data.model.VersionScheme
 import com.make.apk.ui.components.MmaScreen
@@ -67,6 +68,7 @@ fun ProjectEditScreen(
     onEntryHtmlChanged: (String) -> Unit,
     onEntryFileChanged: (String) -> Unit,
     onThemeColorChanged: (Int) -> Unit,
+    onPickIcon: (() -> Unit)? = null,
     onShellSpecChanged: (ShellSpec) -> Unit,
     onJavascriptEnabledChanged: (Boolean) -> Unit,
     onDomStorageEnabledChanged: (Boolean) -> Unit,
@@ -74,6 +76,8 @@ fun ProjectEditScreen(
     onThirdPartyCookiesChanged: (Boolean) -> Unit,
     onCacheModeChanged: (Int) -> Unit,
     onUserAgentChanged: (String?) -> Unit,
+    onShowLoadingProgressChanged: (Boolean) -> Unit = {},
+    onLoadingProgressPositionChanged: (ProgressPosition) -> Unit = {},
     onToggleCollapse: (Boolean) -> Unit,
     onTabSelected: (EditTab) -> Unit,
     onDelete: () -> Unit,
@@ -138,6 +142,7 @@ fun ProjectEditScreen(
                         entryFileMessage = messageOf(state, EditField.ENTRY_FILE),
                         themeColor = state.themeColor,
                         iconRef = state.iconRef,
+                        onPickIcon = onPickIcon,
                         apkNameMessage = messageOf(state, EditField.APK_NAME),
                         packageNameMessage = messageOf(state, EditField.PACKAGE_NAME),
                         versionNameMessage = messageOf(state, EditField.VERSION_NAME),
@@ -162,61 +167,84 @@ fun ProjectEditScreen(
                     modifier = Modifier.fillMaxWidth(),
                 )
                 when (state.selectedTab) {
-                    EditTab.BASIC -> WebSettingsTab(
-                        webSettings = state.webSettings,
-                        themeColor = state.themeColor,
-                        onJavascriptEnabledChanged = onJavascriptEnabledChanged,
-                        onDomStorageEnabledChanged = onDomStorageEnabledChanged,
-                        onFitToAppChanged = onFitToAppChanged,
-                        onThirdPartyCookiesChanged = onThirdPartyCookiesChanged,
-                        onCacheModeChanged = onCacheModeChanged,
-                        onUserAgentChanged = onUserAgentChanged,
-                        onThemeColorChanged = onThemeColorChanged,
+                    // 每个 Tab 内容包一层滚动 Box（weight(1f) 撑满区域高度），
+                    // 内层卡片只按内容高度排布（fillMaxWidth），避免出现"内容顶对齐、底部大片留白"。
+                    EditTab.BASIC -> Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .weight(1f)
-                            .verticalScroll(rememberScrollState())
-                            .padding(horizontal = Spacing.space5, vertical = Spacing.space4),
-                    )
-
-                    // 「项目代码」：HTML 类专属（EditTabRow 已按类型过滤，此处防御兜底）。
-                    EditTab.CODE -> if (state.projectType == ProjectType.HTML) {
-                        ProjectCodeTab(
-                            entryFile = state.entryFile,
-                            entryHtml = state.entryHtml,
-                            entryFileMessage = messageOf(state, EditField.ENTRY_FILE),
-                            entryHtmlMessage = messageOf(state, EditField.ENTRY_HTML),
-                            onEntryFileChanged = onEntryFileChanged,
-                            onEntryHtmlChanged = onEntryHtmlChanged,
+                            .verticalScroll(rememberScrollState()),
+                    ) {
+                        WebSettingsTab(
+                            webSettings = state.webSettings,
+                            themeColor = state.themeColor,
+                            onJavascriptEnabledChanged = onJavascriptEnabledChanged,
+                            onDomStorageEnabledChanged = onDomStorageEnabledChanged,
+                            onFitToAppChanged = onFitToAppChanged,
+                            onThirdPartyCookiesChanged = onThirdPartyCookiesChanged,
+                            onCacheModeChanged = onCacheModeChanged,
+                            onUserAgentChanged = onUserAgentChanged,
+                            onThemeColorChanged = onThemeColorChanged,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .weight(1f)
-                                .verticalScroll(rememberScrollState())
                                 .padding(horizontal = Spacing.space5, vertical = Spacing.space4),
                         )
                     }
 
-                    EditTab.TEMPLATE -> ShellEditorTab(
-                        shellSpec = state.shellSpec,
-                        onShellSpecChanged = onShellSpecChanged,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f)
-                            .verticalScroll(rememberScrollState())
-                            .padding(horizontal = Spacing.space5, vertical = Spacing.space4),
-                    )
+                    // 「项目代码」：HTML 类专属（EditTabRow 已按类型过滤，此处防御兜底）。
+                    EditTab.CODE -> if (state.projectType == ProjectType.HTML) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f)
+                                .verticalScroll(rememberScrollState()),
+                        ) {
+                            ProjectCodeTab(
+                                entryHtml = state.entryHtml,
+                                entryHtmlMessage = messageOf(state, EditField.ENTRY_HTML),
+                                onEntryHtmlChanged = onEntryHtmlChanged,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = Spacing.space5, vertical = Spacing.space4),
+                            )
+                        }
+                    }
 
-                    EditTab.EXPORT -> HighSettingsTab(
-                        apkName = state.apkName,
-                        engineLabel = state.engineLabel,
-                        isolationId = state.isolationId,
-                        onDelete = onDelete,
+                    EditTab.TEMPLATE -> Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .weight(1f)
-                            .verticalScroll(rememberScrollState())
-                            .padding(horizontal = Spacing.space5, vertical = Spacing.space4),
-                    )
+                            .verticalScroll(rememberScrollState()),
+                    ) {
+                        ShellEditorTab(
+                            shellSpec = state.shellSpec,
+                            onShellSpecChanged = onShellSpecChanged,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = Spacing.space5, vertical = Spacing.space4),
+                        )
+                    }
+
+                    EditTab.EXPORT -> Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                            .verticalScroll(rememberScrollState()),
+                    ) {
+                        HighSettingsTab(
+                            apkName = state.apkName,
+                            engineLabel = state.engineLabel,
+                            isolationId = state.isolationId,
+                            onDelete = onDelete,
+                            showLoadingProgress = state.webSettings.showLoadingProgress,
+                            loadingProgressPosition = state.webSettings.loadingProgressPosition,
+                            onShowLoadingProgressChanged = onShowLoadingProgressChanged,
+                            onLoadingProgressPositionChanged = onLoadingProgressPositionChanged,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = Spacing.space5, vertical = Spacing.space4),
+                        )
+                    }
                 }
             }
         }

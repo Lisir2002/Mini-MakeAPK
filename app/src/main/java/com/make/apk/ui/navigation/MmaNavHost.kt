@@ -280,6 +280,23 @@ fun MmaNavHost(
             val state by vm.uiState.collectAsStateWithLifecycle()
             // 保存通知宿主（顶栏居中气泡；§优化：保存成功留驻编辑页，不再强制离开）。
             val editNoticeHost = remember { MmaNoticeHostState() }
+            // 图标选择：系统 Photo Picker（与新建页同源，无需存储权限）。
+            val iconStore = remember(app) { IconStore(app) }
+            val iconScope = rememberCoroutineScope()
+            val pickIconLauncher = rememberLauncherForActivityResult(
+                ActivityResultContracts.PickVisualMedia(),
+            ) { uri ->
+                if (uri == null) return@rememberLauncherForActivityResult
+                iconScope.launch {
+                    val path = iconStore.saveFromPicker(uri, state.themeColor)
+                    if (path != null) {
+                        vm.onIconChanged(path)
+                    } else {
+                        MmaLogger.error("icon_pick_failed", message = "图标拷贝失败")
+                        Toast.makeText(context, "图标读取失败，请重试", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
             LaunchedEffect(Unit) {
                 vm.events.collect { event ->
                     when (event) {
@@ -311,6 +328,11 @@ fun MmaNavHost(
                     onEntryHtmlChanged = vm::onEntryHtmlChanged,
                     onEntryFileChanged = vm::onEntryFileChanged,
                     onThemeColorChanged = vm::onThemeColorChanged,
+                    onPickIcon = {
+                        pickIconLauncher.launch(
+                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                        )
+                    },
                     onShellSpecChanged = vm::onShellSpecChanged,
                     onJavascriptEnabledChanged = vm::onJavascriptEnabledChanged,
                     onDomStorageEnabledChanged = vm::onDomStorageEnabledChanged,
@@ -318,6 +340,8 @@ fun MmaNavHost(
                     onThirdPartyCookiesChanged = vm::onThirdPartyCookiesChanged,
                     onCacheModeChanged = vm::onCacheModeChanged,
                     onUserAgentChanged = vm::onUserAgentChanged,
+                    onShowLoadingProgressChanged = vm::onShowLoadingProgressChanged,
+                    onLoadingProgressPositionChanged = vm::onLoadingProgressPositionChanged,
                     onToggleCollapse = vm::onCollapsedChanged,
                     onTabSelected = vm::onTabSelected,
                     onDelete = vm::delete,
@@ -354,6 +378,7 @@ fun MmaNavHost(
             )
             val state by vm.uiState.collectAsStateWithLifecycle()
             val snackbarHostState = remember { SnackbarHostState() }
+            val scope = rememberCoroutineScope()
             LaunchedEffect(Unit) {
                 vm.events.collect { event ->
                     when (event) {
@@ -371,6 +396,7 @@ fun MmaNavHost(
                     onDrawerItemSelected = vm::onDrawerItemSelected,
                     onDrawerOpenChanged = vm::onDrawerOpenChanged,
                     onShellAction = vm::onShellAction,
+                    onError = { message -> scope.launch { snackbarHostState.showSnackbar(message) } },
                 )
                 SnackbarHost(
                     hostState = snackbarHostState,
