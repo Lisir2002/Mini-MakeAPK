@@ -38,6 +38,7 @@ import com.make.apk.ui.theme.LocalMmaDesign
 import com.make.apk.ui.theme.Spacing
 import com.make.apk.ui.screens.AddProjectScreen
 import com.make.apk.ui.screens.DevelopingScreen
+import com.make.apk.ui.screens.LogViewerScreen
 import com.make.apk.ui.screens.ProfileScreen
 import com.make.apk.ui.screens.ProjectEditScreen
 import com.make.apk.ui.screens.ProjectsScreen
@@ -154,6 +155,28 @@ fun MmaNavHost(
                     )
                     Toast.makeText(context, "$feature 还在开发中，敬请期待", Toast.LENGTH_SHORT).show()
                 },
+                onOpenLogs = { navController.navigate(MmaRoute.Logs.route) },
+            )
+        }
+
+        // ── 运行日志（流程子页：无底栏，rc9 自研分级展示）────────────
+        composable(MmaRoute.Logs.route) {
+            val vm: com.make.apk.ui.viewmodel.LogViewerViewModel = viewModel(
+                factory = remember(app) {
+                    com.make.apk.ui.viewmodel.LogViewerViewModel.factory(app.logRepository)
+                },
+            )
+            val logsState by vm.uiState.collectAsStateWithLifecycle()
+            // 打开日志页是一次用户操作：只在首次进入时记一次（不能随重组重复记）。
+            LaunchedEffect(Unit) {
+                MmaLogger.operation("logs_opened", message = "查看运行日志")
+            }
+            LogViewerScreen(
+                uiState = logsState,
+                onBack = { navController.popBackStack() },
+                onToggleLevel = vm::toggleLevel,
+                onToggleGroup = vm::toggleGroup,
+                onClearFilters = vm::clearFilters,
             )
         }
 
@@ -168,13 +191,14 @@ fun MmaNavHost(
             // 保存通知宿主（顶栏居中气泡，3s 自动消失 / 点击即隐藏；§优化：保存不再强制退出页面）。
             val addNoticeHost = remember { MmaNoticeHostState() }
 
-            // 图标选择：系统 Photo Picker（无需存储权限），选中后拷入应用私有目录。
+            // 图标选择：系统 Photo Picker（无需存储权限）。rc9：居中裁方 + 主题色烘焙
+            // （透明源图不再在启动器渲染成黑块），原始副本留档供换底色重合成。
             val pickIconLauncher = rememberLauncherForActivityResult(
                 ActivityResultContracts.PickVisualMedia(),
             ) { uri ->
                 if (uri == null) return@rememberLauncherForActivityResult // 用户取消，静默即可
                 scope.launch {
-                    val path = iconStore.copyToIconsDir(uri)
+                    val path = iconStore.saveFromPicker(uri, state.themeColor)
                     if (path != null) {
                         vm.onIconChanged(path)
                     } else {

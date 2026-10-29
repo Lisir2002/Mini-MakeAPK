@@ -43,6 +43,8 @@ private const val REPO_URL = "https://github.com/Lisir2002/Mini-MakeAPK"
 fun ProfileScreen(
     bottomBar: @Composable () -> Unit = {},
     onFeatureNotReady: (String) -> Unit = {},
+    /** 打开运行日志页（rc9：真实页面，非占位）。 */
+    onOpenLogs: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -51,6 +53,12 @@ fun ProfileScreen(
     val storageReady = runCatching { MmaStorage.isAuthorized(context) }.getOrDefault(false)
 
     val items = listOf(
+        ProfileItem(
+            iconRes = MmaIcons.History,
+            title = "运行日志",
+            subtitle = "分级查看启动、操作与错误记录",
+            onClick = onOpenLogs,
+        ),
         ProfileItem(
             iconRes = MmaIcons.Notifications,
             title = "软件设置",

@@ -2,11 +2,12 @@
 <!--
   Adaptive 启动图标（API 26+）。
   背景：纯白 @color/ic_launcher_background（与素材底色一致）；
-  前景：mipmap-*/ic_launcher_foreground.png —— MiniMe-MMA 主体（吉祥物 + 网页卡 → APK 卡 + 光环），
-       108dp 网格、主体宽占 61%（66dp 安全区内）：系统只显示画布中央 72dp 视窗再套遮罩，
-       超过 66% 会被圆形 / 方形遮罩裁掉光环与卡片边缘（0.80 即为事故值，已修复）。
+  前景：mipmap-*/ic_launcher_foreground.png —— MiniMe-MMA 主体（吉祥物 + 网页卡 → APK 卡
+       + 光环 + 底部名称字标）。rc9 起**必须含名称字标**（用户要求：象征性应用名不可被切割），
+       裁切仅保留 "MiniMe-MMA" 名称行、副标行舍弃（圆形遮罩下两端必被切），
+       较长边占画布 55%（安全区 66dp ≈ 61% 内，名称行与遮罩留足边距）。
   素材与生成脚本：docs/design/assets/app-icon/ + scripts/design/build_launcher_icon.py。
-  API 24/25 回退到 mipmap-*/ic_launcher.png（白底圆角方，同款主体）。
+  API 24/25 回退到 mipmap-*/ic_launcher.png（白底圆角方，同款含字标主体）。
 
   关于 monochrome（Android 13 主题图标）：不提供。素材是多彩位图，按深色阈值取剪影会把
   卡片阴影一并带进来形成脏块；宁可不支持主题图标，也不交付劣质剪影——取舍与复现方式见

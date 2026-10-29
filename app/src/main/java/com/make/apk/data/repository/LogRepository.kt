@@ -35,12 +35,19 @@ class LogRepository(
     companion object {
         private const val DAY_MILLIS = 24L * 60 * 60 * 1000
         private const val DEFAULT_PAGE_SIZE = 50
+
+        /** 日志查看页默认拉取的最近条数。 */
+        const val RECENT_LIMIT: Int = 500
     }
 
     // ── 读 ────────────────────────────────────────────────────────────
 
     fun observeAll(): Flow<List<LogEntry>> =
         dao.observeAll().map { list -> list.map { it.toDomain() } }
+
+    /** 最近 [limit] 条（日志查看页专用：大库不全量推送）。 */
+    fun observeRecent(limit: Int = RECENT_LIMIT): Flow<List<LogEntry>> =
+        dao.observeRecent(limit).map { list -> list.map { it.toDomain() } }
 
     fun observeByCategory(category: LogCategory, limit: Int = 200): Flow<List<LogEntry>> =
         dao.observeByCategory(category.name, limit).map { list -> list.map { it.toDomain() } }

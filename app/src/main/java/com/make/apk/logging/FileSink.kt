@@ -54,6 +54,9 @@ internal class FileSink(
 
     private fun appendLocked(event: LogEvent) = synchronized(lock) {
         runCatching {
+            // 目录自愈（用户需求：外部日志目录被删后自动补全）：写前发现目录不在，
+            // 幂等重建（mkdirs），失败不抛——写不进去只丢这一条，绝不拖垮日志系统。
+            if (!directory.isDirectory) runCatching { directory.mkdirs() }
             val payload = buildPayload(event).toByteArray(Charsets.UTF_8)
             val active = File(directory, ACTIVE_FILE_NAME)
             val currentSize = if (active.exists()) active.length() else 0L

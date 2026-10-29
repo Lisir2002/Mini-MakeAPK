@@ -41,6 +41,10 @@ interface LogEntryDao {
     @Query("SELECT * FROM log_entries ORDER BY timestampMs DESC")
     fun observeAll(): Flow<List<LogEntryEntity>>
 
+    /** 最近 N 条（日志查看页用：大库下避免全量推送）。 */
+    @Query("SELECT * FROM log_entries ORDER BY timestampMs DESC LIMIT :limit")
+    fun observeRecent(limit: Int): Flow<List<LogEntryEntity>>
+
     @Query("SELECT * FROM log_entries WHERE category = :category ORDER BY timestampMs DESC LIMIT :limit")
     fun observeByCategory(category: String, limit: Int): Flow<List<LogEntryEntity>>
 

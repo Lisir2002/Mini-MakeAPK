@@ -19,6 +19,9 @@ sealed class MmaRoute(val route: String) {
     /** 我的：个人中心（设置/关于/仓库/升级入口）。 */
     data object Profile : MmaRoute("profile")
 
+    /** 运行日志（rc9：自研分级展示，从「我的」进入）。 */
+    data object Logs : MmaRoute("logs")
+
     /** 新建项目（流程子页，不显示底栏）。 */
     data object Add : MmaRoute("add")
 

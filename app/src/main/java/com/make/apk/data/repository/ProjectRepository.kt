@@ -34,7 +34,17 @@ import kotlinx.coroutines.flow.map
 class ProjectRepository(
     private val database: AppDatabase,
     private val clock: () -> Long = { System.currentTimeMillis() },
+    /** 外部 Items 镜像钩子（rc9）：null = 不镜像（单测默认）；生产由 Application 注入真实实现。 */
+    private val workspace: ProjectWorkspaceHooks? = null,
 ) {
+
+    /** 工作区镜像钩子（解耦仓储层与 Android Context，生产实现见 storage.ProjectWorkspaceStore）。 */
+    interface ProjectWorkspaceHooks {
+        suspend fun onCreate(project: Project)
+        suspend fun onUpdate(project: Project)
+        fun onDelete(projectId: Long)
+        suspend fun reconcileAll(projects: List<Project>): Int
+    }
 
     private val dao = database.projectDao()
 
@@ -103,6 +113,8 @@ class ProjectRepository(
         val id = dao.insert(draft.toEntity())
         val isolated = draft.copy(id = id, isolationId = ProjectDefaults.isolationIdOf(id))
         dao.update(isolated.toEntity())
+        // 外部镜像与建库同批创建（rc9 用户需求：内外一起创建）；失败不回滚库（启动对账会补）。
+        workspace?.onCreate(isolated)
         return id
     }
 
@@ -114,12 +126,26 @@ class ProjectRepository(
     suspend fun update(project: Project) {
         ensurePackageNameAvailable(project.packageName, excludeId = project.id)
         val now = clock()
-        dao.update(project.copy(updatedAt = now).toEntity())
+        val updated = project.copy(updatedAt = now)
+        dao.update(updated.toEntity())
+        workspace?.onUpdate(updated)
     }
 
-    /** 删除项目：其导出运行记录由外键 `ON DELETE CASCADE` 一并清除。 */
+    /** 删除项目：其导出运行记录由外键 `ON DELETE CASCADE` 一并清除；外部镜像同步移除。 */
     suspend fun delete(id: Long) {
         dao.deleteById(id)
+        workspace?.onDelete(id)
+    }
+
+    /**
+     * 启动对账（rc9 自愈）：外部 Items 目录被用户删除后，从库逐项目重建镜像。
+     *
+     * @return 自愈的项目数（0 = 无缺口 / 未授权 / 未接镜像）。
+     */
+    suspend fun reconcileWorkspaces(): Int {
+        val hooks = workspace ?: return 0
+        val projects = dao.observeAllSnapshot().map { it.toDomain() }
+        return hooks.reconcileAll(projects)
     }
 
     // ── 迁移对账（§8.5 D-M2）────────────────────────────────────────

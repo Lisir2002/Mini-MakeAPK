@@ -11,14 +11,24 @@ package com.make.apk.logging
  * - [FATAL]：崩溃 / ANR，进程级故障。
  *
  * 判据：如果一条 "error" 不值得人看一眼，它就是 WARN。
+ *
+ * **自研分级展示**（rc9，用户需求"分级一目了然"）：[label] 是用户向中文名、
+ * [severityWeight] 是 UI 徽标的语义权重（越大越重，日志页按此配色排序）——
+ * 展示语义**只在这一处定义**，日志查看页 / 导出格式一律引用，不允许各自再拼。
  */
-enum class LogLevel(val priority: Int) {
-    VERBOSE(2),
-    DEBUG(3),
-    INFO(4),
-    WARN(5),
-    ERROR(6),
-    FATAL(7),
+enum class LogLevel(
+    val priority: Int,
+    /** 用户向级别名（日志页徽标 / 筛选芯片共用，单一事实源）。 */
+    val label: String,
+    /** 展示权重（越大越严重；VERBOSE=0 → FATAL=5）。 */
+    val severityWeight: Int,
+) {
+    VERBOSE(2, "详细", 0),
+    DEBUG(3, "调试", 1),
+    INFO(4, "信息", 2),
+    WARN(5, "警告", 3),
+    ERROR(6, "错误", 4),
+    FATAL(7, "致命", 5),
     ;
 
     /** 该级别是否被 [threshold] 放行。 */

@@ -17,6 +17,7 @@ import com.make.apk.logging.LogLevel
 import com.make.apk.logging.MmaLogger
 import com.make.apk.logging.StartupTracer
 import com.make.apk.storage.MmaStorage
+import com.make.apk.storage.ProjectWorkspaceStore
 import java.io.File
 import kotlin.concurrent.thread
 
@@ -35,9 +36,9 @@ class MmaApplication : Application() {
     /** 惰性打开：首次真正访问数据库时才解密并建连，不拖慢冷启动。 */
     val database: AppDatabase by lazy { AppDatabaseFactory.create(this) }
 
-    /** 项目仓储（稳定定义，§8.4）。 */
+    /** 项目仓储（稳定定义，§8.4）；外部 Items 镜像随建/改/删同步（rc9 用户需求）。 */
     val projectRepository: ProjectRepository by lazy {
-        ProjectRepository(database)
+        ProjectRepository(database, workspace = ProjectWorkspaceStore(this))
     }
 
     /** 导出运行仓储（运行态，§8.4）。 */
@@ -145,10 +146,55 @@ class MmaApplication : Application() {
             runCatching {
                 MmaLogger.attachDao(database.logEntryDao())
                 MmaLogger.startup("log_database_ready", "日志库就绪")
+                // 专用守护线程内 runBlocking：一次性启动对账（无 UI 生命周期语义，
+                // 不值得为它建协程作用域）；阻塞只影响本线程，不影响主线程。
+                kotlinx.coroutines.runBlocking { restoreExternalMirrors() }
             }.onFailure { throwable ->
                 MmaLogger.error("log_database_ready_failed", throwable)
             }
         }
+    }
+
+    /**
+     * 外部镜像自愈（rc9 用户需求，数据库就绪后执行一次）：
+     * 1. **项目 Items**：外部目录被删 → 从库逐项目重建（[ProjectRepository.reconcileWorkspaces]）；
+     * 2. **日志 Log**：外部日志目录被删 → 目录已由 FileSink 写前自愈重建，此处从加密库回灌
+     *    近 3 天日志为 `restored-*.log`（数据库是日志的持久事实源，文件只是外显载体）。
+     */
+    private suspend fun restoreExternalMirrors() {
+        runCatching {
+            val restored = projectRepository.reconcileWorkspaces()
+            if (restored > 0) {
+                MmaLogger.operation(
+                    event = "workspaces_restored",
+                    message = "外部项目目录缺失，已从数据库补全",
+                    fields = mapOf(LogFields.COUNT to restored, LogFields.SUCCESS to true),
+                )
+            }
+        }.onFailure { MmaLogger.error("workspace_reconcile_failed", it) }
+
+        runCatching { restoreLogFilesFromDatabase() }
+            .onFailure { MmaLogger.error("log_restore_failed", it) }
+    }
+
+    /** 外部日志目录为空但库里有日志 → 回灌近 [RESTORE_LOG_DAYS] 天（幂等：有文件就跳过）。 */
+    private suspend fun restoreLogFilesFromDatabase() {
+        val dir = MmaStorage.resolveLogDirectory(this)
+        if (!dir.isDirectory) return
+        val hasActiveLogs = dir.listFiles()?.any { it.isFile && it.name.endsWith(".log") } == true
+        if (hasActiveLogs) return
+        val since = System.currentTimeMillis() - RESTORE_LOG_DAYS * 24L * 60 * 60 * 1000
+        val entries = runCatching { logRepository.querySince(since) }.getOrDefault(emptyList())
+        if (entries.isEmpty()) return
+        val restored = File(dir, "restored-${System.currentTimeMillis()}.log")
+        restored.bufferedWriter(Charsets.UTF_8).use { writer ->
+            entries.forEach { entry -> writer.write(entry.formatLine()); writer.newLine() }
+        }
+        MmaLogger.operation(
+            event = "log_directory_restored",
+            message = "外部日志目录缺失，已从数据库回灌",
+            fields = mapOf(LogFields.COUNT to entries.size, LogFields.SUCCESS to true),
+        )
     }
 
     private fun registerLifecycleLogging() {
@@ -173,6 +219,9 @@ class MmaApplication : Application() {
 
     companion object {
         // 私有日志目录名已移交 MmaStorage.privateFallback 统一管理
+
+        /** 日志回灌窗口（天）：外部日志目录被删后从库恢复最近多少天。 */
+        private const val RESTORE_LOG_DAYS: Long = 3
     }
 }
 

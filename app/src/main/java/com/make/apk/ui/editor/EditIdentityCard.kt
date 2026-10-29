@@ -97,6 +97,14 @@ fun EditIdentityCard(
                 }
             }
 
+            // rc9 应用图标自定义：三种主流启动器遮罩形状预览
+            IconShapePreviewRow(
+                apkName = apkName,
+                themeColor = themeColor,
+                iconRef = iconRef,
+                modifier = Modifier.fillMaxWidth(),
+            )
+
             // 只读：项目类型（锁死）；资产包入口（VUE/PHP）因存档拾取尚未实现，亦只读。
             Row(
                 horizontalArrangement = Arrangement.spacedBy(Spacing.space3),

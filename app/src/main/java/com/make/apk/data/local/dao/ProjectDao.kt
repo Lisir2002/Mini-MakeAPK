@@ -45,6 +45,10 @@ interface ProjectDao {
     @Query("SELECT * FROM projects ORDER BY createdAt DESC")
     fun observeAllByCreatedAt(): Flow<List<ProjectEntity>>
 
+    /** 全部项目一次性快照（启动对账用：不需要响应后续变更）。 */
+    @Query("SELECT * FROM projects ORDER BY id ASC")
+    suspend fun observeAllSnapshot(): List<ProjectEntity>
+
     /**
      * 包名占用查询（包名唯一性强制拦截，§2.6 / §6.1）。
      *
