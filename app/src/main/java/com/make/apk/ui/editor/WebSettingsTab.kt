@@ -44,6 +44,7 @@ fun WebSettingsTab(
     onThirdPartyCookiesChanged: (Boolean) -> Unit,
     onCacheModeChanged: (Int) -> Unit,
     onUserAgentChanged: (String?) -> Unit,
+    onIgnoreSslErrorsChanged: (Boolean) -> Unit,
     onThemeColorChanged: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -92,6 +93,14 @@ fun WebSettingsTab(
                 userAgent = webSettings.userAgent,
                 onUserAgentChanged = onUserAgentChanged,
                 modifier = Modifier.fillMaxWidth(),
+            )
+
+            // 证书：默认行为是"静默取消加载 = 白屏"，给用户一个可显式承担风险的开关。
+            MmaSwitchRow(
+                label = "忽略证书错误",
+                description = IGNORE_SSL_HINT,
+                checked = webSettings.ignoreSslErrors,
+                onCheckedChange = onIgnoreSslErrorsChanged,
             )
 
             // 主题色
@@ -181,6 +190,7 @@ private const val UA_DEFAULT: String = "默认"
 private const val UA_DESKTOP: String = "桌面"
 private const val UA_CUSTOM: String = "自定义"
 private const val UA_CUSTOM_LABEL: String = "自定义 UA"
+private const val IGNORE_SSL_HINT: String = "证书过期 / 自签名站点默认被静默拦截（白屏），开启后放行但不再校验"
 private const val THEME_COLOR_LABEL: String = "主题色"
 
 /**

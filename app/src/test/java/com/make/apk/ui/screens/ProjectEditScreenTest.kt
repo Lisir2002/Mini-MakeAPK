@@ -104,12 +104,12 @@ class ProjectEditScreenTest {
             onThirdPartyCookiesChanged = {},
             onCacheModeChanged = {},
             onUserAgentChanged = {},
+            onIgnoreSslErrorsChanged = {},
             onToggleCollapse = {},
             onTabSelected = {},
             onDelete = {},
             onSave = {},
             onEntryUrlChanged = {},
-            onEntryHtmlChanged = {},
             onEntryFileChanged = {},
         )
     }

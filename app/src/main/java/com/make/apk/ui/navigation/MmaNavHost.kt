@@ -330,7 +330,6 @@ fun MmaNavHost(
                     onVersionNameChanged = vm::onVersionNameChanged,
                     onVersionCodeChanged = vm::onVersionCodeChanged,
                     onEntryUrlChanged = vm::onEntryUrlChanged,
-                    onEntryHtmlChanged = vm::onEntryHtmlChanged,
                     onEntryFileChanged = vm::onEntryFileChanged,
                     onThemeColorChanged = vm::onThemeColorChanged,
                     onPickIcon = {
@@ -345,6 +344,7 @@ fun MmaNavHost(
                     onThirdPartyCookiesChanged = vm::onThirdPartyCookiesChanged,
                     onCacheModeChanged = vm::onCacheModeChanged,
                     onUserAgentChanged = vm::onUserAgentChanged,
+                    onIgnoreSslErrorsChanged = vm::onIgnoreSslErrorsChanged,
                     onShowLoadingProgressChanged = vm::onShowLoadingProgressChanged,
                     onLoadingProgressPositionChanged = vm::onLoadingProgressPositionChanged,
                     // 文件目录树（rc11）：打开 / 新增 / 删除附加文件。

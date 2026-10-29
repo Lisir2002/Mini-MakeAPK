@@ -140,12 +140,12 @@ class ProjectEditScreenInteractionTest {
                     onThirdPartyCookiesChanged = {},
                     onCacheModeChanged = {},
                     onUserAgentChanged = {},
+            onIgnoreSslErrorsChanged = {},
                     onToggleCollapse = { uiState.value = uiState.value.copy(collapsed = it) },
                     onTabSelected = { uiState.value = uiState.value.copy(selectedTab = it) },
                     onDelete = onDelete,
                     onSave = {},
                     onEntryUrlChanged = {},
-                    onEntryHtmlChanged = {},
                     onEntryFileChanged = {},
                 )
             }

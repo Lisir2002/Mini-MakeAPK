@@ -313,16 +313,17 @@ private fun <T> MmaDropdownItem(
     val control = LocalMmaDesign.current.control
     val colorScheme = MaterialTheme.colorScheme
     val typography = MaterialTheme.typography
-    // M3E 规范：选中态用**第三强调色**（tertiaryContainer），避免与触发器（primary）抢视觉；
-    // 而非原生下拉那样只换文字色或套 primaryContainer。
-    val contentColor = if (isSelected) colorScheme.onTertiaryContainer else colorScheme.onSurface
+    // 选中态 = 主色容器（蓝点缀）：设计语言只允许**一种彩色点缀**（DESIGN_LANGUAGE §2），
+    // 用 tertiaryContainer 会引入第二个色相（M3 默认还是粉/珊瑚色系——即"旧版色彩残留"），
+    // 故统一收敛到 primaryContainer / onPrimaryContainer。
+    val contentColor = if (isSelected) colorScheme.onPrimaryContainer else colorScheme.onSurface
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .height(control.menuItemHeight)
             .clip(shape)
-            .background(if (isSelected) colorScheme.tertiaryContainer else Color.Transparent)
+            .background(if (isSelected) colorScheme.primaryContainer else Color.Transparent)
             .clickableNoRipple(onClick = onClick)
             .padding(horizontal = control.menuItemPaddingH)
             .semantics { role = Role.Button },

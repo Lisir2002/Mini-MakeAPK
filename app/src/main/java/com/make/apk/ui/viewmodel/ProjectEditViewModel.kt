@@ -284,9 +284,13 @@ class ProjectEditViewModel(
     fun onCacheModeChanged(cacheMode: Int) =
         updateWebSettings { it.copy(cacheMode = cacheMode) }
 
-    /** 自定义 User-Agent（null 表示沿用系统默认）。 */
+    /** 自定义 User-Agent（null 表示沿用系统默认 UA，仅做去 `; wv)` 归一化）。 */
     fun onUserAgentChanged(userAgent: String?) =
         updateWebSettings { it.copy(userAgent = userAgent) }
+
+    /** 忽略 SSL 证书错误（默认关：放行意味着不再校验证书，风险由用户承担）。 */
+    fun onIgnoreSslErrorsChanged(enabled: Boolean) =
+        updateWebSettings { it.copy(ignoreSslErrors = enabled) }
 
     /** 功能加载进度条开关。 */
     fun onShowLoadingProgressChanged(enabled: Boolean) =

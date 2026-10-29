@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  SVG 来源：Material Icons "chevron_right"（Apache-2.0）路径数据转为 Android VectorDrawable。
+  24dp 网格，tint 由调用方注入，底色纯黑。
+  文件树「折叠」态专用图标（展开态用 ic_collapse，本体朝下）。
+  说明：不复用"旋转 90°"方案——旋转在纯 JVM 渲染（Paparazzi/layoutlib）与真机上的
+  方向表现不一致，直给两枚方向明确的图标，视觉与语义都不靠运行时变换。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M10,6L8.59,7.41 13.17,12l-4.58,4.59L10,18l6,-6z" />
+</vector>

@@ -54,3 +54,37 @@ val md_blue_900 = Color(0xFF15346F) // OKLCH(0.3392 0.1090 261.7)
 // info 语义色复用 primary（亮/暗同 primary 组），不单独发明色值。
 val md_info_light  = md_primary_light
 val md_info_dark   = md_primary_dark
+
+// ── 次级强调槽（secondary / tertiary）：显式锁死，禁止回落 M3 默认 ──
+//
+// 根因：`lightColorScheme()` / `darkColorScheme()` 只覆盖我们传入的槽，**未传入的槽回落
+// Material 3 默认色**——`tertiaryContainer` 默认是粉/珊瑚色系（亮色 #FFD8E4、暗色 #633B48），
+// 与「黑白为主 + 蓝色点缀」直接冲突，表现为"旧版珊瑚粉残留"（缓存模式选中态、
+// 下拉选中态、通知与日志级别徽标都命中这条）。故此处把 secondary / tertiary 两组全部
+// 显式定义；取值一律**派生自既有令牌**（不发明新色相）：
+//   secondary = 中性灰（次级信息 / 中性容器）——取 on-surface-variant / surface-2；
+//   tertiary  = 蓝色家族次级（主色之外的一档强调蓝）——取 blue scale。
+val md_secondary_light             = md_onSurfaceVariant_light // OKLCH(0.4921 0.0221 265.8)
+val md_onSecondary_light           = md_surface_light
+val md_secondaryContainer_light    = md_surface2_light
+val md_onSecondaryContainer_light  = md_onSurface_light
+val md_tertiary_light              = md_blue_500               // OKLCH(0.5686 0.1814 263.2)
+val md_onTertiary_light            = md_surface_light
+val md_tertiaryContainer_light     = md_blue_100               // OKLCH(0.9243 0.0361 266.7)
+val md_onTertiaryContainer_light   = md_blue_900               // OKLCH(0.3392 0.1090 261.7)
+
+val md_secondary_dark              = md_onSurfaceVariant_dark  // OKLCH(0.7063 0.0123 252.1)
+val md_onSecondary_dark            = md_bg_dark
+val md_secondaryContainer_dark     = md_surface2_dark
+val md_onSecondaryContainer_dark   = md_onSurface_dark
+val md_tertiary_dark               = md_blue_200               // OKLCH(0.8665 0.0651 265.8)
+val md_onTertiary_dark             = md_blue_900
+val md_tertiaryContainer_dark      = md_blue_900               // OKLCH(0.3392 0.1090 261.7)
+val md_onTertiaryContainer_dark    = md_blue_100
+
+// ── 错误容器槽：同样禁止回落 M3 默认（默认亮色为浅粉 #F9DEDC）──
+// 由 --error 派生（同色相，仅调明度/彩度），不引入新色相。
+val md_errorContainer_light        = Color(0xFFFBE9E9) // 派生于 --error #DC2626（提亮）
+val md_onErrorContainer_light      = Color(0xFF7F1D1D) // 派生于 --error #DC2626（压暗）
+val md_errorContainer_dark         = Color(0xFF4E1517) // 派生于 --error #F87171（压暗）
+val md_onErrorContainer_dark       = Color(0xFFFFDAD6) // 派生于 --error #F87171（提亮）

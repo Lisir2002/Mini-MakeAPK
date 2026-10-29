@@ -16,6 +16,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import com.make.apk.data.model.ProjectFile
 import com.make.apk.data.model.ProjectType
 import com.make.apk.data.model.ProgressPosition
 import com.make.apk.data.model.ShellSpec
@@ -66,7 +67,8 @@ fun ProjectEditScreen(
     onVersionNameChanged: (String) -> Unit,
     onVersionCodeChanged: (String) -> Unit,
     onEntryUrlChanged: (String) -> Unit,
-    onEntryHtmlChanged: (String) -> Unit = {},
+    // 注：入口 HTML 的内容编辑已统一收敛到「项目代码 → 入口文件 → 编辑器页」
+    // （`BundledHtml.withFile` 对入口文件名写回 `html`），本页不再承载 HTML 编辑区。
     onEntryFileChanged: (String) -> Unit,
     onThemeColorChanged: (Int) -> Unit,
     onPickIcon: (() -> Unit)? = null,
@@ -77,6 +79,7 @@ fun ProjectEditScreen(
     onThirdPartyCookiesChanged: (Boolean) -> Unit,
     onCacheModeChanged: (Int) -> Unit,
     onUserAgentChanged: (String?) -> Unit,
+    onIgnoreSslErrorsChanged: (Boolean) -> Unit,
     onShowLoadingProgressChanged: (Boolean) -> Unit = {},
     onLoadingProgressPositionChanged: (ProgressPosition) -> Unit = {},
     /** 打开文件（rc11：文件目录树 → 独立编辑器页；NavHost 接线导航）。 */
@@ -191,6 +194,7 @@ fun ProjectEditScreen(
                             onThirdPartyCookiesChanged = onThirdPartyCookiesChanged,
                             onCacheModeChanged = onCacheModeChanged,
                             onUserAgentChanged = onUserAgentChanged,
+                            onIgnoreSslErrorsChanged = onIgnoreSslErrorsChanged,
                             onThemeColorChanged = onThemeColorChanged,
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -209,7 +213,13 @@ fun ProjectEditScreen(
                         ) {
                             ProjectCodeTab(
                                 entryFile = state.entryFile.trim().ifBlank { "index.html" },
-                                fileNames = listOf(state.entryFile.trim()) + state.projectFiles.map { it.name },
+                                // 入口 HTML 与附加文件一起构成目录树（入口带「入口」徽标）。
+                                files = listOf(
+                                    ProjectFile(
+                                        name = state.entryFile.trim().ifBlank { "index.html" },
+                                        content = state.entryHtml,
+                                    ),
+                                ) + state.projectFiles,
                                 onOpenFile = onOpenFile,
                                 onFileAdded = onFileAdded,
                                 onFileDeleted = onFileDeleted,

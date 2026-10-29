@@ -51,6 +51,17 @@ data class WebSettings(
      * 加载进度条位置（[ProgressPosition]）：仅当 [showLoadingProgress] 为 true 时生效。
      */
     val loadingProgressPosition: ProgressPosition = ProgressPosition.TOP,
+    /**
+     * 是否忽略 SSL 证书错误（默认关）。
+     *
+     * WebView 对证书异常的**默认行为是静默取消加载**（`onReceivedSslError` 的 super 实现
+     * 即 `handler.cancel()`）——表现为"干净白屏、零线索"。开启后改为放行并给出可见提示，
+     * 用于打开证书过期 / 自签名 / 证书链不完整的内网与老旧站点。
+     *
+     * 安全权衡：放行意味着**不再校验证书**，中间人风险由用户自行承担，故默认关闭，
+     * 且开启后每次命中都会在界面上提示"连接未加密校验"。
+     */
+    val ignoreSslErrors: Boolean = false,
 ) {
     /** 缓存模式常量：值与 [android.webkit.WebSettings] 同名常量一致，故可直接赋给 `settings.cacheMode`。 */
     companion object {

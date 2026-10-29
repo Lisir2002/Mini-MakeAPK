@@ -21,6 +21,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
@@ -149,11 +150,31 @@ private fun LineGutter(
     }
 }
 
-/** 高亮变换：text 不变，仅视觉着色（选区映射恒等）。 */
+/**
+ * 高亮变换：text 不变，仅视觉着色（选区映射恒等）。
+ *
+ * 单条结果缓存：`filter` 在**每一次输入与每一帧重组**时被调用，若每次都跑全套正则，
+ * 输入长文件会逐字符重复扫描（掉帧）。这里以"上一次输入文本"为键缓存着色结果——
+ * 文本未变（重组 / 光标移动 / 滚动）时零成本复用。
+ */
 private class CodeHighlightTransformation(
     private val lang: CodeHighlight.Lang,
     private val palette: CodeHighlight.Palette,
 ) : VisualTransformation {
-    override fun filter(text: androidx.compose.ui.text.AnnotatedString): TransformedText =
-        TransformedText(CodeHighlight.highlight(text.text, lang, palette), OffsetMapping.Identity)
+    private var lastInput: String? = null
+    private var lastOutput: AnnotatedString? = null
+
+    override fun filter(text: AnnotatedString): TransformedText {
+        val cached = lastOutput
+        val source = text.text
+        val result = if (cached != null && lastInput == source) {
+            cached
+        } else {
+            CodeHighlight.highlight(source, lang, palette).also {
+                lastInput = source
+                lastOutput = it
+            }
+        }
+        return TransformedText(result, OffsetMapping.Identity)
+    }
 }

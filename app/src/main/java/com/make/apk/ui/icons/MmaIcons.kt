@@ -25,6 +25,8 @@ object MmaIcons {
     val Notifications: Int = R.drawable.ic_notifications
     val InstallMobile: Int = R.drawable.ic_install_mobile
     val Folder: Int = R.drawable.ic_folder
+    /** 目录**展开**态（与 [Folder] 闭合态成对：文件树据此表达开 / 闭）。 */
+    val FolderOpen: Int = R.drawable.ic_folder_open
     val Add: Int = R.drawable.ic_add
     val Collapse: Int = R.drawable.ic_collapse
     val Projects: Int = R.drawable.ic_projects
@@ -48,6 +50,9 @@ object MmaIcons {
 
     // ── 文件（项目代码页文件树 / 文件页）─────────────────────────────
     val File: Int = R.drawable.ic_file
+
+    /** 目录**折叠**态指示箭头（朝右；展开态用 [Collapse]，本体朝下）。 */
+    val ChevronRight: Int = R.drawable.ic_chevron_right
 }
 
 /**

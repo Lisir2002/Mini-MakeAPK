@@ -80,18 +80,15 @@ object CodeHighlight {
         }
         return buildAnnotatedString {
             append(text)
-            rules(lang).forEach { rule ->
-                rule.regex.findAll(text).forEach { match ->
-                    val value = match.value
-                    if (value.isEmpty()) return@forEach
-                    // 规则可能带捕获组（如 HTML 属性取组 1）；无组用整段匹配。
-                    val start = match.groups[1]?.range?.first ?: match.range.first
-                    val end = match.groups[1]?.range?.last ?: match.range.last
-                    if (start >= 0) {
-                        addStyle(rule.style(palette), start, end + 1)
-                    } else {
-                        addStyle(rule.style(palette), match.range.first, match.range.last + 1)
-                    }
+            rules(lang).forEach rule@{ rule ->
+                rule.regex.findAll(text).forEach match@{ match ->
+                    // 取该规则声明的捕获组区间（组不存在 / 未参与匹配时回落整段匹配）。
+                    val range = match.rangeOf(rule.group)
+                    val start = range.first
+                    val end = range.last + 1
+                    // 零宽匹配（如纯断言规则）与越界区间一律跳过：不产生空 span、不越界着色。
+                    if (start < 0 || start >= end || end > text.length) return@match
+                    addStyle(rule.style(palette), start, end)
                 }
             }
         }
@@ -99,8 +96,28 @@ object CodeHighlight {
 
     // ── 规则定义 ──────────────────────────────────────────────────────
 
-    /** 一条高亮规则：组合正则里的一个命名组。 */
-    private class Rule(val name: String, val regex: Regex, val style: (Palette) -> SpanStyle)
+    /**
+     * 安全取组区间。
+     *
+     * 直接写 `match.groups[1]` 会在该正则**没有捕获组**时抛
+     * `IndexOutOfBoundsException("No group 1")`（Kotlin `MatchGroupCollection.get`
+     * 先校验 `index > matcher.groupCount()`）——rc11 的线上崩溃即源于此：绝大多数规则
+     * 是零捕获组的整段匹配，只有少数规则（如 CSS 属性名）才需要取组 1。
+     * 故：[group] 由规则**显式声明**，取组前先判组数，绝不抛异常。
+     */
+    private fun MatchResult.rangeOf(group: Int): IntRange {
+        if (group <= 0) return range
+        if (group >= groups.size) return range
+        return groups[group]?.range ?: range
+    }
+
+    /** 一条高亮规则：[group] 为需要着色的捕获组下标（0 = 整段匹配）。 */
+    private class Rule(
+        val name: String,
+        val regex: Regex,
+        val group: Int = 0,
+        val style: (Palette) -> SpanStyle,
+    )
 
     private val JS_KEYWORDS: Regex =
         Regex("""\b(?:function|return|var|let|const|if|else|for|while|do|switch|case|break|continue|new|this|typeof|instanceof|class|extends|import|export|from|try|catch|finally|throw|async|await|yield|null|undefined|true|false)\b""")
@@ -122,7 +139,8 @@ object CodeHighlight {
             Rule("string", Regex(""""[^"]*"|'[^']*'""")) { it.string },
             Rule("number", Regex("""#[0-9a-fA-F]{3,8}\b|\b\d+(?:\.\d+)?(?:px|em|rem|%|vh|vw|s|ms)?\b""")) { it.number },
             Rule("keyword", Regex("""@[\w-]+""")) { it.keyword },
-            Rule("attr", CSS_PROPERTIES) { it.attr },
+            // CSS 属性名：正则带一个捕获组（后接零宽断言），只给"属性名"上色，不含冒号。
+            Rule("attr", CSS_PROPERTIES, group = 1) { it.attr },
         )
         Lang.JS -> listOf(
             Rule("comment", Regex("""//[^\n]*|/\*[\s\S]*?\*/""")) { it.comment },

@@ -203,17 +203,24 @@ private fun <T> SelectOptionRow(
     val colorScheme = MaterialTheme.colorScheme
     val control = LocalMmaDesign.current.control
 
+    // 选中态 = 主色容器（蓝点缀）：设计语言只允许一种彩色点缀（DESIGN_LANGUAGE §2），
+    // 用 tertiaryContainer 会引入第二个色相（M3 默认更是粉/珊瑚色系——"旧版色彩残留"），
+    // 故与下拉等自绘控件统一收敛到 primaryContainer / onPrimaryContainer。
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(ControlShapes.itemSingle)
-            .background(if (isSelected) colorScheme.tertiaryContainer else colorScheme.surface)
+            .background(if (isSelected) colorScheme.primaryContainer else colorScheme.surface)
             .border(
                 1.dp,
-                if (isSelected) colorScheme.tertiaryContainer else colorScheme.outlineVariant,
+                if (isSelected) colorScheme.primaryContainer else colorScheme.outlineVariant,
                 ControlShapes.itemSingle,
             )
             .clickable(onClick = onClick)
+            .semantics {
+                role = Role.Button
+                contentDescription = "${option.title}：${option.description}"
+            }
             .padding(horizontal = Spacing.space3, vertical = Spacing.space2),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.space2),
@@ -222,13 +229,13 @@ private fun <T> SelectOptionRow(
             Text(
                 text = option.title,
                 style = MaterialTheme.typography.bodyLarge,
-                color = if (isSelected) colorScheme.onTertiaryContainer else colorScheme.onSurface,
+                color = if (isSelected) colorScheme.onPrimaryContainer else colorScheme.onSurface,
             )
             Text(
                 text = option.description,
                 style = MaterialTheme.typography.bodySmall,
                 color = if (isSelected) {
-                    colorScheme.onTertiaryContainer
+                    colorScheme.onPrimaryContainer
                 } else {
                     colorScheme.onSurfaceVariant
                 },
@@ -239,7 +246,7 @@ private fun <T> SelectOptionRow(
                 iconRes = MmaIcons.CheckCircle,
                 contentDescription = "已选中",
                 size = control.menuItemIcon,
-                tint = colorScheme.onTertiaryContainer,
+                tint = colorScheme.onPrimaryContainer,
             )
         }
     }
