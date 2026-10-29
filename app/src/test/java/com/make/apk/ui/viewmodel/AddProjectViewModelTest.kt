@@ -281,8 +281,8 @@ class AddProjectViewModelTest {
 
     @Test
     fun save_withInvalidFields_doesNotWrite() = runTest(dispatcher) {
-        vm.onProjectTypeSelected(ProjectType.HTML)
-        // HTML 入口为空 → 不允许保存
+        vm.onProjectTypeSelected(ProjectType.URL)
+        // URL 入口为空 → 不允许保存（HTML 空代码自 rc9 起兜底默认模板，不再作为非法样例）
         vm.onApkNameChanged("示例应用")
         vm.onPackageNameChanged("com.example.demo")
         advanceUntilIdle()

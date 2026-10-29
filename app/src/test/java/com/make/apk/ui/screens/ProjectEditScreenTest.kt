@@ -78,6 +78,12 @@ class ProjectEditScreenTest {
         )
     }
 
+    @Test
+    fun light_html_code_tab() = paparazzi.snapshot {
+        // HTML 类专属「项目代码」页（类型隔离：URL 项目无此 tab）。
+        editBody(state = htmlState(collapsed = false, tab = EditTab.CODE))
+    }
+
     // ── 渲染辅助 ─────────────────────────────────────────────────────
 
     @Composable
@@ -104,6 +110,7 @@ class ProjectEditScreenTest {
             onSave = {},
             onEntryUrlChanged = {},
             onEntryHtmlChanged = {},
+            onEntryFileChanged = {},
         )
     }
 
@@ -124,6 +131,30 @@ class ProjectEditScreenTest {
             iconPlaceholderLabel = "示",
             engineLabel = "设备端即时封装（WebView）",
             isolationId = "webapp_1",
+            collapsed = collapsed,
+            selectedTab = tab,
+        )
+    }
+
+    /** HTML 类典型状态：入口文件 + 源码（「项目代码」页基线用）。 */
+    private fun htmlState(collapsed: Boolean, tab: EditTab): ProjectEditUiState {
+        val scheme: VersionScheme = ProjectDefaults.DEFAULT_VERSION_SCHEME
+        return ProjectEditUiState(
+            loading = false,
+            projectType = ProjectType.HTML,
+            entryRef = "<html>…</html>",
+            entryFile = "index.html",
+            entryHtml = "<!DOCTYPE html>\n<html>\n  <body>\n    <h1>你好</h1>\n  </body>\n</html>",
+            apkName = "示例网页",
+            packageName = "com.example.webapp",
+            versionScheme = scheme,
+            versionName = ProjectDefaults.defaultVersionName(scheme),
+            versionCode = ProjectDefaults.DEFAULT_VERSION_CODE.toString(),
+            themeColor = ProjectDefaults.DEFAULT_THEME_COLOR,
+            iconRef = null,
+            iconPlaceholderLabel = "示",
+            engineLabel = "设备端即时封装（WebView）",
+            isolationId = "webapp_2",
             collapsed = collapsed,
             selectedTab = tab,
         )

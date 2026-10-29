@@ -125,6 +125,22 @@ class ProjectMapperTest {
     }
 
     @Test
+    fun bundledHtml_oldJsonWithoutEntryFile_fallsBackToDefault() {
+        // rc9 起 BundledHtml 增 entryFile 字段：老数据只有 html，反序列化须兜底 index.html。
+        val decoded = RuntimeJson.decodeEntry("""{"type":"html","html":"<p/>"}""")
+        assertEquals(
+            ProjectEntry.BundledHtml.DEFAULT_ENTRY_FILE,
+            (decoded as ProjectEntry.BundledHtml).entryFile,
+        )
+    }
+
+    @Test
+    fun bundledHtml_entryFile_roundTrips() {
+        val entry = ProjectEntry.BundledHtml(html = "<p/>", entryFile = "main.htm")
+        assertEquals(entry, RuntimeJson.decodeEntry(RuntimeJson.encodeEntry(entry)))
+    }
+
+    @Test
     fun converters_enumRoundTrip() {
         ProjectType.values().forEach { type ->
             assertEquals(type, converters.toProjectType(converters.fromProjectType(type)))

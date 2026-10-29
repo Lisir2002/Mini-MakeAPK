@@ -16,6 +16,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import com.make.apk.data.model.ProjectType
 import com.make.apk.data.model.ShellSpec
 import com.make.apk.data.model.VersionScheme
 import com.make.apk.ui.components.MmaScreen
@@ -25,6 +26,7 @@ import com.make.apk.ui.editor.EditIdentityCard
 import com.make.apk.ui.editor.EditTabRow
 import com.make.apk.ui.editor.FieldMessage
 import com.make.apk.ui.editor.HighSettingsTab
+import com.make.apk.ui.editor.ProjectCodeTab
 import com.make.apk.ui.editor.ShellEditorTab
 import com.make.apk.ui.editor.WebSettingsTab
 import com.make.apk.ui.icons.MmaIcon
@@ -63,6 +65,7 @@ fun ProjectEditScreen(
     onVersionCodeChanged: (String) -> Unit,
     onEntryUrlChanged: (String) -> Unit,
     onEntryHtmlChanged: (String) -> Unit,
+    onEntryFileChanged: (String) -> Unit,
     onThemeColorChanged: (Int) -> Unit,
     onShellSpecChanged: (ShellSpec) -> Unit,
     onJavascriptEnabledChanged: (Boolean) -> Unit,
@@ -130,9 +133,9 @@ fun ProjectEditScreen(
                         projectType = state.projectType,
                         entryRef = state.entryRef,
                         entryUrl = state.entryUrl,
-                        entryHtml = state.entryHtml,
+                        entryFile = state.entryFile,
                         entryUrlMessage = messageOf(state, EditField.ENTRY_URL),
-                        entryHtmlMessage = messageOf(state, EditField.ENTRY_HTML),
+                        entryFileMessage = messageOf(state, EditField.ENTRY_FILE),
                         themeColor = state.themeColor,
                         iconRef = state.iconRef,
                         apkNameMessage = messageOf(state, EditField.APK_NAME),
@@ -145,16 +148,17 @@ fun ProjectEditScreen(
                         onVersionNameChanged = onVersionNameChanged,
                         onVersionCodeChanged = onVersionCodeChanged,
                         onEntryUrlChanged = onEntryUrlChanged,
-                        onEntryHtmlChanged = onEntryHtmlChanged,
+                        onEntryFileChanged = onEntryFileChanged,
                     )
                 }
             }
 
-            // 底部三 Tab 区：TabRow 固定顶部，内容区可滚动且不压身份卡。
+            // 底部 Tab 区：TabRow 按项目类型过滤（HTML 多一个「项目代码」页），内容区可滚动。
             Column(modifier = Modifier.weight(1f)) {
                 EditTabRow(
                     selectedTab = state.selectedTab,
                     onTabSelected = onTabSelected,
+                    projectType = state.projectType,
                     modifier = Modifier.fillMaxWidth(),
                 )
                 when (state.selectedTab) {
@@ -174,6 +178,23 @@ fun ProjectEditScreen(
                             .verticalScroll(rememberScrollState())
                             .padding(horizontal = Spacing.space5, vertical = Spacing.space4),
                     )
+
+                    // 「项目代码」：HTML 类专属（EditTabRow 已按类型过滤，此处防御兜底）。
+                    EditTab.CODE -> if (state.projectType == ProjectType.HTML) {
+                        ProjectCodeTab(
+                            entryFile = state.entryFile,
+                            entryHtml = state.entryHtml,
+                            entryFileMessage = messageOf(state, EditField.ENTRY_FILE),
+                            entryHtmlMessage = messageOf(state, EditField.ENTRY_HTML),
+                            onEntryFileChanged = onEntryFileChanged,
+                            onEntryHtmlChanged = onEntryHtmlChanged,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f)
+                                .verticalScroll(rememberScrollState())
+                                .padding(horizontal = Spacing.space5, vertical = Spacing.space4),
+                        )
+                    }
 
                     EditTab.TEMPLATE -> ShellEditorTab(
                         shellSpec = state.shellSpec,

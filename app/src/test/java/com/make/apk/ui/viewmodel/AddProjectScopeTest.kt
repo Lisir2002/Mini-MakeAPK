@@ -146,7 +146,9 @@ class AddProjectScopeTest {
     }
 
     @Test
-    fun whitespaceOnlyHtml_blocksSaveAndWrite() = runTest(dispatcher) {
+    fun emptyHtml_fallsBackToTemplate_andSaves() = runTest(dispatcher) {
+        // rc9 类型隔离：新建 HTML 不再强制先写代码——代码兜底默认模板，
+        // 入口文件兜底 index.html（「项目代码」页后续维护源码）。
         vm.onProjectTypeSelected(ProjectType.HTML)
         vm.onHtmlChanged("   \n  ")
         vm.onApkNameChanged("示例应用")
@@ -154,12 +156,53 @@ class AddProjectScopeTest {
         advanceUntilIdle()
 
         val state = vm.uiState.value
-        assertNotNull(state.errors[AddField.ENTRY_HTML])
-        assertFalse("空白 HTML 不得保存", state.canSave)
+        assertNull("空代码不得阻断保存（兜底默认模板）", state.errors[AddField.ENTRY_HTML])
+        assertTrue(state.canSave)
 
         vm.save()
         advanceUntilIdle()
-        assertNull(directory.lastCreated)
+        val created = directory.lastCreated
+        assertNotNull("空代码 HTML 项目应可落库", created)
+        val entry = created!!.entry as ProjectEntry.BundledHtml
+        assertEquals(ProjectEntry.BundledHtml.DEFAULT_TEMPLATE, entry.html)
+        assertEquals(ProjectEntry.BundledHtml.DEFAULT_ENTRY_FILE, entry.entryFile)
+    }
+
+    @Test
+    fun entryFile_customName_persistsToEntry() = runTest(dispatcher) {
+        vm.onProjectTypeSelected(ProjectType.HTML)
+        vm.onEntryFileChanged("main.htm")
+        vm.onApkNameChanged("示例应用")
+        vm.onPackageNameChanged("com.example.demo")
+        advanceUntilIdle()
+
+        assertTrue(vm.uiState.value.canSave)
+        vm.save()
+        advanceUntilIdle()
+        val entry = directory.lastCreated!!.entry as ProjectEntry.BundledHtml
+        assertEquals("main.htm", entry.entryFile)
+    }
+
+    @Test
+    fun entryFile_withPathOrBadExtension_blocksSave() = runTest(dispatcher) {
+        vm.onProjectTypeSelected(ProjectType.HTML)
+        vm.onApkNameChanged("示例应用")
+        vm.onPackageNameChanged("com.example.demo")
+
+        vm.onEntryFileChanged("a/b.html")
+        advanceUntilIdle()
+        assertNotNull("含路径成分的入口文件必须被拦", vm.uiState.value.errors[AddField.ENTRY_FILE])
+        assertFalse(vm.uiState.value.canSave)
+
+        vm.onEntryFileChanged("home.php")
+        advanceUntilIdle()
+        assertNotNull("非 html/htm 扩展名必须被拦", vm.uiState.value.errors[AddField.ENTRY_FILE])
+        assertFalse(vm.uiState.value.canSave)
+
+        vm.onEntryFileChanged("")
+        advanceUntilIdle()
+        assertNull("空文件名回落默认 index.html，必须放行", vm.uiState.value.errors[AddField.ENTRY_FILE])
+        assertTrue(vm.uiState.value.canSave)
     }
 
     // ── §9 四项并列设计（占位项仍可见可选）────────────────────────────

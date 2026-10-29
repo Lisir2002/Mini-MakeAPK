@@ -74,6 +74,7 @@ class AddProjectViewModel(
             projectType = type,
             urlInput = "",
             htmlInput = "",
+            entryFileInput = "",
             archivePath = null,
             dirty = state.dirty || state.projectType != null,
         )
@@ -90,10 +91,16 @@ class AddProjectViewModel(
         revalidate()
     }
 
-    /** 内置 HTML 输入变化。 */
+    /** 内置 HTML 源码输入变化（新建页不暴露；保留供代码类通道使用）。 */
     fun onHtmlChanged(html: String) {
         _uiState.value = _uiState.value.copy(htmlInput = html, dirty = true)
         refreshSuggestions()
+        revalidate()
+    }
+
+    /** 入口文件名输入变化（HTML 类专属；空 = 默认 index.html）。 */
+    fun onEntryFileChanged(name: String) {
+        _uiState.value = _uiState.value.copy(entryFileInput = name, dirty = true)
         revalidate()
     }
 
@@ -279,6 +286,7 @@ class AddProjectViewModel(
             htmlInput = state.htmlInput,
             archivePath = state.archivePath,
             archiveKind = state.archiveKind,
+            entryFileInput = state.entryFileInput,
         )
 
     /** 重算自动建议；用户手动改过的字段不再被自动覆盖。 */
@@ -361,6 +369,7 @@ class AddProjectViewModel(
                     htmlInput = state.htmlInput,
                     archivePath = state.archivePath,
                     probeResult = probeResult,
+                    entryFileInput = state.entryFileInput,
                 ).error?.let { errors[ProjectTypeStrategy.entryField(state.projectType)] = it }
             }
         }

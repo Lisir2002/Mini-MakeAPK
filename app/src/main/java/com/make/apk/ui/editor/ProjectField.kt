@@ -30,8 +30,11 @@ enum class AddField {
     /** 入口：远程网址。 */
     ENTRY_URL,
 
-    /** 入口：内置 HTML。 */
+    /** 入口：内置 HTML 源码（新建页不再直录代码，保留用于代码内容类错误）。 */
     ENTRY_HTML,
+
+    /** 入口：HTML 类的入口文件名（首屏加载文件，留空默认 index.html）。 */
+    ENTRY_FILE,
 
     /** 入口：资产包（zip）。 */
     ENTRY_ARCHIVE,
@@ -62,8 +65,11 @@ enum class EditField {
     /** 入口：远程网址（编辑页现在允许修改 URL 入口，见 §优化·第四点）。 */
     ENTRY_URL,
 
-    /** 入口：内置 HTML（编辑页现在允许修改 HTML 入口，见 §优化·第四点）。 */
+    /** 入口：内置 HTML 源码（「项目代码」页编辑，空内容保存时兜底默认模板）。 */
     ENTRY_HTML,
+
+    /** 入口：HTML 类的入口文件名（首屏加载文件，留空默认 index.html）。 */
+    ENTRY_FILE,
 }
 
 /**

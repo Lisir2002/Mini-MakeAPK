@@ -20,8 +20,10 @@ data class AddProjectUiState(
     val projectType: ProjectType? = null,
     /** 入口：远程网址输入。 */
     val urlInput: String = "",
-    /** 入口：内置 HTML 输入。 */
+    /** 入口：内置 HTML 源码（新建页不暴露输入；留空保存时兜底默认模板）。 */
     val htmlInput: String = "",
+    /** 入口（HTML 类）：入口文件名输入；空 = 默认 index.html（首屏加载文件）。 */
+    val entryFileInput: String = "",
     /** 入口：资产包路径；null 表示未选择。 */
     val archivePath: String? = null,
     /** 入口：资产包框架类型。 */
@@ -78,7 +80,8 @@ data class AddProjectUiState(
     /** 入口是否已填写完整（与项目类型联动）。 */
     private fun entryValid(): Boolean = when (projectType) {
         ProjectType.URL -> urlInput.isNotBlank()
-        ProjectType.HTML -> htmlInput.isNotBlank()
+        // HTML 类：入口文件可选（默认 index.html）、代码兜底默认模板，恒可保存。
+        ProjectType.HTML -> true
         ProjectType.VUE, ProjectType.PHP -> !archivePath.isNullOrBlank()
         null -> false
     }

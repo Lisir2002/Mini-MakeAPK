@@ -71,7 +71,7 @@ fun AddProjectScreen(
     onBack: () -> Unit,
     onProjectTypeSelected: (ProjectType) -> Unit,
     onUrlChanged: (String) -> Unit,
-    onHtmlChanged: (String) -> Unit,
+    onEntryFileChanged: (String) -> Unit,
     onApkNameChanged: (String) -> Unit,
     onPackageNameChanged: (String) -> Unit,
     onVersionSchemeChanged: (VersionScheme) -> Unit,
@@ -155,14 +155,14 @@ fun AddProjectScreen(
                 ProjectSourceSection(
                     projectType = state.projectType,
                     urlInput = state.urlInput,
-                    htmlInput = state.htmlInput,
+                    entryFileInput = state.entryFileInput,
                     urlMessage = messageOf(state, AddField.ENTRY_URL),
-                    htmlMessage = messageOf(state, AddField.ENTRY_HTML),
+                    entryFileMessage = messageOf(state, AddField.ENTRY_FILE),
                     // 占位类型（VUE/PHP）没有输入框，归档错误挂在占位卡底部——先有展示位，
                     // 后续接上 zip 选择器时错误才不会"无处可见"。
                     archiveMessage = messageOf(state, AddField.ENTRY_ARCHIVE),
                     onUrlChanged = onUrlChanged,
-                    onHtmlChanged = onHtmlChanged,
+                    onEntryFileChanged = onEntryFileChanged,
                     modifier = Modifier.fillMaxWidth(),
                 )
             }

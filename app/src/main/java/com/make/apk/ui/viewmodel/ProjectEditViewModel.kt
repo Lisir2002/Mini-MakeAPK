@@ -135,8 +135,10 @@ class ProjectEditViewModel(
             themeColor = project.themeColor,
             isolationId = project.isolationId,
             engineLabel = engineLabelOf(project.projectType),
-            // 入口（URL/HTML）回填到可编辑字段（§优化·第四点：编辑页可改入口）。
+            // 入口按类型回填到可编辑字段（URL → 网址；HTML → 入口文件 + 源码）。
             entryUrl = (project.entry as? ProjectEntry.Url)?.url ?: "",
+            entryFile = (project.entry as? ProjectEntry.BundledHtml)?.entryFile
+                ?: ProjectEntry.BundledHtml.DEFAULT_ENTRY_FILE,
             entryHtml = (project.entry as? ProjectEntry.BundledHtml)?.html ?: "",
             // 壳契约只读展示：读到即用，不参与 dirty 语义（本轮无壳配置写路径）。
             shellSpec = project.shellSpec,
@@ -203,12 +205,22 @@ class ProjectEditViewModel(
     }
 
     /**
-     * 入口（HTML 类）变化（§优化·第四点：放开原 §6.2 锁死）。
+     * 入口（HTML 类）源码变化（「项目代码」页编辑）。
      *
-     * 仅当项目类型为 [ProjectType.HTML] 时有意义。
+     * 留空不阻断保存——保存时兜底内置默认模板。
      */
     fun onEntryHtmlChanged(html: String) {
         _uiState.value = _uiState.value.copy(entryHtml = html, dirty = true)
+        revalidate()
+    }
+
+    /**
+     * 入口文件名变化（HTML 类专属，类型隔离）。
+     *
+     * 留空 = 默认 index.html（首屏加载文件，保存时兜底）。
+     */
+    fun onEntryFileChanged(name: String) {
+        _uiState.value = _uiState.value.copy(entryFile = name, dirty = true)
         revalidate()
     }
 
@@ -282,10 +294,15 @@ class ProjectEditViewModel(
 
         val base = loaded ?: return
         val versionCode = state.versionCode.trim().toIntOrNull() ?: return
-        // 入口重建（§优化·第四点）：URL/HTML 用编辑页最新值；资产包（VUE/PHP）沿用库中原值。
+        // 入口重建（§优化·第四点；HTML 自 rc9 起为「入口文件 + 源码」形态）：
+        // URL/HTML 用编辑页最新值（HTML 代码空 → 兜底默认模板；文件空 → 兜底 index.html）；
+        // 资产包（VUE/PHP）沿用库中原值。
         val entry = when (state.projectType) {
             ProjectType.URL -> ProjectEntry.Url(state.entryUrl.trim())
-            ProjectType.HTML -> ProjectEntry.BundledHtml(state.entryHtml.trim())
+            ProjectType.HTML -> ProjectEntry.BundledHtml(
+                html = state.entryHtml.trim().ifBlank { ProjectEntry.BundledHtml.DEFAULT_TEMPLATE },
+                entryFile = state.entryFile.trim().ifBlank { ProjectEntry.BundledHtml.DEFAULT_ENTRY_FILE },
+            )
             ProjectType.VUE, ProjectType.PHP, null -> base.entry
         }
         val updated = base.copy(
@@ -391,12 +408,13 @@ class ProjectEditViewModel(
         iconVerdict.error?.let { errors[EditField.ICON] = it }
         iconVerdict.warning?.let { warnings[EditField.ICON] = it }
 
-        // 入口（URL/HTML 现在可编辑，§优化·第四点）：按类型校验，错误挂到对应字段。
+        // 入口（按类型隔离校验，错误挂到对应字段）：
+        // URL → 网址；HTML → 入口文件名（源码可空，保存兜底默认模板，不再阻断）。
         when (state.projectType) {
             ProjectType.URL -> validator.validateEntryUrl(state.entryUrl)
                 .error?.let { errors[EditField.ENTRY_URL] = it }
-            ProjectType.HTML -> validator.validateEntryHtml(state.entryHtml)
-                .error?.let { errors[EditField.ENTRY_HTML] = it }
+            ProjectType.HTML -> validator.validateEntryFile(state.entryFile)
+                .error?.let { errors[EditField.ENTRY_FILE] = it }
             ProjectType.VUE, ProjectType.PHP, null -> Unit
         }
 

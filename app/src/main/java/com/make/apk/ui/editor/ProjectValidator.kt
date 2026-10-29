@@ -139,6 +139,23 @@ class ProjectValidator {
     }
 
     /**
+     * 入口文件名规则（HTML 类专属，类型隔离）：
+     * - 空 = 通过（保存时兜底 [com.make.apk.data.model.ProjectEntry.BundledHtml.DEFAULT_ENTRY_FILE]）；
+     * - 非空须为**单段**文件名：禁路径分隔符 `/` `\` 与 `..`（防路径穿越）；
+     * - 扩展名限 `.html` / `.htm`。
+     */
+    fun validateEntryFile(raw: String): FieldVerdict {
+        val name = raw.trim()
+        if (name.isEmpty()) return FieldVerdict()
+        if (name.contains('/') || name.contains('\\') || name.contains("..")) {
+            return error(MSG_ENTRY_FILE_PATH)
+        }
+        val extension = name.substringAfterLast('.', "").lowercase()
+        if (extension !in ENTRY_FILE_EXTENSIONS) return error(MSG_ENTRY_FILE_EXTENSION)
+        return FieldVerdict()
+    }
+
+    /**
      * 入口资产包规则：路径非空 + `.zip` + 文件存在 + 不超过 100MB。
      *
      * 文件是否存在 / 多大由 [ArchiveProbeResult] 给出（探测在 IO 层完成，
@@ -243,6 +260,9 @@ class ProjectValidator {
         /** 资产包扩展名。 */
         const val ARCHIVE_EXTENSION: String = ".zip"
 
+        /** 入口文件允许的扩展名（HTML 类专属）。 */
+        val ENTRY_FILE_EXTENSIONS: List<String> = listOf("html", "htm")
+
         /** 资产包大小上限（100MB）。 */
         const val MAX_ARCHIVE_SIZE_BYTES: Long = 100L * 1024 * 1024
 
@@ -317,6 +337,12 @@ class ProjectValidator {
 
         /** HTML 为空或不含标签。 */
         const val MSG_HTML_REQUIRED: String = "请填写 HTML 内容"
+
+        /** 入口文件名含路径成分。 */
+        const val MSG_ENTRY_FILE_PATH: String = "入口文件只能填文件名，不能含路径"
+
+        /** 入口文件扩展名不支持。 */
+        const val MSG_ENTRY_FILE_EXTENSION: String = "入口文件须为 .html 或 .htm"
 
         /** 资产包不合规。 */
         const val MSG_ARCHIVE_REQUIRED: String = "请选择 zip 压缩包（不超过 100MB）"

@@ -21,11 +21,51 @@ sealed interface ProjectEntry {
         override val rawRef: String get() = url
     }
 
-    /** 内置 HTML 源码：本地 `loadDataWithBaseURL` 渲染（粘贴 / 上传的 HTML）。 */
+    /**
+     * 内置 HTML 项目：本地 `loadDataWithBaseURL` 渲染（新建时生成的网页应用）。
+     *
+     * ## 文件形态（rc9 起，类型隔离）
+     *
+     * HTML 项目是"有文件的项目"：[entryFile] 是该网页应用的**入口文件**（首屏加载的文件），
+     * 默认 `index.html`；[html] 是入口文件的源码内容。二者共同构成 HTML 项目的
+     * 专属数据形态，与 URL（纯网址）互不混用（类型隔离，见 docs/design/project-editor-design.md）。
+     *
+     * **向后兼容**：[entryFile] 带默认值，老数据 JSON 只有 `html` 字段时反序列化
+     * 自动落 [DEFAULT_ENTRY_FILE]，不炸、行为不变。
+     */
     @Serializable
     @SerialName("html")
-    data class BundledHtml(val html: String) : ProjectEntry {
+    data class BundledHtml(
+        /** 入口文件的源码内容。 */
+        val html: String,
+        /** 入口文件名（首屏加载的文件；留空语义由构造方兜底为 [DEFAULT_ENTRY_FILE]）。 */
+        val entryFile: String = DEFAULT_ENTRY_FILE,
+    ) : ProjectEntry {
         override val rawRef: String get() = html
+
+        companion object {
+            /** 默认入口文件名（网页应用规范：首屏加载 index.html）。 */
+            const val DEFAULT_ENTRY_FILE: String = "index.html"
+
+            /**
+             * 新建不写代码时的内置默认模板：最小可运行 HTML（含 viewport 与提示文案），
+             * 保证项目开箱能跑、预览与导出不出空白页；用户可在「项目代码」页替换。
+             */
+            val DEFAULT_TEMPLATE: String = """
+                <!DOCTYPE html>
+                <html lang="zh-CN">
+                <head>
+                  <meta charset="utf-8">
+                  <meta name="viewport" content="width=device-width, initial-scale=1">
+                  <title>我的网页</title>
+                </head>
+                <body>
+                  <h1>你好，这是你的网页</h1>
+                  <p>在项目的「项目代码」页编辑本文件，替换成你自己的内容。</p>
+                </body>
+                </html>
+            """.trimIndent()
+        }
     }
 
     /**

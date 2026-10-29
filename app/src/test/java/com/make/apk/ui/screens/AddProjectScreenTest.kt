@@ -159,7 +159,7 @@ class AddProjectScreenTest {
             onBack = {},
             onProjectTypeSelected = {},
             onUrlChanged = {},
-            onHtmlChanged = {},
+            onEntryFileChanged = {},
             onApkNameChanged = {},
             onPackageNameChanged = {},
             onVersionSchemeChanged = {},

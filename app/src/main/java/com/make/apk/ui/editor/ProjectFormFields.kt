@@ -93,6 +93,8 @@ fun ProjectTextField(
     modifier: Modifier = Modifier,
     placeholder: String? = null,
     message: FieldMessage? = null,
+    /** 中性提示（无校验消息时显示；如「留空默认 index.html」，不参与校验）。 */
+    hint: String? = null,
     singleLine: Boolean = true,
     minLines: Int = 1,
     keyboardType: KeyboardType = KeyboardType.Text,
@@ -146,6 +148,12 @@ fun ProjectTextField(
         )
         if (message != null) {
             FieldMessageText(message = message)
+        } else if (hint != null) {
+            Text(
+                text = hint,
+                style = typography.labelSmall,
+                color = colorScheme.onSurfaceVariant,
+            )
         }
     }
 }

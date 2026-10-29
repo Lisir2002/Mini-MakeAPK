@@ -30,7 +30,9 @@ data class ProjectEditUiState(
     val entryRef: String = "",
     /** 入口（URL 类）：可编辑网址。 */
     val entryUrl: String = "",
-    /** 入口（HTML 类）：可编辑 HTML 源码。 */
+    /** 入口（HTML 类）：入口文件名（首屏加载文件；空 = 默认 index.html）。 */
+    val entryFile: String = "",
+    /** 入口（HTML 类）：入口文件源码（「项目代码」页编辑；空保存时兜底默认模板）。 */
     val entryHtml: String = "",
     /** 应用名称输入。 */
     val apkName: String = "",
@@ -89,10 +91,17 @@ data class ProjectEditUiState(
 
 /**
  * 编辑页页签。
+ *
+ * **按类型过滤显示**（类型隔离）：[CODE] 仅对"有文件的项目"（HTML）出现，
+ * URL 等纯引用类型不显示——tab 集合由 [com.make.apk.ui.editor.EditTabRow] 按
+ * `projectType` 计算，本枚举只定义全集与顺序。
  */
 enum class EditTab {
     /** 基本信息。 */
     BASIC,
+
+    /** 项目代码（HTML 类专属：查看/编辑入口文件与源码）。 */
+    CODE,
 
     /** 模板与 Web 配置。 */
     TEMPLATE,

@@ -297,8 +297,9 @@ class ProjectEditViewModelTest {
         assertFalse(names.any { it.contains("ProjectType", ignoreCase = true) })
         assertFalse(names.any { it.contains("Isolation", ignoreCase = true) })
         assertFalse(names.any { it.contains("Archive", ignoreCase = true) })
-        // 放开契约面：入口 URL/HTML 的修改 API 必须存在。
+        // 放开契约面：入口 URL / 源码 / 入口文件的修改 API 必须存在。
         assertTrue(names.any { it == "onEntryUrlChanged" })
         assertTrue(names.any { it == "onEntryHtmlChanged" })
+        assertTrue(names.any { it == "onEntryFileChanged" })
     }
 }

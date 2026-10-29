@@ -218,6 +218,7 @@ class ProjectEditViewModelContractTest {
         }
         assertTrue(names.any { it == "onEntryUrlChanged" })
         assertTrue(names.any { it == "onEntryHtmlChanged" })
+        assertTrue(names.any { it == "onEntryFileChanged" })
     }
 
     // ── 不存在的 id ─────────────────────────────────────────────────────

@@ -277,6 +277,34 @@ class ProjectValidatorTest {
         assertFalse(validator.validateEntryHtml("<html><body>hi</body></html>").hasError)
     }
 
+    // ── 入口：HTML 入口文件名（rc9 类型隔离）─────────────────────────
+
+    @Test
+    fun entryFile_blank_passes() {
+        // 空 = 兜底默认 index.html，必须放行。
+        assertFalse(validator.validateEntryFile("").hasError)
+        assertFalse(validator.validateEntryFile("   ").hasError)
+    }
+
+    @Test
+    fun entryFile_validHtmlExtension_passes() {
+        assertFalse(validator.validateEntryFile("index.html").hasError)
+        assertFalse(validator.validateEntryFile("main.HTM").hasError)
+    }
+
+    @Test
+    fun entryFile_withPathSegments_isError() {
+        assertEquals(ProjectValidator.MSG_ENTRY_FILE_PATH, validator.validateEntryFile("a/b.html").error?.text)
+        assertEquals(ProjectValidator.MSG_ENTRY_FILE_PATH, validator.validateEntryFile("a\\b.html").error?.text)
+        assertEquals(ProjectValidator.MSG_ENTRY_FILE_PATH, validator.validateEntryFile("..\\x.html").error?.text)
+    }
+
+    @Test
+    fun entryFile_badExtension_isError() {
+        assertEquals(ProjectValidator.MSG_ENTRY_FILE_EXTENSION, validator.validateEntryFile("home.php").error?.text)
+        assertEquals(ProjectValidator.MSG_ENTRY_FILE_EXTENSION, validator.validateEntryFile("noext").error?.text)
+    }
+
     // ── 入口：资产包 ───────────────────────────────────────────────────
 
     @Test

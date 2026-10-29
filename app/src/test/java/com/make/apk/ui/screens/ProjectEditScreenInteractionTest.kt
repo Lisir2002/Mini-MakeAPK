@@ -146,6 +146,7 @@ class ProjectEditScreenInteractionTest {
                     onSave = {},
                     onEntryUrlChanged = {},
                     onEntryHtmlChanged = {},
+                    onEntryFileChanged = {},
                 )
             }
         }

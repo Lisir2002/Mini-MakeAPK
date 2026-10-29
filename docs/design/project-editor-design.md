@@ -340,6 +340,31 @@ data class WebSettings(
 - **后续数据模型预留**：`Project` 未来可增 `templateConfig`（主题覆盖 / 顶栏配置 / 底栏配置 / tab 槽位配置），与 §2 统一内核并存，不影响 `WebSettings` / `entry` 既有字段。
 - **槽位（slot）概念**：顶栏槽、底栏槽、tab 槽 —— 这些槽位未来可由模版或用户开关控制显隐与内容，是「模版应用」的核心抽象。
 
+### 10.6 HTML 项目形态：入口文件 + 项目代码（rc9 · 类型隔离）
+
+> 背景：HTML 类型此前与 URL 共用"入口即全部"的同一套 UI（新建/编辑都直录大段代码），
+> 类型隔离缺失。rc9 起按类型深度绑定，通用处保持适配。
+
+#### 四类型隔离对照表
+
+| | URL | HTML | VUE / PHP |
+|---|---|---|---|
+| 入口形态 | `ProjectEntry.Url` | `ProjectEntry.BundledHtml(html, entryFile)` | `ProjectEntry.Archive` |
+| 新建页来源输入 | 网址（必填） | **入口文件**（可选，默认 `index.html`）；**不再直录代码** | 占位卡（存档拾取未实现） |
+| 基本配置入口字段 | 入口网址（可改） | **入口文件**（可改） | 只读锁死 |
+| 「项目代码」页 | **隐藏**（隔离） | **显示**：文件卡（入口文件名 + 「入口」徽标）+ 代码卡（源码编辑） | 隐藏（待存档接入） |
+| 代码兜底 | — | 空 → 内置默认模板 `DEFAULT_TEMPLATE`（开箱能跑） | — |
+| 渲染方式 | `loadUrl` | `loadDataWithBaseURL`（`entryFile` 为元数据） | 解包后 `file://` |
+
+#### 契约要点
+
+- `BundledHtml.entryFile` 带默认值 `index.html`：老数据反序列化兼容，行为不变。
+- 「项目代码」页（`EditTab.CODE`）位置在**进阶配置之前**；可见类型由 `EditTabRow`
+  按 `projectType` 表驱动过滤（`CODE_TAB_TYPES`），VUE/PHP 存档拾取实现后一行加入。
+- 校验分工：入口文件名走 `validateEntryFile`（禁路径成分、限 `.html/.htm`，空=放行）；
+  源码留空不阻断（保存兜底默认模板）。
+- URL / HTML 互不出现对方专属字段；Web 配置 / 壳配置 / 主题色等通用字段全类型共享。
+
 ---
 
 ## 11. 架构变更：废弃云端引擎（全本地注入）

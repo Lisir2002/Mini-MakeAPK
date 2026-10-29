@@ -21,8 +21,9 @@ import com.make.apk.ui.theme.Spacing
 /**
  * 编辑页顶部身份卡（§4.2 / §10.4 D-T2）——**可就地编辑**。
  *
- * 可改：应用名 / 包名 / 版本段式 / 版本号 / 内部版本号 / 图标（占位）。
- * 只读锁死：`projectType` 与 `entry`（保存后不可改，见 VM 锁死 API，无任何修改出口）。
+ * 可改：应用名 / 包名 / 版本段式 / 版本号 / 内部版本号 / 图标（占位）；
+ * 入口按类型隔离可改（URL → 网址；HTML → 入口文件）。
+ * 只读锁死：`projectType` 与存档入口（VUE/PHP）。
  *
  * 校验零判断：错误 / 警告文案由调用方按 [EditField] 从状态取好传入（`messageOf`），
  * 本组件只按 [FieldMessage.Severity] 选色，不自造任何校验语句。
@@ -42,9 +43,9 @@ fun EditIdentityCard(
     projectType: ProjectType?,
     entryRef: String,
     entryUrl: String,
-    entryHtml: String,
+    entryFile: String,
     entryUrlMessage: FieldMessage?,
-    entryHtmlMessage: FieldMessage?,
+    entryFileMessage: FieldMessage?,
     themeColor: Int,
     iconRef: String?,
     apkNameMessage: FieldMessage?,
@@ -57,7 +58,7 @@ fun EditIdentityCard(
     onVersionNameChanged: (String) -> Unit,
     onVersionCodeChanged: (String) -> Unit,
     onEntryUrlChanged: (String) -> Unit,
-    onEntryHtmlChanged: (String) -> Unit,
+    onEntryFileChanged: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     CuteCard(modifier = modifier.fillMaxWidth()) {
@@ -114,7 +115,7 @@ fun EditIdentityCard(
                 }
             }
 
-            // 入口（URL/HTML 可编辑，§优化·第四点：放开原 §6.2 锁死）。
+            // 入口（按类型隔离：URL 改网址；HTML 改入口文件——代码在「项目代码」页维护）。
             when (projectType) {
                 ProjectType.URL -> ProjectTextField(
                     value = entryUrl,
@@ -126,13 +127,12 @@ fun EditIdentityCard(
                     modifier = Modifier.fillMaxWidth(),
                 )
                 ProjectType.HTML -> ProjectTextField(
-                    value = entryHtml,
-                    onValueChange = onEntryHtmlChanged,
-                    label = ENTRY_HTML_LABEL,
-                    placeholder = ENTRY_HTML_PLACEHOLDER,
-                    message = entryHtmlMessage,
-                    singleLine = false,
-                    minLines = ENTRY_HTML_MIN_LINES,
+                    value = entryFile,
+                    onValueChange = onEntryFileChanged,
+                    label = ENTRY_FILE_LABEL,
+                    placeholder = ENTRY_FILE_PLACEHOLDER,
+                    message = entryFileMessage,
+                    hint = ENTRY_FILE_HINT,
                     modifier = Modifier.fillMaxWidth(),
                 )
                 ProjectType.VUE, ProjectType.PHP, null -> Unit
@@ -213,11 +213,11 @@ private const val ENTRY_URL_LABEL: String = "入口网址"
 /** 入口（URL）占位提示。 */
 private const val ENTRY_URL_PLACEHOLDER: String = "https://example.com"
 
-/** 入口（HTML）输入框标签。 */
-private const val ENTRY_HTML_LABEL: String = "入口 HTML"
+/** 入口文件输入框标签（HTML 类专属）。 */
+private const val ENTRY_FILE_LABEL: String = "入口文件"
 
-/** 入口（HTML）占位提示。 */
-private const val ENTRY_HTML_PLACEHOLDER: String = "<html>…</html>"
+/** 入口文件输入框占位提示。 */
+private const val ENTRY_FILE_PLACEHOLDER: String = "index.html"
 
-/** 入口（HTML）最小行数（多行粘贴区）。 */
-private const val ENTRY_HTML_MIN_LINES: Int = 6
+/** 入口文件输入框中性提示（留空默认 index.html）。 */
+private const val ENTRY_FILE_HINT: String = "网页应用首屏加载的文件，留空默认 index.html"
