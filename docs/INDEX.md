@@ -14,6 +14,13 @@
 | [`DESIGN_LANGUAGE.md`](../DESIGN_LANGUAGE.md) | Reference | **设计语言**：OKLCH 令牌、风格、反模式 |
 | [`CONTRIBUTING.md`](../CONTRIBUTING.md) | How-to | 贡献指南：人类 + Agent 协作流程 |
 
+## 团队与技能
+
+| 文档 | 类型 | 说明 |
+|------|------|------|
+| [`docs/team/INSTALLED_SKILLS.md`](team/INSTALLED_SKILLS.md) | Reference | 已安装的本地开发技能清单与校验状态 |
+| [`docs/team/github_skills_for_software_design.md`](team/github_skills_for_software_design.md) | Reference | 可用于新软件设计的 GitHub Skill 调研清单 |
+
 ## docs/ 深度文档
 
 | 文档 | 类型 | 说明 |
