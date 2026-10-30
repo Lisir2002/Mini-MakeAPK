@@ -69,4 +69,4 @@ Kotlin / Compose 规范见 [`docs/CODE_STYLE.md`](docs/CODE_STYLE.md)：包结�
 
 ## 8. 许可
 
-当前为专有/内部项目，贡献即视为同意在现行许可框架下授权使用。开源许可待定。
+本项目采用 **MIT License**（见 [`LICENSE`](LICENSE)）。贡献即视为同意在 MIT 许可框架下授权使用。

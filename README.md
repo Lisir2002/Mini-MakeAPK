@@ -15,7 +15,7 @@
 ![ui](https://img.shields.io/badge/UI-Jetpack%20Compose%20%2B%20M3-2563EB)
 ![package](https://img.shields.io/badge/package-com.make.apk-blueviolet)
 ![version](https://img.shields.io/badge/version-0.0.0.1--rc12-orange)
-![license](https://img.shields.io/badge/license-专有/内部-orange)
+![license](https://img.shields.io/badge/license-MIT-blue)
 
 ---
 
@@ -127,7 +127,7 @@ MMA/  （仓库 Mini-MakeAPK）
 
 - 版本规范：纯四段式 `MAJOR.MINOR.PATCH.BUILD[-rcN]`（当前 `0.0.0.1-rc12`；正式版需用户授权、否则发 RC；无 `+N` 后缀），见 [`docs/VERSIONING.md`](docs/VERSIONING.md)。
 - 版本日志：[`docs/Version Log/CHANGELOG.md`](docs/Version%20Log/CHANGELOG.md)（遵循 Keep a Changelog，格式规约见 [`docs/RELEASE_NOTES.md`](docs/RELEASE_NOTES.md)）。
-- 许可：当前为**专有 / 内部项目**，开源许可待定。如需使用请先联系维护者。
+- 许可：采用 **MIT License**，免费、无限制、可任意使用 / 修改 / 分发，唯需在副本中保留版权与许可声明（见 [`LICENSE`](LICENSE)）。
 
 ---
 
