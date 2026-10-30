@@ -215,7 +215,7 @@ private fun setupChrome(view: WebView, onError: ((String) -> Unit)?, onProgress:
         override fun onConsoleMessage(consoleMessage: ConsoleMessage?): Boolean {
             val message = consoleMessage
             if (message != null && message.messageLevel() == ConsoleMessage.MessageLevel.ERROR) {
-                val record = "${message.message()} @${message.sourceUrl()}:${message.lineNumber()}"
+                val record = "${message.message()} @${message.sourceId()}:${message.lineNumber()}"
                 if (view.getTag(TAG_JS_ERROR_KEY) != record) {
                     view.setTag(TAG_JS_ERROR_KEY, record)
                     Log.w(TAG_LOG, "js_console_error: $record")
