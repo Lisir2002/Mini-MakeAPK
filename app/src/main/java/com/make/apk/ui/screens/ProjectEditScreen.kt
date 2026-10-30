@@ -32,6 +32,7 @@ import com.make.apk.ui.editor.LoadingProgressCard
 import com.make.apk.ui.editor.ProjectCodeTab
 import com.make.apk.ui.editor.ShellEditorTab
 import com.make.apk.ui.editor.WebSettingsTab
+import com.make.apk.ui.fs.PasteRequest
 import com.make.apk.ui.icons.MmaIcon
 import com.make.apk.ui.icons.MmaIcons
 import com.make.apk.ui.theme.Spacing
@@ -88,6 +89,12 @@ fun ProjectEditScreen(
     onFileAdded: (String) -> Unit = {},
     /** 删除附加文件（文件目录树）。 */
     onFileDeleted: (String) -> Unit = {},
+    /** 新建文件夹（文件目录树；空文件夹约定，`name/` 空条目落库）。 */
+    onFolderAdded: (String) -> Unit = {},
+    /** 重命名 / 移动文件或目录（前缀替换，由 ViewModel 落库）。 */
+    onFileRenamed: (String, String) -> Unit = { _, _ -> },
+    /** 粘贴（复制 / 剪切落库）。 */
+    onFilesPasted: (PasteRequest) -> Unit = {},
     onToggleCollapse: (Boolean) -> Unit,
     onTabSelected: (EditTab) -> Unit,
     onDelete: () -> Unit,
@@ -222,7 +229,10 @@ fun ProjectEditScreen(
                                 ) + state.projectFiles,
                                 onOpenFile = onOpenFile,
                                 onFileAdded = onFileAdded,
+                                onFolderAdded = onFolderAdded,
+                                onFileRenamed = onFileRenamed,
                                 onFileDeleted = onFileDeleted,
+                                onFilesPasted = onFilesPasted,
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(horizontal = Spacing.space5, vertical = Spacing.space4),

@@ -12,9 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AssistChip
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -43,7 +41,6 @@ import com.make.apk.ui.editor.ProjectTypeSelector
 import com.make.apk.ui.editor.SectionCard
 import com.make.apk.ui.editor.ThemeColorSwatches
 import com.make.apk.ui.editor.VersionSchemeChips
-import com.make.apk.ui.icons.MmaIcon
 import com.make.apk.ui.icons.MmaIcons
 import com.make.apk.ui.theme.Spacing
 import com.make.apk.ui.viewmodel.AddProjectUiState
@@ -59,7 +56,9 @@ import com.make.apk.ui.viewmodel.AddProjectUiState
  * - **零校验判断**：所有提示都从 `state.errors / warnings` 按 [AddField] 取，
  *   文案唯一来源是 `ProjectValidator`，本页面不拼任何校验语句；
  * - 顶栏右侧「保存」是**唯一**保存入口（§4.1 只定义顶栏保存，不另加底部按钮），
- *   `saving` 时按钮内显示进度圈防重复提交。
+ *   `saving` 时按钮内显示进度圈防重复提交；
+ *   保存成功后由导航层回项目列表（本页不持有导航职责，也不设页内预览入口——
+ *   预览属于项目编辑页的合法入口）。
  * - **放弃修改确认**：`dirty` 时（无论系统返回还是顶栏返回箭头）先弹确认，
  *   确认后才真正退出——表单填了一半被静默丢弃是不可接受的。
  *
@@ -83,8 +82,6 @@ fun AddProjectScreen(
     onPickIcon: () -> Unit,
     onSave: () -> Unit,
     modifier: Modifier = Modifier,
-    /** 预览入口（保存成功后提供，进入壳预览 `project/{id}/run`）；null 时不显示。 */
-    onPreview: ((Long) -> Unit)? = null,
 ) {
     // 「放弃修改？」确认框：纯 UI 状态（不进 UiState——它不属于表单数据）。
     var showDiscardDialog by remember { mutableStateOf(false) }
@@ -100,16 +97,6 @@ fun AddProjectScreen(
         onBack = requestBack,
         modifier = modifier,
         actions = {
-            // 保存成功后留驻编辑页：给出一键预览入口（§优化：保存不再强制退出页面）。
-            if (state.savedProjectId != null && onPreview != null) {
-                IconButton(onClick = { onPreview(state.savedProjectId) }) {
-                    MmaIcon(
-                        iconRes = MmaIcons.Play,
-                        contentDescription = "预览注入壳",
-                        tint = MaterialTheme.colorScheme.onSurface,
-                    )
-                }
-            }
             // 自绘文字按钮：原生 TextButton 的内边距与涟漪与自绘顶栏不同皮肤。
             MmaTextButton(
                 label = "保存",

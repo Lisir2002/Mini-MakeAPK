@@ -18,6 +18,14 @@ import com.make.apk.data.repository.ExportRunRepository
 import com.make.apk.data.repository.ProjectRepository
 import com.make.apk.logging.LogFields
 import com.make.apk.logging.MmaLogger
+import com.make.apk.ui.fs.normalizePath
+import com.make.apk.ui.fs.resolveCopyName
+import com.make.apk.ui.fs.renamePathPrefix
+import com.make.apk.ui.fs.directoryPathsOf
+import com.make.apk.ui.fs.RawFsEntry
+import com.make.apk.ui.fs.PasteMode
+import com.make.apk.ui.fs.PasteRequest
+import java.util.Locale
 import com.make.apk.ui.editor.EditField
 import com.make.apk.ui.editor.FieldMessage
 import com.make.apk.ui.editor.ProjectDirectory
@@ -227,23 +235,183 @@ class ProjectEditViewModel(
         revalidate()
     }
 
-    /** 新增附加文件（rc11：文件目录树；重名 / 与入口同名静默忽略——UI 已前置校验）。 */
+    /** 新增附加文件（rc11：文件目录树；重名 / 与入口同名 / 与目录同名静默忽略——UI 已前置校验）。 */
     fun onProjectFileAdded(name: String) {
-        val trimmed = name.trim().trimStart('/')
+        val trimmed = normalizePath(name)
         val current = _uiState.value
         if (trimmed.isEmpty()) return
-        if (current.entryFile == trimmed || current.projectFiles.any { it.name == trimmed }) return
+        if (current.entryFile.equals(trimmed, ignoreCase = true)) return
+        if (current.projectFiles.any { it.name.removeSuffix("/").equals(trimmed, ignoreCase = true) }) return
         _uiState.value = current.copy(
             projectFiles = current.projectFiles + ProjectFile(trimmed, ""),
             dirty = true,
         )
+        MmaLogger.operation(
+            event = "project_file_added",
+            message = "新建文件",
+            fields = mapOf(LogFields.SUCCESS to true, "path" to trimmed),
+        )
     }
 
-    /** 删除附加文件（入口文件不可删，调用方已拦；防御性再拦一次）。 */
-    fun onProjectFileDeleted(name: String) {
-        _uiState.value = _uiState.value.copy(
-            projectFiles = _uiState.value.projectFiles.filterNot { it.name == name },
+    /**
+     * 新建文件夹（空文件夹约定：落库为 `name/` 空目录条目）。
+     *
+     * 路径归一化后追加尾 "/"；重名（精确 / 与现有文件同名 / 与入口同名）静默忽略。
+     * 父目录由树构建层按路径前缀隐式推导，无需在此创建。
+     */
+    fun onProjectFolderAdded(name: String) {
+        val trimmed = normalizePath(name)
+        val current = _uiState.value
+        if (trimmed.isEmpty()) return
+        if (current.entryFile.equals(trimmed, ignoreCase = true)) return
+        if (current.projectFiles.any { it.name.removeSuffix("/").equals(trimmed, ignoreCase = true) }) return
+        val folderName = "$trimmed/"
+        _uiState.value = current.copy(
+            projectFiles = current.projectFiles + ProjectFile(folderName, ""),
             dirty = true,
+        )
+        MmaLogger.operation(
+            event = "project_folder_added",
+            message = "新建文件夹",
+            fields = mapOf(LogFields.SUCCESS to true, "path" to trimmed),
+        )
+    }
+
+    /**
+     * 重命名 / 移动（前缀替换；目标重名不静默覆盖）。
+     *
+     * - 旧名即入口文件：仅更新 [ProjectEditUiState.entryFile]（入口内容以 [ProjectEntry.BundledHtml.html] 为单一事实源）；
+     * - 否则对 [ProjectEditUiState.projectFiles] 中命中 `oldName` 或以其为前缀的条目做前缀替换
+     *   （含空目录条目 `oldName/`），实现文件与目录（及其子树）的统一重命名 / 移动。
+     */
+    fun onProjectFileRenamed(oldName: String, newName: String) {
+        val old = normalizePath(oldName)
+        val newN = normalizePath(newName)
+        if (old.isEmpty() || newN.isEmpty() || old == newN) return
+        val current = _uiState.value
+        if (old.equals(current.entryFile, ignoreCase = true)) {
+            if (current.entryFile.equals(newN, ignoreCase = true)) return
+            if (current.projectFiles.any { it.name.removeSuffix("/").equals(newN, ignoreCase = true) }) return
+            _uiState.value = current.copy(entryFile = newN, dirty = true)
+            MmaLogger.operation(
+                event = "project_file_renamed",
+                message = "重命名入口文件",
+                fields = mapOf(LogFields.SUCCESS to true, "from" to old, "to" to newN),
+            )
+            return
+        }
+        val targetExists = current.projectFiles.any { it.name.removeSuffix("/").equals(newN, ignoreCase = true) } ||
+            current.entryFile.equals(newN, ignoreCase = true) ||
+            // 隐式目录（如 css/style.css 推导出的 css）同名也应判冲突，否则重命名目录到
+            // 已存在目录会导致其子文件被前缀替换到目标目录造成重复条目。
+            directoryPathsOf(current.projectFiles.map { RawFsEntry(it.name, 0L) })
+                .any { it.equals(newN, ignoreCase = true) }
+        if (targetExists) {
+            MmaLogger.operation(
+                event = "project_file_renamed",
+                message = "重命名被拒：目标重名",
+                fields = mapOf(LogFields.SUCCESS to false, "from" to old, "to" to newN),
+            )
+            return
+        }
+        val renamed = current.projectFiles.mapNotNull { f ->
+            val renamedName = renamePathPrefix(f.name, old, newN)
+            if (renamedName == f.name) f else f.copy(name = renamedName)
+        }
+        _uiState.value = current.copy(projectFiles = renamed, dirty = true)
+        MmaLogger.operation(
+            event = "project_file_renamed",
+            message = "重命名文件",
+            fields = mapOf(LogFields.SUCCESS to true, "from" to old, "to" to newN),
+        )
+    }
+
+    /**
+     * 删除附加文件 / 目录（目录递归：删除该前缀下全部条目 + 目录条目自身）。
+     *
+     * 入口文件不可删（防御性拦截，组件层也已禁用）；无匹配时不做无谓标脏。
+     */
+    fun onProjectFileDeleted(name: String) {
+        val norm = normalizePath(name)
+        if (norm.isEmpty()) return
+        val current = _uiState.value
+        if (current.entryFile.equals(norm, ignoreCase = true)) return
+        val filtered = current.projectFiles.filterNot { f ->
+            val n = f.name.removeSuffix("/")
+            n == norm || n.startsWith("$norm/")
+        }
+        if (filtered.size == current.projectFiles.size) return
+        _uiState.value = current.copy(projectFiles = filtered, dirty = true)
+        MmaLogger.operation(
+            event = "project_file_deleted",
+            message = "删除文件",
+            fields = mapOf(LogFields.SUCCESS to true, "path" to norm),
+        )
+    }
+
+    /**
+     * 粘贴（复制 / 剪切）：把 [PasteRequest.sources] 落到 [PasteRequest.targetDir]。
+     *
+     * - **复制**：对每个源，递归复制其下全部条目（含空目录条目），路径做前缀替换；
+     *   目标同名时自动改名（[resolveCopyName]，如 `name 副本` / `name(2)`）；
+     * - **剪切**：复制完成后从原位置删除源（移动语义）；
+     * - 全部走现有"更新 UiState → 落库"同一路径（[save] 时写回 Room 的 projects JSON）。
+     */
+    fun onProjectFilesPasted(request: PasteRequest) {
+        val current = _uiState.value
+        val all = current.projectFiles
+        val taken = mutableSetOf<String>().apply {
+            addAll(all.map { it.name.removeSuffix("/") })
+            // 隐式目录（由文件路径前缀推导，如 css/style.css → css）一并纳入，
+            // 否则同目录级复制 / 剪切到已存在目录会漏判冲突、原路径重复加入。
+            addAll(directoryPathsOf(all.map { RawFsEntry(it.name, 0L) }))
+            add(current.entryFile)
+        }
+        val additions = mutableListOf<ProjectFile>()
+        val toRemove = mutableSetOf<String>()
+        val targetDir = normalizePath(request.targetDir)
+        for (src in request.sources) {
+            val s = normalizePath(src)
+            if (s.isEmpty()) continue
+            val isDir = all.any { it.name == "$s/" } ||
+                all.any { it.name.removeSuffix("/").startsWith("$s/") }
+            val base = s.substringAfterLast('/')
+            var dest = if (targetDir.isEmpty()) base else "$targetDir/$base"
+            dest = resolveCopyName(dest, taken)
+            taken.add(dest)
+            if (isDir) {
+                // 显式空目录条目一并复制
+                all.firstOrNull { it.name.removeSuffix("/") == s && it.name.endsWith("/") }
+                    ?.let { additions += ProjectFile("$dest/", "") }
+                // 复制目录下全部条目（前缀替换保留子树结构）
+                for (f in all) {
+                    val fn = f.name.removeSuffix("/")
+                    if (fn.startsWith("$s/")) {
+                        additions += ProjectFile(name = renamePathPrefix(f.name, s, dest), content = f.content)
+                    }
+                }
+            } else {
+                val srcFile = all.firstOrNull { it.name.removeSuffix("/") == s }
+                additions += ProjectFile(name = dest, content = srcFile?.content ?: "")
+            }
+            if (request.mode == PasteMode.CUT) toRemove.add(s)
+        }
+        if (additions.isEmpty() && toRemove.isEmpty()) return
+        // 剪切：删除需连带整棵子树——对每个待删源 s，移除 fn == s 或 fn.startsWith("s/") 的条目；
+        // 单文件 s 无子项，仅精确匹配自身，行为保持不变。
+        val remaining = current.projectFiles.filterNot { entry ->
+            val fn = entry.name.removeSuffix("/")
+            toRemove.any { s -> fn == s || fn.startsWith("$s/") }
+        }
+        _uiState.value = current.copy(projectFiles = remaining + additions, dirty = true)
+        MmaLogger.operation(
+            event = "project_files_pasted",
+            message = "粘贴文件",
+            fields = mapOf(
+                LogFields.SUCCESS to true,
+                LogFields.COUNT to additions.size,
+                "mode" to request.mode.name.lowercase(Locale.US),
+            ),
         )
     }
 

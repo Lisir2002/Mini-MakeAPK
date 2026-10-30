@@ -51,6 +51,25 @@ object MmaIcons {
     // ── 文件（项目代码页文件树 / 文件页）─────────────────────────────
     val File: Int = R.drawable.ic_file
 
+    /** 代码类文件（kt/js/ts/css/html/php/vue 等）图标。 */
+    val Code: Int = R.drawable.ic_code
+
+    /** 文档类文件（md/txt 等）图标。 */
+    val Document: Int = R.drawable.ic_document
+
+    /** 配置 / 花括号类文件（json/xml/properties/toml/yml/gradle 等）图标。 */
+    val Config: Int = R.drawable.ic_config
+
+    // ── 目录浏览器条目操作 ───────────────────────────────────────────
+    /** 复制（剪贴板来源）。 */
+    val ContentCopy: Int = R.drawable.ic_content_copy
+
+    /** 剪切（剪贴板来源）。 */
+    val ContentCut: Int = R.drawable.ic_content_cut
+
+    /** 条目「更多操作」溢出菜单。 */
+    val MoreVert: Int = R.drawable.ic_more_vert
+
     /** 目录**折叠**态指示箭头（朝右；展开态用 [Collapse]，本体朝下）。 */
     val ChevronRight: Int = R.drawable.ic_chevron_right
 

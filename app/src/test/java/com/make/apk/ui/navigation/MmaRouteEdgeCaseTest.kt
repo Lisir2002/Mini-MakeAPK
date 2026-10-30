@@ -44,18 +44,16 @@ class MmaRouteEdgeCaseTest {
     @Test
     fun resultKeys_areDistinctFromArgumentKeys() {
         val resultKeys = setOf(
-            MmaRoute.RESULT_CREATED_PROJECT_ID,
             MmaRoute.RESULT_UPDATED_PROJECT_ID,
         )
         val argumentKeys = setOf(MmaRoute.ARG_PROJECT_ID)
         assertTrue(resultKeys.intersect(argumentKeys).isEmpty())
-        assertEquals(2, resultKeys.size)
+        assertEquals(1, resultKeys.size)
     }
 
     @Test
     fun resultKeys_haveStableValues() {
         // 键值一旦发布即为对外契约，改动会破坏跨页面回传
-        assertEquals("result_created_project_id", MmaRoute.RESULT_CREATED_PROJECT_ID)
         assertEquals("result_updated_project_id", MmaRoute.RESULT_UPDATED_PROJECT_ID)
     }
 

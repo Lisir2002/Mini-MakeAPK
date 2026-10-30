@@ -59,9 +59,6 @@ sealed class MmaRoute(val route: String) {
         /** 文件名路由参数名（文件编辑器）。 */
         const val ARG_FILE_NAME = "fileName"
 
-        /** 新建成功回传的项目 id（放在上一个 backStackEntry 的 savedStateHandle）。 */
-        const val RESULT_CREATED_PROJECT_ID = "result_created_project_id"
-
         /** 编辑成功回传的项目 id。 */
         const val RESULT_UPDATED_PROJECT_ID = "result_updated_project_id"
     }

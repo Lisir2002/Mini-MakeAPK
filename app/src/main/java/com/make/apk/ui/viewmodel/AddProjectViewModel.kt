@@ -224,7 +224,6 @@ class AddProjectViewModel(
                     )
                     _uiState.value = _uiState.value.copy(
                         saving = false,
-                        savedProjectId = id,
                         dirty = false,
                     )
                     eventChannel.send(AddProjectEvent.Saved(id))

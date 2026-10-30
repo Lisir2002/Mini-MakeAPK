@@ -63,15 +63,9 @@ data class AddProjectUiState(
      *
      * **只由用户操作置 true**：准星在首帧就会回传默认类型（URL），那是渲染副产物不是用户动作，
      * 因此 `onProjectTypeSelected` 只在"此前已有选中项"时才置 true。
+     * 保存成功时归零——随后的返回（回列表）不应被"放弃修改"确认拦截。
      */
     val dirty: Boolean = false,
-    /**
-     * 最近一次保存成功写入的项目 id；null 表示尚未保存或保存失败。
-     *
-     * 用于保存后**留驻编辑页**时给出「预览」入口（§优化：保存不再强制退出页面）。
-     * 重新编辑（任意 onXxxChanged）会再次置脏，但不清空此值——已落库的项目随时可预览。
-     */
-    val savedProjectId: Long? = null,
 ) {
     /** 是否允许保存：无错误、项目类型已定、入口有效。 */
     val canSave: Boolean

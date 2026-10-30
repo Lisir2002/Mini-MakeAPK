@@ -7,12 +7,13 @@ import org.junit.Rule
 import org.junit.Test
 
 /**
- * 「项目代码」目录树截图回归（Paparazzi，纯 JVM）。
+ * 「项目代码」卡片列表式目录浏览器截图回归（Paparazzi，纯 JVM）。
  *
- * 钉住 rc12 重建的**真实目录结构**：面包屑路径条、文件夹开 / 闭两态图标、
- * 逐层缩进、文件行右对齐大小、入口徽标——以及"文件夹优先、文件其次"的排序。
+ * 钉住本次重构后的**逐层卡片列表** UI：当前目录头、面包屑、圆角条目卡片、
+ * 按扩展名映射的图标底色、入口徽标、空文件夹条目（`assets/img/`）。
  *
- * 样例刻意包含**三层嵌套**（`assets/img/logo.svg`），验证缩进封顶与目录折叠。
+ * 样例刻意包含**三层嵌套**（`assets/img/logo.svg`）与**显式空目录条目**
+ * （`assets/empty/`），覆盖目录进入与空目录约定。
  */
 class ProjectCodeTabTest {
 
@@ -57,6 +58,8 @@ class ProjectCodeTabTest {
             ProjectFile(name = "css/theme.css", content = ":root{--brand:#2563EB}"),
             ProjectFile(name = "js/app.js", content = "console.log('mma')".repeat(120)),
             ProjectFile(name = "assets/img/logo.svg", content = "<svg/>"),
+            // 显式空目录条目（空文件夹约定：name 尾随 "/"、content 为空）
+            ProjectFile(name = "assets/empty/", content = ""),
             ProjectFile(name = "README.md", content = "# MMA".repeat(30)),
         )
     }

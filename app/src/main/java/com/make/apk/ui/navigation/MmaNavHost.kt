@@ -24,7 +24,6 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.navArgument
-import com.make.apk.logging.LogFields
 import com.make.apk.logging.MmaLogger
 import com.make.apk.requireMmaApplication
 import com.make.apk.storage.IconStore
@@ -109,20 +108,6 @@ fun MmaNavHost(
             )
             val projects by listVm.projects.collectAsStateWithLifecycle()
 
-            // 新建成功回传的 id：读一次即 remove（避免二次进入重复读到、重复消费）
-            val createdProjectId by entry.savedStateHandle
-                .getStateFlow<Long?>(MmaRoute.RESULT_CREATED_PROJECT_ID, null)
-                .collectAsStateWithLifecycle()
-            LaunchedEffect(createdProjectId) {
-                val id = createdProjectId ?: return@LaunchedEffect
-                entry.savedStateHandle.remove<Long?>(MmaRoute.RESULT_CREATED_PROJECT_ID)
-                MmaLogger.operation(
-                    event = "project_created_consumed",
-                    message = "新建项目已回传列表",
-                    fields = mapOf(LogFields.SUCCESS to true, "project_id" to id),
-                )
-            }
-
             ProjectsScreen(
                 projects = projects,
                 // 整卡点击进入项目编辑页（阶段 4 落地；路由已注册）
@@ -193,7 +178,8 @@ fun MmaNavHost(
             val state by vm.uiState.collectAsStateWithLifecycle()
             val iconStore = remember(app) { IconStore(app) }
             val scope = rememberCoroutineScope()
-            // 保存通知宿主（顶栏居中气泡，3s 自动消失 / 点击即隐藏；§优化：保存不再强制退出页面）。
+            // 失败通知宿主（顶栏居中气泡，3s 自动消失 / 点击即隐藏）；
+            // 保存成功不经过它——页面随即销毁气泡看不见，改用 Toast（见下方 Saved 分支）。
             val addNoticeHost = remember { MmaNoticeHostState() }
 
             // 图标选择：系统 Photo Picker（无需存储权限）。rc9：居中裁方 + 主题色烘焙
@@ -216,11 +202,12 @@ fun MmaNavHost(
             LaunchedEffect(Unit) {
                 vm.events.collect { event ->
                     when (event) {
-                        // 保存成功：顶栏居中气泡提示，**留驻编辑页**（用户手动返回）；
-                        // 不再 popBackStack 强制离开（§优化：简化操作步骤）。
-                        is AddProjectEvent.Saved -> addNoticeHost.show(
-                            MmaNoticeData(MmaNoticeCategory.Success, "已保存项目"),
-                        )
+                        // 保存成功：立即回项目列表（本页生命周期内气泡来不及展示，
+                        // 故用 Toast 承载反馈；保存后 dirty=false，返回不会被"放弃修改"拦截）。
+                        is AddProjectEvent.Saved -> {
+                            Toast.makeText(context, "已保存项目", Toast.LENGTH_SHORT).show()
+                            navController.popBackStack()
+                        }
                         // 失败：字段级原因已由 errors 落在输入框下方；这里补一次轻提示
                         // （包名占用等非字段异常也要让用户看见"确实点了但没保存成功"）。
                         is AddProjectEvent.SaveFailed -> addNoticeHost.show(
@@ -251,7 +238,6 @@ fun MmaNavHost(
                         )
                     },
                     onSave = vm::save,
-                    onPreview = { id -> navController.navigate(MmaRoute.ProjectRun.create(id)) },
                 )
                 MmaNoticeHost(
                     hostState = addNoticeHost,
@@ -347,12 +333,15 @@ fun MmaNavHost(
                     onIgnoreSslErrorsChanged = vm::onIgnoreSslErrorsChanged,
                     onShowLoadingProgressChanged = vm::onShowLoadingProgressChanged,
                     onLoadingProgressPositionChanged = vm::onLoadingProgressPositionChanged,
-                    // 文件目录树（rc11）：打开 / 新增 / 删除附加文件。
+                    // 文件目录树（rc12 重构）：打开 / 新增 / 删除 / 重命名 / 复制剪切粘贴。
                     onOpenFile = { name ->
                         navController.navigate(MmaRoute.ProjectFileEditor.create(projectId, name))
                     },
                     onFileAdded = vm::onProjectFileAdded,
+                    onFolderAdded = vm::onProjectFolderAdded,
+                    onFileRenamed = vm::onProjectFileRenamed,
                     onFileDeleted = vm::onProjectFileDeleted,
+                    onFilesPasted = vm::onProjectFilesPasted,
                     onToggleCollapse = vm::onCollapsedChanged,
                     onTabSelected = vm::onTabSelected,
                     onDelete = vm::delete,

@@ -33,7 +33,6 @@ class MmaRouteTest {
 
     @Test
     fun resultKeys_areStable() {
-        assertEquals("result_created_project_id", MmaRoute.RESULT_CREATED_PROJECT_ID)
         assertEquals("result_updated_project_id", MmaRoute.RESULT_UPDATED_PROJECT_ID)
     }
 }
