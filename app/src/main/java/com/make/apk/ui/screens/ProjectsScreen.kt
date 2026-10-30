@@ -10,18 +10,15 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import kotlinx.coroutines.launch
-import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -30,6 +27,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.make.apk.data.model.Project
 import com.make.apk.ui.components.CuteCard
+import com.make.apk.ui.components.MmaPullToRefreshBox
 import com.make.apk.ui.components.MmaDialog
 import com.make.apk.ui.components.MmaTextButton
 import com.make.apk.ui.components.MmaScreen
@@ -96,7 +94,6 @@ fun ProjectsScreen(
     ) { innerPadding ->
         ProjectListContent(
             projects = projects,
-            pendingDeleteId = pendingDeleteId,
             onOpenProject = onOpenProject,
             onDeleteRequest = { id -> pendingDeleteId = id },
             onRunProject = onRunProject,
@@ -125,17 +122,17 @@ fun ProjectsScreen(
 }
 
 /**
- * 列表内容 + 下拉刷新容器（rc11）。
+ * 列表内容 + 下拉刷新容器。
  *
- * 调研结论落地（Material 3 官方 `PullToRefreshBox`，material3 1.3+）：
- * 容器包住 LazyColumn / 空态，`onRefresh` 挂起执行完即收起指示器；
+ * 刷新容器走自研 [MmaPullToRefreshBox]（不再用 material3 的 `PullToRefreshBox`，
+ * 原因见该文件 KDoc：官方件在刷新瞬时返回时会把指示器定死在半途，且样式与本项目
+ * 语言不符）。刷新态由容器**内部自持**，本函数无从"忘记复位"。
+ *
  * 未接回调时**不包**刷新容器（截图基线零漂移、无谓手势层少一层）。
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ProjectListContent(
     projects: List<Project>,
-    pendingDeleteId: Long?,
     onOpenProject: (Long) -> Unit,
     onDeleteRequest: (Long) -> Unit,
     onRunProject: ((Long) -> Unit)?,
@@ -143,13 +140,12 @@ private fun ProjectListContent(
     onRefresh: (suspend () -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
-    var refreshing by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
-
     val list: @Composable () -> Unit = {
         Column(modifier = Modifier.fillMaxSize()) {
             if (projects.isEmpty()) {
-                EmptyState(modifier = Modifier.weight(1f))
+                // 空态也挂一个可滚动容器：空白页没有 scrollable 子节点，
+                // 手势就不会上抛，下拉刷新在空列表里会完全无响应。
+                EmptyState(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()))
             } else {
                 LazyColumn(
                     modifier = Modifier.weight(1f),
@@ -176,15 +172,8 @@ private fun ProjectListContent(
     if (onRefresh == null) {
         Box(modifier = modifier) { list() }
     } else {
-        PullToRefreshBox(
-            isRefreshing = refreshing,
-            onRefresh = {
-                scope.launch {
-                    refreshing = true
-                    onRefresh()
-                    refreshing = false
-                }
-            },
+        MmaPullToRefreshBox(
+            onRefresh = onRefresh,
             modifier = modifier,
         ) {
             list()

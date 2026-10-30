@@ -53,6 +53,9 @@ object MmaIcons {
 
     /** 目录**折叠**态指示箭头（朝右；展开态用 [Collapse]，本体朝下）。 */
     val ChevronRight: Int = R.drawable.ic_chevron_right
+
+    /** 刷新（下拉刷新指示器 / 顶栏刷新动作）。 */
+    val Refresh: Int = R.drawable.ic_refresh
 }
 
 /**
