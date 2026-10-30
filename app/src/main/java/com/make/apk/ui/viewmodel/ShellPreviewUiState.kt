@@ -1,6 +1,7 @@
 package com.make.apk.ui.viewmodel
 
 import com.make.apk.data.model.ProjectDefaults
+import com.make.apk.data.model.ProjectEntry
 import com.make.apk.data.model.ShellSpec
 import com.make.apk.data.model.WebRuntimeConfig
 
@@ -30,10 +31,29 @@ data class ShellPreviewUiState(
     /** 项目主题色（ARGB）——壳强调色的来源。 */
     val themeColor: Int = ProjectDefaults.DEFAULT_THEME_COLOR,
     /**
+     * **项目自身入口（只读真值）**：由 [com.make.apk.ui.screens.ShellPreviewScreen]
+     * 所属 VM 在加载项目时写入一次，此后**任何壳动作都不改它**。
+     *
+     * ## 为什么必须有它
+     *
+     * [runtimeConfig] 的 `entry` 是"内容区**当前**加载的目标"，会被 tab / 底栏动作
+     * 就地改写；而"打开本地页面"要的是**从项目文件集里取一页**——若把改写后的
+     * entry 当取页源，访问过的页面会因为"入口名被改写 + 该文件已从附加文件集剔除"
+     * 而从项目里消失，表现为：
+     * - A → B → 再回 A：取不到（A 已不在源里）；
+     * - 访问子页后回入口页：入口页也丢了（首屏不可再达）；
+     * - 顶栏 tab 的 pager 各页都从被污染的 baseConfig 解析 → 分页漂移。
+     *
+     * 故本地页面一律 **从本字段解析**、只把结果写进 [runtimeConfig]（展示态），
+     * 与"壳运行态不回写项目数据"同一不变式。
+     */
+    val projectEntry: ProjectEntry? = null,
+    /**
      * 内容区运行时配置（喂给 `WebViewScreen`）。
      *
-     * 仅当项目**可预览**（URL 项目）时非 null；点击 tab / 底栏条目改变目标地址时，
-     * 本字段的 `entry` 会被替换为新的 URL → WebView 重新加载目标地址。
+     * 仅当项目**可预览**（URL / HTML 项目）时非 null；点击 tab / 底栏条目改变目标地址时，
+     * 本字段的 `entry` 会被替换为新的目标（URL 或本地页面）→ WebView 重新加载。
+     * 它是**展示态**，不作为"项目有什么文件"的事实来源（那是 [projectEntry]）。
      */
     val runtimeConfig: WebRuntimeConfig? = null,
     /** 是否可预览（当前仅 URL 项目可预览）。 */

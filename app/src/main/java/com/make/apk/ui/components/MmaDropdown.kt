@@ -40,6 +40,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -284,6 +285,7 @@ private fun <T> MmaDropdownMenu(
                 val isSelected = option.label == selectedLabel
                 MmaDropdownItem(
                     option = option,
+                    testTag = "dropdown_item_${option.label}",
                     isSelected = isSelected,
                     shape = when {
                         isSelected -> ControlShapes.itemSelected
@@ -302,10 +304,16 @@ private fun <T> MmaDropdownMenu(
     }
 }
 
-/** 单个菜单项：前导图标 + 标签 + 选中勾（选中时脱离 run，四角全圆）。 */
+/**
+ * 单个菜单项：前导图标 + 标签 + 选中勾（选中时脱离 run，四角全圆）。
+ *
+ * @param testTag 语义化测试标签（`dropdown_item_<label>`）：下拉项在 Compose 测试里
+ *   靠文案也能找，但同文案多项 / 文案被省略号截断时会误点，故按标签打标，让测试可**精确点击**。
+ */
 @Composable
 private fun <T> MmaDropdownItem(
     option: MmaOption<T>,
+    testTag: String,
     isSelected: Boolean,
     shape: Shape,
     onClick: () -> Unit,
@@ -326,6 +334,7 @@ private fun <T> MmaDropdownItem(
             .background(if (isSelected) colorScheme.primaryContainer else Color.Transparent)
             .clickableNoRipple(onClick = onClick)
             .padding(horizontal = control.menuItemPaddingH)
+            .testTag(testTag)
             .semantics { role = Role.Button },
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.space2),

@@ -3,17 +3,15 @@
   "topBar": {
     "enabled": true,
     "showTitle": true,
-    "titleOverride": null,
     "showBackButton": true,
     "actions": [
       {
-        "id": "itm_tabbed_refresh",
-        "title": "刷新",
-        "iconRef": "refresh",
+        "id": "a1",
+        "title": "关于",
+        "iconRef": "add",
         "action": {
-          "type": "url",
-          "url": "https://example.com",
-          "openInNewTab": false
+          "type": "local_page",
+          "path": "page/about.html"
         },
         "visible": true,
         "selected": false
@@ -24,35 +22,12 @@
     "enabled": true,
     "items": [
       {
-        "id": "itm_tabbed_home",
+        "id": "t1",
         "title": "首页",
         "iconRef": "home",
         "action": {
-          "type": "url",
-          "url": "https://example.com"
-        },
-        "visible": true,
-        "selected": true,
-        "isEntry": true
-      },
-      {
-        "id": "itm_tabbed_discover",
-        "title": "发现",
-        "iconRef": "discover",
-        "action": {
-          "type": "url",
-          "url": "https://example.org"
-        },
-        "visible": true,
-        "selected": false
-      },
-      {
-        "id": "itm_tabbed_profile",
-        "title": "我的",
-        "iconRef": "profile",
-        "action": {
-          "type": "url",
-          "url": "https://example.net"
+          "type": "local_page",
+          "path": "index.html"
         },
         "visible": true,
         "selected": false
@@ -66,34 +41,12 @@
     "enabled": true,
     "items": [
       {
-        "id": "itm_tabbed_bottom_home",
-        "title": "首页",
+        "id": "b1",
+        "title": "网页",
         "iconRef": "home",
         "action": {
           "type": "url",
           "url": "https://example.com"
-        },
-        "visible": true,
-        "selected": true
-      },
-      {
-        "id": "itm_tabbed_bottom_discover",
-        "title": "发现",
-        "iconRef": "discover",
-        "action": {
-          "type": "url",
-          "url": "https://example.org"
-        },
-        "visible": true,
-        "selected": false
-      },
-      {
-        "id": "itm_tabbed_bottom_profile",
-        "title": "我的",
-        "iconRef": "profile",
-        "action": {
-          "type": "url",
-          "url": "https://example.net"
         },
         "visible": true,
         "selected": false
@@ -106,44 +59,21 @@
     "enabled": true,
     "items": [
       {
-        "id": "itm_drawer_home",
-        "title": "首页",
+        "id": "d1",
+        "title": "本地",
         "iconRef": "home",
         "action": {
-          "type": "url",
-          "url": "https://example.com"
-        },
-        "visible": true,
-        "selected": false
-      },
-      {
-        "id": "itm_drawer_discover",
-        "title": "发现",
-        "iconRef": "discover",
-        "action": {
-          "type": "url",
-          "url": "https://example.org"
-        },
-        "visible": true,
-        "selected": false
-      },
-      {
-        "id": "itm_drawer_about",
-        "title": "关于",
-        "iconRef": "profile",
-        "action": {
-          "type": "url",
-          "url": "https://example.com/about"
+          "type": "local_page",
+          "path": "page/about.html"
         },
         "visible": true,
         "selected": false
       }
     ],
     "contentSource": "NATIVE",
-    "webMenuUrl": null,
     "width": {
       "mode": "MEDIUM",
-      "customDp": 0
+      "customDp": 300
     },
     "pauseContentWhileOpen": true
   }

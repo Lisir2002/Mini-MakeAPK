@@ -74,6 +74,21 @@ sealed interface ProjectEntry {
             }
         }
 
+        /**
+         * 取名为 [name] 的页面作为**新的入口形态**（壳动作「打开本地页面」的消费入口）。
+         *
+         * 结果：该文件的源码成为入口内容、[entryFile] 改写为 [name]，附加文件集**剔除自身**
+         * （避免与入口同名被重复供给）；文件不存在（含入口本身不存在）返回 `null`，
+         * 由调用方决定"忽略 / 提示"，绝不退化成 URL。
+         *
+         * **模式隔离**：本方法只产出 [BundledHtml]（项目文件形态），
+         * 与 [Url] 互斥 —— 本地页面路径不参与任何 URL 拼接或规范化。
+         */
+        fun pageEntryOf(name: String): BundledHtml? {
+            val content = contentOf(name) ?: return null
+            return copy(html = content, entryFile = name, files = files.filterNot { it.name == name })
+        }
+
         /** 移除文件（入口文件不可移除，调用方拦截）。 */
         fun withoutFile(name: String): BundledHtml = copy(files = files.filterNot { it.name == name })
 

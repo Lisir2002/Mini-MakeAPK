@@ -81,6 +81,11 @@ jobs:
       - name: 设计令牌门禁（严格）
         run: python3 scripts/gitops/check_token_usage.py --strict
 
+      # 出成品前再跑一遍注入管线回归（与 Verify 工作流同一步）：本地页面注入是
+      # 「导出 APK 里点本地页面要有反应」的唯一保证面，带病不许打包。纯标准库，无需装依赖。
+      - name: 注入管线回归测试（本地页面）
+        run: python3 -m unittest discover -s scripts/gitops -p "test_*.py"
+
   # ② 构建成品并发布
   release:
     name: 构建并发布 APK

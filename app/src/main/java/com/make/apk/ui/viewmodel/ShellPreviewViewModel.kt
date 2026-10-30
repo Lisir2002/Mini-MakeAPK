@@ -26,7 +26,7 @@ import kotlinx.coroutines.launch
  *
  * - **加载项目**：从 [ProjectDirectory] 观察项目（读 URL 入口 + 主题色 + 项目名 + 壳契约）；
  * - **执行壳动作**：顶栏动作 / 顶栏 tab / 底栏条目的 [ShellAction.NavigateUrl]
- *   落到"内容区加载目标 URL"；
+ *   落到"内容区加载目标 URL"、[ShellAction.OpenLocalPage] 落到"内容区加载项目内页面"；
  * - **不做壳编辑**：预览页**不提供**任何切换 / 编辑壳的入口（用户指令："预览就是预览"）。
  *   壳的编辑只在进阶配置页进行，改完项目 spec 后预览自动跟随。
  *
@@ -90,6 +90,7 @@ class ShellPreviewViewModel(
                 previewable = false,
                 apkName = project.apkName,
                 themeColor = project.themeColor,
+                projectEntry = null,
                 runtimeConfig = null,
                 unsupportedMessage = UNSUPPORTED_ENTRY_MESSAGE,
             )
@@ -109,6 +110,8 @@ class ShellPreviewViewModel(
                     previewable = true,
                     apkName = project.apkName,
                     themeColor = project.themeColor,
+                    // 项目自身入口：本地页面的**取页源**（只读，任何壳动作都不改）。
+                    projectEntry = entry,
                     runtimeConfig = project.toRuntimeConfig(),
                     unsupportedMessage = null,
                     currentUrl = entryUrl,
@@ -190,13 +193,17 @@ class ShellPreviewViewModel(
     /**
      * 执行壳动作。
      *
-     * 当前仅 [ShellAction.NavigateUrl] 可执行；其余类型（原生动作 / 内置页 / 未知）
-     * 一律记日志并忽略——**不崩溃、不静默**：未知动作在预览里表现为"点了没反应"，
-     * 属于契约已登记但尚未实现的类型。
+     * 可执行两类（**互不混用**）：
+     * - [ShellAction.NavigateUrl] → 内容区加载目标网址；
+     * - [ShellAction.OpenLocalPage] → 内容区加载项目内的本地页面（HTML 项目文件）；
+     *
+     * 其余类型（原生动作 / 内置页 / 未知）一律记日志并忽略——**不崩溃、不静默**：
+     * 未知动作在预览里表现为"点了没反应"，属于契约已登记但尚未实现的类型。
      */
     private fun applyAction(action: ShellAction) {
         when (action) {
             is ShellAction.NavigateUrl -> navigateTo(action.url)
+            is ShellAction.OpenLocalPage -> openLocalPage(action.path)
             is ShellAction.Native -> {
                 MmaLogger.operation(
                     event = "shell_native_action_ignored",
@@ -216,6 +223,40 @@ class ShellPreviewViewModel(
                 )
             }
         }
+    }
+
+    /**
+     * 内容区加载**项目内的本地页面**（[ShellAction.OpenLocalPage]）。
+     *
+     * 与 [navigateTo] 是两条互不相交的路径：本地页面把入口换成"项目文件形态"
+     * [ProjectEntry.BundledHtml]（内容取自该项目文件），**绝不**拼成 URL
+     * ——否则 `page/about.html` 会变成一个必然打不开的网址。
+     *
+     * **取页源恒为 [ShellPreviewUiState.projectEntry]（项目自身入口，只读）**，
+     * 结果只写进 `runtimeConfig.entry`（展示态）。若拿被改写过的 `runtimeConfig.entry`
+     * 当取页源，"访问过的页面 / 入口页"会从源里消失（A→B→A 取不到、入口页不可再达），
+     * 顶栏 tab 的 pager 也会随之漂移。
+     *
+     * 页面不存在 / 项目不是 HTML 项目（无项目文件）时记日志并忽略：与未知动作同一策略，
+     * 不崩溃、不静默。
+     */
+    private fun openLocalPage(path: String) {
+        val target = path.trim()
+        if (target.isEmpty()) return
+        val config = _uiState.value.runtimeConfig ?: return
+        val page = (_uiState.value.projectEntry as? ProjectEntry.BundledHtml)?.pageEntryOf(target)
+        if (page == null) {
+            MmaLogger.operation(
+                event = "shell_local_page_missing",
+                message = "本地页面不存在，已忽略：$target",
+            )
+            return
+        }
+        _uiState.value = _uiState.value.copy(
+            runtimeConfig = config.copy(entry = page),
+            currentUrl = target,
+            isExampleContent = false,
+        )
     }
 
     /** 内容区加载目标地址（空地址忽略）。 */

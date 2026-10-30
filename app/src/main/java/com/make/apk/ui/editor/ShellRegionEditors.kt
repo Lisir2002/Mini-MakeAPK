@@ -30,6 +30,7 @@ import com.make.apk.ui.theme.Spacing
 @Composable
 internal fun TopBarEditor(
     topBar: ShellTopBar,
+    localPageFileNames: List<String>,
     onTopBar: (ShellTopBar) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -54,6 +55,7 @@ internal fun TopBarEditor(
         ShellItemListEditor(
             label = "右侧动作按钮",
             items = topBar.actions,
+            localPageFileNames = localPageFileNames,
             onItems = { onTopBar(topBar.copy(actions = it)) },
         )
     }
@@ -63,6 +65,7 @@ internal fun TopBarEditor(
 @Composable
 internal fun TopTabsEditor(
     topTabs: ShellTopTabs,
+    localPageFileNames: List<String>,
     onTopTabs: (ShellTopTabs) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -70,6 +73,7 @@ internal fun TopTabsEditor(
         ShellItemListEditor(
             label = "分页标签",
             items = topTabs.items,
+            localPageFileNames = localPageFileNames,
             onItems = { onTopTabs(topTabs.copy(items = it)) },
             // 空槽位快速填充（rc11 交互强化）。
             showQuickFill = true,
@@ -104,6 +108,7 @@ internal fun TopTabsEditor(
 @Composable
 internal fun BottomBarEditor(
     bottomBar: ShellBottomBar,
+    localPageFileNames: List<String>,
     onBottomBar: (ShellBottomBar) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -111,6 +116,7 @@ internal fun BottomBarEditor(
         ShellItemListEditor(
             label = "底栏条目",
             items = bottomBar.items,
+            localPageFileNames = localPageFileNames,
             onItems = { onBottomBar(bottomBar.copy(items = it)) },
             // 槽位上限提示 + 空槽位快速填充（rc11 扩展槽位强化）。
             maxItems = bottomBar.maxItems,
@@ -140,6 +146,7 @@ internal fun BottomBarEditor(
 @Composable
 internal fun DrawerEditor(
     drawer: ShellDrawer,
+    localPageFileNames: List<String>,
     onDrawer: (ShellDrawer) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -162,6 +169,7 @@ internal fun DrawerEditor(
         ShellItemListEditor(
             label = "菜单条目",
             items = drawer.items,
+            localPageFileNames = localPageFileNames,
             onItems = { onDrawer(drawer.copy(items = it)) },
         )
         MmaSegmentedChoice(

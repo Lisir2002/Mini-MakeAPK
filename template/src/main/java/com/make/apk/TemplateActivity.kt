@@ -1,6 +1,7 @@
 package com.make.apk
 
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Box
@@ -73,7 +74,8 @@ class TemplateActivity : ComponentActivity() {
  * - **EntryRoot**：被标记为 `isEntry` 的 tab（或首个可见 tab）是其所属栈的入口根；
  *   点顶栏「回入口」（home 图标）或重选当前 tab，即复位到入口根。
  * - **RouterContract**：[ShellAction.NavigateUrl] 经 [routeToTab] 解析——命中某 tab 目标则切到该 tab，
- *   否则压入当前 tab 栈；[ShellAction.InternalPage] 复位到入口根；[ShellAction.Native.REFRESH] 重载当前页。
+ *   否则压入当前 tab 栈；[ShellAction.InternalPage] 复位到入口根；[ShellAction.Native.REFRESH] 重载当前页；
+ *   [ShellAction.OpenLocalPage] 显式忽略（导出壳只注入壳契约，不含项目页面内容，见 handleAction 内注释）。
  * - 运行态（选中 tab / 栈）由本地持有，**不回写 spec**（壳「不变量」），故与 app 预览屏一致。
  */
 @Composable
@@ -101,10 +103,15 @@ private fun TemplateApp() {
     // 入口 tab：首个 isEntry 可见项，否则首个可见项（默认首项即入口）。
     val entryTab = remember(spec) { spec.topTabs.entryTabItem() }
 
+    // 本地页面读取器：把「项目内文件名」解析成 WebView 能直接加载的 assets URL。
+    // 内容由注入脚本写进 assets/mma_pages/（见 scripts/gitops/inject_shell_spec.py）。
+    val context = LocalContext.current
+    val localPages = remember(context) { InjectedLocalPages(context) }
+
     // 每 tab 独立的 URL 后退栈（栈顶 = 当前显示）；首屏初始化为各自入口根。
     val tabStacks = remember {
         mutableStateMapOf<String, List<String>>().apply {
-            visibleTabs.forEach { tab -> this[tab.id] = listOf(tabEntryUrl(baseEntryUrl, tab)) }
+            visibleTabs.forEach { tab -> this[tab.id] = listOf(tabEntryUrl(baseEntryUrl, tab, localPages)) }
         }
     }
     var activeTabId: String? by remember {
@@ -114,7 +121,7 @@ private fun TemplateApp() {
     // 当前 tab 的栈顶 URL；栈空则回落该 tab 的入口根。
     fun currentUrl(tabId: String?): String {
         val tab = visibleTabs.firstOrNull { it.id == tabId } ?: entryTab ?: visibleTabs.firstOrNull()
-        return tabStacks[tabId]?.lastOrNull() ?: tabEntryUrl(baseEntryUrl, tab)
+        return tabStacks[tabId]?.lastOrNull() ?: tabEntryUrl(baseEntryUrl, tab, localPages)
     }
 
     // 把 URL 压入目标 tab 栈（默认当前 tab），并激活该 tab。
@@ -127,7 +134,7 @@ private fun TemplateApp() {
     // 复位某 tab 的栈到其入口根。
     fun resetTab(tabId: String?) {
         val tab = visibleTabs.firstOrNull { it.id == tabId } ?: return
-        tabStacks[tab.id] = listOf(tabEntryUrl(baseEntryUrl, tab))
+        tabStacks[tab.id] = listOf(tabEntryUrl(baseEntryUrl, tab, localPages))
     }
 
     // 回入口：跳到入口 tab 并将其栈复位到入口根（其他 tab 栈保留，互不干扰）。
@@ -146,6 +153,17 @@ private fun TemplateApp() {
                 if (match != null) activeTabId = match else navigate(action.url)
             }
             is ShellAction.InternalPage -> resetToEntry()
+            is ShellAction.OpenLocalPage -> {
+                // 本地页面：读注入到 assets 里的项目页面内容（相对路径原样保留）。
+                // 硬约束：path 是**项目文件名**，绝不拼成网址；文件缺失时安全回落 + 留痕，
+                // 绝不崩溃（注入脚本已在构建期校验过，这里是运行期兜底）。
+                val localUrl = localPages.urlOf(action.path)
+                if (localUrl != null) {
+                    navigate(localUrl)
+                } else {
+                    Log.w(TAG_TEMPLATE, "local_page_missing: ${action.path}")
+                }
+            }
             is ShellAction.Native -> {
                 // 仅 REFRESH 本期可执行（重载当前 tab 栈顶）；其余种类本期仅记录不执行。
                 if (action.kind == ShellNativeAction.REFRESH) {
@@ -195,13 +213,27 @@ private fun TemplateApp() {
     }
 }
 
-/** 某 tab 的入口根 URL：取该 tab 的 NavigateUrl 目标；为空则回落项目自身入口 [baseEntryUrl]。 */
-private fun tabEntryUrl(baseEntryUrl: String, tab: ShellMenuItem?): String {
+/** 模板运行时日志标签（导出壳唯一可用的诊断面：Logcat）。 */
+private const val TAG_TEMPLATE: String = "template_shell"
+
+/**
+ * 某 tab 的入口根 URL：取该 tab 动作的目标。
+ *
+ * - [ShellAction.NavigateUrl] → 该网址；
+ * - [ShellAction.OpenLocalPage] → 注入的本地页面（assets URL）；
+ * - 其余 / 目标为空 / 本地页面缺失 → 回落项目自身入口 [baseEntryUrl]。
+ */
+private fun tabEntryUrl(
+    baseEntryUrl: String,
+    tab: ShellMenuItem?,
+    localPages: InjectedLocalPages,
+): String {
     if (tab == null) return baseEntryUrl
-    return (tab.action as? ShellAction.NavigateUrl)
-        ?.url
-        ?.takeIf { it.isNotBlank() }
-        ?: baseEntryUrl
+    return when (val action = tab.action) {
+        is ShellAction.NavigateUrl -> action.url.takeIf { it.isNotBlank() } ?: baseEntryUrl
+        is ShellAction.OpenLocalPage -> localPages.urlOf(action.path) ?: baseEntryUrl
+        else -> baseEntryUrl
+    }
 }
 
 /** 集中式路由：把 URL 解析到其所属 tab（匹配某 tab 的 NavigateUrl 目标），未命中返回 null。 */

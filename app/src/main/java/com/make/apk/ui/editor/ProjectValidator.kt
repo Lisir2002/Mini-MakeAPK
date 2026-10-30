@@ -1,6 +1,8 @@
 package com.make.apk.ui.editor
 
 import com.make.apk.data.model.ProjectType
+import com.make.apk.data.model.ShellAction
+import com.make.apk.data.model.ShellSpec
 import com.make.apk.data.model.VersionScheme
 
 /**
@@ -193,6 +195,38 @@ class ProjectValidator {
         null -> null
     }
 
+    // ── 壳条目引用的本地页面 ─────────────────────────────────────────
+
+    /**
+     * 壳条目引用的**本地页面**是否仍存在于项目文件里（保存前体检）。
+     *
+     * 只**警告不阻断**：条目都是用户自己配的，页面被删常常是有意为之（也可能忘了），
+     * 留一条可见提醒比拦住保存更有用——这类条目在预览 / 导出里表现为"点了没反应"，
+     * 用户很难自己定位到原因。
+     *
+     * @param spec 项目壳契约（四区条目全部纳入）。
+     * @param localPageFileNames 项目内可加载的本地页面文件名（空集 = 该项目没有本地页面）。
+     */
+    fun validateShellLocalPages(
+        spec: ShellSpec,
+        localPageFileNames: List<String>,
+    ): FieldVerdict {
+        val missing = spec.allItems
+            .mapNotNull { (it.action as? ShellAction.OpenLocalPage)?.path }
+            .map { it.trim() }
+            .filter { it.isNotEmpty() && it !in localPageFileNames }
+            .distinct()
+        if (missing.isEmpty()) return FieldVerdict()
+        val shown = missing.joinToString("、").let {
+            if (it.length > MAX_MISSING_PAGES_SNIPPET) {
+                it.take(MAX_MISSING_PAGES_SNIPPET) + ELLIPSIS
+            } else {
+                it
+            }
+        }
+        return warning(MSG_SHELL_LOCAL_PAGE_MISSING + shown)
+    }
+
     /**
      * 包名建议：URL 的反向域名（`example.com` → `com.example`）。
      *
@@ -346,5 +380,14 @@ class ProjectValidator {
 
         /** 资产包不合规。 */
         const val MSG_ARCHIVE_REQUIRED: String = "请选择 zip 压缩包（不超过 100MB）"
+
+        /** 壳条目引用的本地页面在项目里已不存在（警告，不阻断保存）。 */
+        const val MSG_SHELL_LOCAL_PAGE_MISSING: String = "壳条目引用的本地页面已不存在："
+
+        /** 缺失页面清单的最大展示长度（超出截断，避免提示把页面撑满）。 */
+        const val MAX_MISSING_PAGES_SNIPPET: Int = 60
+
+        /** 截断省略号。 */
+        const val ELLIPSIS: String = "…"
     }
 }

@@ -34,13 +34,24 @@ data class ShellSpec(
     /** 侧边栏（抽屉）区（阶段 6.5 起由 [ShellDrawer] 渲染原生抽屉）。 */
     val drawer: ShellDrawer = ShellDrawer(),
 ) {
+    /**
+     * 四区**全部条目**（顶栏动作 → 顶栏 tab → 底栏 → 抽屉，顺序固定）。
+     *
+     * 供"跨区体检"使用（如校验壳引用的本地页面是否仍存在于项目文件里），
+     * 避免调用方各写一份四区拼接（漏一区就是一类静默漏检）。
+     */
+    val allItems: List<ShellMenuItem>
+        get() = topBar.actions + topTabs.items + bottomBar.items + drawer.items
+
     companion object {
         /** 当前契约版本。新增字段时 +1，并在此登记升级说明。 */
         const val CURRENT_SPEC_VERSION: Int = 1
 
         /** 契约版本升级说明（写进文档与导出壳的兼容判断）。 */
         const val VERSION_NOTES: String =
-            "v1: 四区（topBar/topTabs/bottomBar/drawer）+ ShellAction 仅 NavigateUrl 可用"
+            "v1: 四区（topBar/topTabs/bottomBar/drawer）+ ShellAction 可执行两类：" +
+                "NavigateUrl（网页，http/https）与 OpenLocalPage（项目内本地页面，path 为项目文件名）；" +
+                "Native / InternalPage 仅登记不执行，未知 type 降级 Unknown"
 
         /** 默认壳：四区全关，等价于"裸 WebView"（与阶段 5 现状一致，零回归）。 */
         val DEFAULT: ShellSpec = ShellSpec()

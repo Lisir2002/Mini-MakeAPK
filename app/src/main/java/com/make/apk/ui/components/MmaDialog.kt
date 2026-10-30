@@ -14,8 +14,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -29,10 +32,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.make.apk.ui.theme.ControlShapes
@@ -84,6 +89,8 @@ fun MmaDialog(
     val elevation = LocalMmaDesign.current.elevation
     val colorScheme = MaterialTheme.colorScheme
     val typography = MaterialTheme.typography
+    // 视口高度：内容区限高的基准（矮屏 / 横屏同样成立）。
+    val screenHeight = LocalConfiguration.current.screenHeightDp.dp
 
     Dialog(
         onDismissRequest = onDismissRequest,
@@ -129,7 +136,17 @@ fun MmaDialog(
                         color = colorScheme.onSurface,
                         textAlign = if (centered) TextAlign.Center else TextAlign.Start,
                     )
-                    content()
+                    // 内容区可滚动 + 限高（视口 90%）：表单型弹窗变高时（如条目弹窗新增
+                    // 分段控件）矮屏 / 横屏 / 大字号下也不会溢出屏幕——溢出会让确认按钮
+                    // 被挤到屏幕外，表现为"填完了却点不到确定"。
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = screenHeight * DIALOG_MAX_HEIGHT_RATIO)
+                            .verticalScroll(rememberScrollState()),
+                    ) {
+                        content()
+                    }
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.End,
@@ -198,6 +215,9 @@ fun MmaTextButton(
 
 /** 遮罩不透明度（M3 scrim 规范 32%）。 */
 private const val SCRIM_ALPHA: Float = 0.32f
+
+/** 内容区限高占比（视口的 90%：标题与按钮区始终留在屏内）。 */
+private const val DIALOG_MAX_HEIGHT_RATIO: Float = 0.9f
 
 /** 弹窗进场初始缩放。 */
 private const val DIALOG_CLOSED_SCALE: Float = 0.9f

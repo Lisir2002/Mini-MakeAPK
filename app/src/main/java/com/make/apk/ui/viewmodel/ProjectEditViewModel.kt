@@ -622,6 +622,12 @@ class ProjectEditViewModel(
             ProjectType.VUE, ProjectType.PHP, null -> Unit
         }
 
+        // 壳条目引用的本地页面体检（M3）：条目指向的 .html 被删后预览 / 导出会"点了没反应"，
+        // 用户很难自查，故在保存前给出一条**可见警告**（不阻断保存——删文件可能是有意为之）。
+        // 挂在 ENTRY_FILE 字段上：它是"项目文件"类提示的唯一既有展示位。
+        validator.validateShellLocalPages(state.shellSpec, state.localPageFileNames)
+            .warning?.let { warnings[EditField.ENTRY_FILE] = it }
+
         _uiState.value = _uiState.value.copy(errors = errors, warnings = warnings)
     }
 

@@ -249,6 +249,8 @@ fun ProjectEditScreen(
                         Column(modifier = Modifier.fillMaxWidth()) {
                             ShellEditorTab(
                                 shellSpec = state.shellSpec,
+                                // 项目内页面文件（壳条目「本地页面」的候选；URL 项目为空集）。
+                                localPageFileNames = state.localPageFileNames,
                                 onShellSpecChanged = onShellSpecChanged,
                                 modifier = Modifier
                                     .fillMaxWidth()

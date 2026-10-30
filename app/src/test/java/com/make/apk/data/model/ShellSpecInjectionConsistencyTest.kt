@@ -22,6 +22,15 @@ import java.io.File
  *
  * 若 [Json.decodeFromString] 抛 [kotlinx.serialization.SerializationException]，
  * 说明注入 JSON 与契约不匹配——需定位是 JSON 笔误还是契约层面 bug（本测试不改契约）。
+ *
+ * ## 断言策略（QA 终验修正）
+ *
+ * 注入件是 `inject_shell_spec.py` 的**产物**，换一份演示壳条目数量就会变。故本测试
+ * 只钉**契约与跨模块一致性**，不钉某次产物的条目数量/具体文案：
+ * - 不得有任何 action 降级成 [ShellAction.Unknown]（= 注入 JSON 与契约对不上）；
+ * - 有条目的区必须 enabled（悬空配置在预览/导出里都看不见）；
+ * - 两类内容来源严格隔离：URL 槽位只放 http(s)，本地页面槽位只放项目文件名；
+ * - 每个 `local_page.path` 都必须能在 `assets/mma_pages/` 下读到（否则真机「点了没反应」）。
  */
 class ShellSpecInjectionConsistencyTest {
 
@@ -61,41 +70,86 @@ class ShellSpecInjectionConsistencyTest {
         assertEquals(1, spec.specVersion)
     }
 
-    @Test
-    fun topTabs_contractMatchesExpectation() {
-        assertTrue("spec.topTabs.enabled == true", spec.topTabs.enabled)
-        assertEquals("spec.topTabs.items.size == 3", 3, spec.topTabs.items.size)
-        assertTrue("spec.topTabs.swipeEnabled == true", spec.topTabs.swipeEnabled)
-    }
+    // ── 以下断言**不钉死条目数量**（QA 终验修正）─────────────────────────
+    // 注入的 shell_spec.json 是 inject_shell_spec.py 的**产物**：谁用哪份示例壳做验证，
+    // 条目数量就会变。旧的「每区 3 项 / 首个 tab 必须是 example.com」把测试钉在了
+    // 某一次的产物形状上 —— 换一份演示壳（本次是本地页面演示壳）就从"验证契约"
+    // 退化成"验证某次注入的巧合"，且失败信息完全指不到真问题。
+    // 现改为钉**契约本身**：解码结果必须与 ShellSpec/ShellAction 精确对得上
+    // （无 Unknown 降级）、四区配置自洽、两类内容来源互不混用。
 
     @Test
-    fun bottomBar_contractMatchesExpectation() {
-        assertTrue("spec.bottomBar.enabled == true", spec.bottomBar.enabled)
-        assertEquals("spec.bottomBar.items.size == 3", 3, spec.bottomBar.items.size)
-    }
-
-    @Test
-    fun drawer_contractMatchesExpectation() {
-        assertTrue("spec.drawer.enabled == true", spec.drawer.enabled)
-        assertEquals("spec.drawer.items.size == 3", 3, spec.drawer.items.size)
-        assertEquals(
-            "spec.drawer.contentSource == NATIVE",
-            ShellDrawerSource.NATIVE,
-            spec.drawer.contentSource,
-        )
-    }
-
-    @Test
-    fun firstTopTab_action_isNavigateUrlWithExpectedUrl() {
-        val action = spec.topTabs.items.first().action
+    fun noItemDegradesToUnknownAction() {
+        // 任何一条 action 落成 Unknown，都说明注入的 JSON 与契约不一致
+        // （类型判别符写错 / 用了契约里没有的 type）——这正是本测试要抓的东西。
+        val degraded = spec.allItems.filter { it.action is ShellAction.Unknown }.map { it.id }
         assertTrue(
-            "首个 topTab action 应为 ShellAction.NavigateUrl",
-            action is ShellAction.NavigateUrl,
+            "以下条目的 action 解码成了 Unknown（注入 JSON 与壳契约不一致）：$degraded",
+            degraded.isEmpty(),
         )
-        assertEquals(
-            "url == https://example.com",
-            "https://example.com",
-            (action as ShellAction.NavigateUrl).url,
+    }
+
+    @Test
+    fun regionsWithItems_areEnabled() {
+        // 配了条目却没启用该区 = 用户配的东西渲染不出来（且预览/导出一致地看不见）。
+        val dangling = buildList {
+            if (spec.topBar.actions.isNotEmpty() && !spec.topBar.enabled) add("topBar")
+            if (spec.topTabs.items.isNotEmpty() && !spec.topTabs.enabled) add("topTabs")
+            if (spec.bottomBar.items.isNotEmpty() && !spec.bottomBar.enabled) add("bottomBar")
+            if (spec.drawer.items.isNotEmpty() && !spec.drawer.enabled) add("drawer")
+        }
+        assertTrue("以下区域有条目却没有 enabled（悬空配置）：$dangling", dangling.isEmpty())
+    }
+
+    @Test
+    fun urlActions_areHttpAndNeverLocalFilePaths() {
+        // 隔离性硬约束的一半：URL 槽位里绝不能出现项目内文件名。
+        val bad = spec.allItems
+            .mapNotNull { (it.action as? ShellAction.NavigateUrl)?.url }
+            .filterNot { it.startsWith("http://") || it.startsWith("https://") }
+        assertTrue("以下 NavigateUrl 不是 http(s) 网址（本地文件名混进了 URL 槽位？）：$bad", bad.isEmpty())
+    }
+
+    @Test
+    fun localPagePaths_areFileNames_andResolveToInjectedAssets() {
+        // 隔离性硬约束的另一半 + 导出可用性：
+        // - path 必须是项目内文件名（不得长得像网址）；
+        // - 必须真实存在于注入目录 assets/mma_pages/ 下（否则真机上就是「点了没反应」）。
+        val paths = spec.allItems.mapNotNull { (it.action as? ShellAction.OpenLocalPage)?.path }
+        val urlShaped = paths.filter { "://" in it || it.startsWith("www.") }
+        assertTrue("以下 local_page.path 长得像网址（本地页面被当成了 URL）：$urlShaped", urlShaped.isEmpty())
+        if (paths.isEmpty()) return // 本次注入的壳不含本地页面：无契约可查（不制造假失败）。
+
+        val assets = root().resolve("template/src/main/assets/mma_pages")
+        assertTrue(
+            "壳引用了本地页面 $paths，但注入目录不存在：${assets.absolutePath}\n" +
+                "先运行 python3 scripts/gitops/inject_shell_spec.py --in <spec> --project <entry> 注入页面",
+            assets.isDirectory,
         )
+        val missing = paths.filterNot { java.io.File(assets, it).isFile }
+        assertTrue(
+            "以下本地页面在导出壳里读不到（assets/mma_pages 下缺文件，真机上会「点了没反应」）：$missing",
+            missing.isEmpty(),
+        )
+    }
+
+    @Test
+    fun topTabsStyle_andDrawerSource_areWithinContractEnums() {
+        // 枚举落到非法取值时，渲染层会静默回落 —— 在契约层先拦住。
+        assertTrue(
+            "topTabs.selectionStyle 非法：${spec.topTabs.selectionStyle}",
+            spec.topTabs.selectionStyle in ShellSelectionStyle.entries,
+        )
+        assertTrue(
+            "drawer.contentSource 非法：${spec.drawer.contentSource}",
+            spec.drawer.contentSource in ShellDrawerSource.entries,
+        )
+    }
+
+    /** 仓库根（从 user.dir 向上找 settings.gradle.kts，与 [locateInjectedSpec] 同一套定位）。 */
+    private fun root(): File {
+        val start = File(checkNotNull(System.getProperty("user.dir")) { "user.dir 未设置" })
+        return generateSequence(start) { it.parentFile }
+            .first { it.isDirectory && File(it, "settings.gradle.kts").exists() }
     }
 }

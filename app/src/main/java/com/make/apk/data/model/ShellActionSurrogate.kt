@@ -40,6 +40,7 @@ import kotlinx.serialization.json.put
  * |---|---|---|---|
  * | `type` | 字符串（判别符，**必需**） | JSON 字符串 | 数字 / 布尔 / `null` / 对象 / 数组 / 缺失 |
  * | `url` | 字符串（**必需**） | JSON 字符串（含**空串**） | 数字 / 布尔 / `null` / 对象 / 数组 / 缺失 |
+ * | `path` | 字符串（**必需**，`local_page` 用） | JSON 字符串（含**空串**） | 数字 / 布尔 / `null` / 对象 / 数组 / 缺失 |
  * | `openInNewTab` | 布尔（**可选**，缺省 `false`） | JSON 布尔 | 存在但类型不符（数字 / 字符串 / `null` / 对象 / 数组） |
  * | `kind` | 字符串枚举（**必需**） | JSON 字符串 | 数字 / 布尔 / `null` / 对象 / 数组 / 缺失 |
  * | `pageId` | 字符串（**必需**） | JSON 字符串 | 数字 / 布尔 / `null` / 对象 / 数组 / 缺失 |
@@ -60,6 +61,12 @@ import kotlinx.serialization.json.put
  *
  * 本序列化器**不依赖** `ShellAction.serializer()`（那会把"判别符由插件生成"与本文件耦合），
  * 而是自行构造 JSON 对象，故未知 `type` 的降级路径完全可控且可测。
+ *
+ * ## 向后兼容（新增 `local_page`）
+ *
+ * 新增判别符**只新增分支**，不改动 `url` 分支的任何判据：
+ * 老数据 `{"type":"url","url":...}` 的解码结果逐字段不变（含空串 URL 可往返）；
+ * 老壳读到 `local_page`（未知 type）走既有 `else -> Unknown` 降级，**不抛异常**。
  */
 object ShellActionSurrogate : KSerializer<ShellAction> {
 
@@ -69,6 +76,9 @@ object ShellActionSurrogate : KSerializer<ShellAction> {
 
     /** 判别符：打开网页。 */
     private const val TYPE_URL = "url"
+
+    /** 判别符：打开项目内的本地页面。 */
+    private const val TYPE_LOCAL_PAGE = "local_page"
 
     /** 判别符：原生动作。 */
     private const val TYPE_NATIVE = "native"
@@ -87,6 +97,11 @@ object ShellActionSurrogate : KSerializer<ShellAction> {
                 put("type", TYPE_URL)
                 put("url", value.url)
                 put("openInNewTab", value.openInNewTab)
+            }
+
+            is ShellAction.OpenLocalPage -> buildJsonObject {
+                put("type", TYPE_LOCAL_PAGE)
+                put("path", value.path)
             }
 
             is ShellAction.Native -> buildJsonObject {
@@ -120,6 +135,7 @@ object ShellActionSurrogate : KSerializer<ShellAction> {
         val type = stringField(TYPE_KEY) ?: return ShellAction.Unknown
         return when (type) {
             TYPE_URL -> toNavigateUrlOrUnknown()
+            TYPE_LOCAL_PAGE -> toLocalPageOrUnknown()
             TYPE_NATIVE -> toNativeOrUnknown()
             TYPE_INTERNAL_PAGE -> toInternalPageOrUnknown()
             else -> ShellAction.Unknown
@@ -141,6 +157,18 @@ object ShellActionSurrogate : KSerializer<ShellAction> {
             false
         }
         return ShellAction.NavigateUrl(url = url, openInNewTab = openInNewTab)
+    }
+
+    /**
+     * `type = "local_page"` → [ShellAction.OpenLocalPage]。
+     *
+     * - `path` **必需**：缺失 → Unknown；类型不符（数字 / 布尔 / `null` / 对象 / 数组）→ Unknown；
+     * - `path` 原样保留（**不做任何 URL 规范化**）——本地页面是项目文件，不是网址；
+     * - 空串按"类型合法"接受（与 `url` 同一判据），语义为空由消费侧忽略。
+     */
+    private fun JsonObject.toLocalPageOrUnknown(): ShellAction {
+        val path = stringField(PATH_KEY) ?: return ShellAction.Unknown
+        return ShellAction.OpenLocalPage(path = path)
     }
 
     /**
@@ -202,6 +230,9 @@ object ShellActionSurrogate : KSerializer<ShellAction> {
 
     /** URL 字段名。 */
     private const val URL_KEY: String = "url"
+
+    /** 本地页面字段名（项目内页面文件名）。 */
+    private const val PATH_KEY: String = "path"
 
     /** 新标签页开关字段名。 */
     private const val OPEN_IN_NEW_TAB_KEY: String = "openInNewTab"

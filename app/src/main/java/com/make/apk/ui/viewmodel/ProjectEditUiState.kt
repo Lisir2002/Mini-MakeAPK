@@ -2,6 +2,7 @@ package com.make.apk.ui.viewmodel
 
 import com.make.apk.data.model.ExportRun
 import com.make.apk.data.model.ProjectDefaults
+import com.make.apk.data.model.ProjectEntry
 import com.make.apk.data.model.ProjectFile
 import com.make.apk.data.model.ProjectType
 import com.make.apk.data.model.ShellSpec
@@ -90,7 +91,41 @@ data class ProjectEditUiState(
     /** 是否允许保存：加载完成、无错误。 */
     val canSave: Boolean
         get() = !saving && !loading && !projectNotFound && errors.isEmpty()
+
+    /**
+     * 项目内可加载的**本地页面**文件名（壳条目「本地页面」下拉的候选集）。
+     *
+     * 顺序：入口文件在前（首屏页面），其后是附加文件里的 `.html` / `.htm`（按存储序）。
+     *
+     * **没有本地页面时返回空集**（URL 项目：既无入口源码也无页面文件）——
+     * 编辑器据此禁用「本地页面」模式并给出可见提示（模式隔离：URL 模式不出现本地文件，
+     * 本地模式不出现 URL 输入框）。
+     */
+    val localPageFileNames: List<String>
+        get() {
+            val extraPages = projectFiles.map { it.name }.filter(::isLocalPageFileName)
+            val entry = entryFile.trim().ifBlank { ProjectEntry.BundledHtml.DEFAULT_ENTRY_FILE }
+            // 入口只在**确有源码**时可选（空源码的入口渲染出来是空白页）。
+            val entryPage = if (entryHtml.isNotBlank() && isLocalPageFileName(entry)) {
+                listOf(entry)
+            } else {
+                emptyList()
+            }
+            val restPages = extraPages.filterNot { it.equals(entry, ignoreCase = true) }
+            return entryPage + restPages
+        }
 }
+
+/**
+ * 是否为**可加载页面**文件名（`.html` / `.htm`，忽略大小写）。
+ *
+ * 壳条目「本地页面」只接受真正的页面文件：CSS / JS / 图片等附加文件不可作为加载目标。
+ */
+fun isLocalPageFileName(name: String): Boolean =
+    name.substringAfterLast('.', missingDelimiterValue = "").lowercase() in LOCAL_PAGE_EXTENSIONS
+
+/** 可加载页面的扩展名集合（WebView 按 text/html 解析）。 */
+private val LOCAL_PAGE_EXTENSIONS: Set<String> = setOf("html", "htm")
 
 /**
  * 编辑页页签。

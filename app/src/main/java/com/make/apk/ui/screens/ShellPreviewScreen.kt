@@ -93,6 +93,7 @@ fun ShellPreviewScreen(
                             WebViewScreen(
                                 config = pagedRuntimeConfig(
                                     baseConfig = config,
+                                    projectEntry = state.projectEntry,
                                     topTabs = state.shellSpec.topTabs,
                                     page = page,
                                 ),
@@ -125,20 +126,37 @@ fun ShellPreviewScreen(
  * 页序取自 [visibleTopTabItems] —— 与 [ShellHost] 里的 pager、与 tab 区**同一份**可见条目顺序，
  * 故隐藏条目既不会被渲染成 tab，也不会被摊成页（阶段 6.6 QA D7）。
  *
- * 入口隔离：tab 命中 [ShellAction.NavigateUrl] 且地址非空时换成该 URL；
- * 否则**保留原入口**（HTML 内联 / 资产包等不强制 URL），避免 HTML 项目在分页态被错误落成空 URL。
+ * 入口隔离：
+ * - tab 命中 [ShellAction.NavigateUrl] 且地址非空时换成该 URL；
+ * - tab 命中 [ShellAction.OpenLocalPage] 且该项目文件存在时换成该本地页面
+ *   （仍是 [ProjectEntry.BundledHtml] 文件形态，**不**落成 URL）；
+ *   取页源是 [projectEntry]（项目自身入口，**只读**）——绝不用 [baseConfig] 的 entry，
+ *   否则各页互相改写会让页面"越切越少"（pager 漂移）；
+ * - 否则**保留原入口**（HTML 内联 / 资产包等不强制 URL），
+ *   避免 HTML 项目在分页态被错误落成空 URL。
  */
 private fun pagedRuntimeConfig(
     baseConfig: WebRuntimeConfig,
+    projectEntry: ProjectEntry?,
     topTabs: ShellTopTabs,
     page: Int,
 ): WebRuntimeConfig {
     val item = visibleTopTabItems(topTabs).getOrNull(page) ?: return baseConfig
-    val url = (item.action as? ShellAction.NavigateUrl)
-        ?.url
-        ?.takeIf { it.isNotBlank() }
-        ?: return baseConfig
-    return baseConfig.copy(entry = ProjectEntry.Url(url))
+    return when (val action = item.action) {
+        is ShellAction.NavigateUrl -> {
+            val url = action.url.takeIf { it.isNotBlank() } ?: return baseConfig
+            baseConfig.copy(entry = ProjectEntry.Url(url))
+        }
+        is ShellAction.OpenLocalPage -> {
+            // 取页源是**项目自身入口**（只读），不是 baseConfig.entry：
+            // baseConfig.entry 可能是上一页被改写后的展示态，从它取页会让各页互相"吃掉"文件。
+            val pageEntry = (projectEntry as? ProjectEntry.BundledHtml)
+                ?.pageEntryOf(action.path)
+                ?: return baseConfig
+            baseConfig.copy(entry = pageEntry)
+        }
+        else -> baseConfig
+    }
 }
 
 /** 预览屏的居中提示（加载中 / 项目不存在 / 不支持预览）。 */

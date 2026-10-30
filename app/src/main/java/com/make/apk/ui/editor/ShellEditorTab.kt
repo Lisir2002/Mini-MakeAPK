@@ -36,11 +36,16 @@ import com.make.apk.ui.theme.Spacing
  * [ShellItemEditor] —— 本文件只做装配，避免再次膨胀成 700+ 行的巨文件。
  *
  * @param shellSpec 当前壳契约（来自 VM，只读展示 + 编辑回写）。
+ * @param localPageFileNames 项目内可加载的本地页面文件名（入口在前；URL 项目传空集）。
+ *   逐级透传给四个区域的条目弹窗，供「本地页面」模式单选；**没有默认值**——
+ *   漏传会让"本地页面"静默不可用，故由调用方显式给（数据来源：
+ *   [com.make.apk.ui.viewmodel.ProjectEditUiState.localPageFileNames]）。
  * @param onShellSpecChanged 任意区域改动后回调，携带**新的整份** [ShellSpec]。
  */
 @Composable
 fun ShellEditorTab(
     shellSpec: ShellSpec,
+    localPageFileNames: List<String>,
     onShellSpecChanged: (ShellSpec) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -63,6 +68,7 @@ fun ShellEditorTab(
         ) {
             TopBarEditor(
                 topBar = shellSpec.topBar,
+                localPageFileNames = localPageFileNames,
                 onTopBar = { onShellSpecChanged(shellSpec.copy(topBar = it)) },
             )
         }
@@ -76,6 +82,7 @@ fun ShellEditorTab(
         ) {
             TopTabsEditor(
                 topTabs = shellSpec.topTabs,
+                localPageFileNames = localPageFileNames,
                 onTopTabs = { onShellSpecChanged(shellSpec.copy(topTabs = it)) },
             )
         }
@@ -89,6 +96,7 @@ fun ShellEditorTab(
         ) {
             BottomBarEditor(
                 bottomBar = shellSpec.bottomBar,
+                localPageFileNames = localPageFileNames,
                 onBottomBar = { onShellSpecChanged(shellSpec.copy(bottomBar = it)) },
             )
         }
@@ -102,6 +110,7 @@ fun ShellEditorTab(
         ) {
             DrawerEditor(
                 drawer = shellSpec.drawer,
+                localPageFileNames = localPageFileNames,
                 onDrawer = { onShellSpecChanged(shellSpec.copy(drawer = it)) },
             )
         }

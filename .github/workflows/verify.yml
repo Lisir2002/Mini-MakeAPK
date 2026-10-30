@@ -35,6 +35,12 @@ jobs:
       - name: 设计令牌门禁（严格）
         run: python3 scripts/gitops/check_token_usage.py --strict
 
+      # 注入管线回归（scripts/gitops/test_inject_shell_spec.py）：钉住「本地页面注入」契约 ——
+      # 相对路径子目录保留、构建期硬拦截、越界防护、幂等清理、脚本与导出壳目录名一致。
+      # 纯标准库（无 pillow 之类依赖），放在 gradle 之前：失败即早停，不必等编译。
+      - name: 注入管线回归测试（本地页面）
+        run: python3 -m unittest discover -s scripts/gitops -p "test_*.py"
+
       - name: 运行单元测试（含数据层逻辑）
         run: ./gradlew testDebugUnitTest --no-daemon
 
