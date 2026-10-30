@@ -101,11 +101,6 @@ fun ProjectCodeTab(
                     onPaste = onFilesPasted,
                 ),
             )
-            Text(
-                text = TAB_HINT,
-                style = typography.bodySmall,
-                color = colorScheme.onSurfaceVariant,
-            )
         }
     }
 }
@@ -120,5 +115,3 @@ private fun summarize(items: List<FsItem>): String {
 // ── 常量（中文文案集中） ──────────────────────────────────────────────
 
 private const val TAB_TITLE: String = "项目文件"
-private const val TAB_HINT: String =
-    "点文件打开编辑器 / 查看器；点文件夹进入该层。支持新建、重命名、删除与复制 / 剪切 / 粘贴（入口文件仅可复制 / 重命名）。"
