@@ -237,14 +237,17 @@ fun resolveCopyName(desiredName: String, taken: Set<String>): String {
     val norm = normalizePath(desiredName)
     if (norm !in taken) return norm
     val (stem, ext) = splitName(norm)
+    // 首选「副本」形式（带扩展名时插入在扩展名之前），其次数字递推 (2)、(3)……
+    val copyForm = "$stem 副本$ext"
+    if (copyForm !in taken) return copyForm
     var i = 2
-    return buildList {
-        add("$stem 副本$ext")
-        while (true) {
-            add("$stem($i)$ext")
-            i++
-        }
-    }.first { it !in taken }
+    while (i <= 9999) {
+        val candidate = "$stem($i)$ext"
+        if (candidate !in taken) return candidate
+        i++
+    }
+    // 兜底（极端情况）：时间戳后缀保证必定返回不冲突名
+    return "$stem-${System.nanoTime()}$ext"
 }
 
 /**
