@@ -56,6 +56,9 @@
     # 壳里含「本地页面」条目：必须同时给 --project（否则拒绝注入）：
     python3 scripts/gitops/inject_shell_spec.py --in spec.json --project entry.json --build
 
+    # 壳 drawer.headerMode=IMAGE：必须同时给 --header-image（否则拒绝注入，W2 ⑨）：
+    python3 scripts/gitops/inject_shell_spec.py --in spec.json --header-image header.png
+
     # 仅注入不构建（CI 门禁/本地预览用）：
     python3 scripts/gitops/inject_shell_spec.py --in path/to/shell_spec.json
 
@@ -80,11 +83,20 @@ GRADLEW = REPO_ROOT / "gradlew"
 LOCAL_PAGE_ASSET_DIR = "mma_pages"
 PAGES_TARGET = REPO_ROOT / "template" / "src" / "main" / "assets" / LOCAL_PAGE_ASSET_DIR
 
+# 抽屉头图注入位置（W2 ⑨，方案 B）：固定名——每次导出只服务一个项目，无命名冲突；
+# 与 Kotlin `DRAWER_HEADER_ASSET`（ui/shell/DrawerHeaderImage.kt）必须一致。
+HEADER_IMAGE_ASSET = "mma_drawer_header.png"
+HEADER_IMAGE_TARGET = REPO_ROOT / "template" / "src" / "main" / "assets" / HEADER_IMAGE_ASSET
+
+# PNG 文件签名（8 字节魔数，QA Minor-F4）：头图内容校验的最小充分证据。
+PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
+
 # 白名单（与 Kotlin `ShellSpec` / `ShellActionSurrogate` 严格对齐）。
 ACTION_TYPES = {"url", "local_page", "native", "internal_page", "unknown"}
 SELECTION_STYLES = {"INDICATOR", "PILL", "TEXT"}
 DRAWER_SOURCES = {"NATIVE", "WEB"}
 DRAWER_WIDTH_MODES = {"SMALL", "MEDIUM", "LARGE", "CUSTOM"}
+DRAWER_HEADER_MODES = {"TEXT", "IMAGE"}
 # 可加载页面扩展名（与 Kotlin `isLocalPageFileName` 对齐）。
 PAGE_EXTENSIONS = (".html", ".htm")
 # 项目入口 JSON 的判别符（RuntimeJson.encodeEntry：ProjectEntry.BundledHtml 的 @SerialName）。
@@ -155,6 +167,14 @@ def validate_spec(obj, path: str = "$") -> list[str]:
                     m = w.get("mode", "MEDIUM")
                     if m not in DRAWER_WIDTH_MODES:
                         errs.append(_err(f"{path}.{name}.width.mode: 取值 {m!r} 不在 {sorted(DRAWER_WIDTH_MODES)}"))
+            # 抽屉头部（W2 ⑨）：模式白名单 + 三个可空字符串字段（与 Kotlin ShellDrawer 对齐）。
+            hm = region.get("headerMode", "TEXT")
+            if hm not in DRAWER_HEADER_MODES:
+                errs.append(_err(f"{path}.{name}.headerMode: 取值 {hm!r} 不在 {sorted(DRAWER_HEADER_MODES)}"))
+            for field in ("headerTitle", "headerSubtitle", "headerImageRef"):
+                v = region.get(field)
+                if v is not None and not isinstance(v, str):
+                    errs.append(_err(f"{path}.{name}.{field}: 期望字符串或 null，实为 {type(v).__name__}"))
     return errs
 
 
@@ -423,7 +443,7 @@ def cmd_check(src: Path) -> int:
     return 0
 
 
-def cmd_inject(src: Path, project: Path | None, build: bool) -> int:
+def cmd_inject(src: Path, project: Path | None, header_image: Path | None, build: bool) -> int:
     rc = cmd_check(src)
     if rc != 0:
         return rc
@@ -461,6 +481,36 @@ def cmd_inject(src: Path, project: Path | None, build: bool) -> int:
             sys.stderr.write(f"  - {e}\n")
         return 1
 
+    # ── 抽屉头图（W2 ⑨）：mode=IMAGE 缺图在构建期拒绝（与 local_page 缺 --project 同策略）──
+    # 运行期虽会安全回落文字模式，但"用户配了图、导出后图没了"必须拦在构建期，而不是留给用户去猜。
+    drawer = obj.get("drawer") if isinstance(obj.get("drawer"), dict) else {}
+    header_mode = drawer.get("headerMode", "TEXT")
+    header_bytes: bytes | None = None
+    if header_mode == "IMAGE":
+        if header_image is None:
+            sys.stderr.write(
+                "::error::壳 drawer.headerMode=IMAGE 但未提供 --header-image："
+                "只注入壳契约会导出「头图丢失」的 APK；如确要文字头部，请把 headerMode 改为 TEXT\n"
+            )
+            return 1
+        if not header_image.is_file():
+            sys.stderr.write(f"::error::找不到头图文件 {header_image}\n")
+            return 1
+        try:
+            header_bytes = header_image.read_bytes()
+        except OSError as e:
+            sys.stderr.write(f"::error::头图读取失败：{e}\n")
+            return 1
+        # PNG 签名校验（QA Minor-F4）：固定 assets 名是 .png，运行期 BitmapFactory
+        # 只解 PNG 才不会白白浪费一次 IO 回落；签名不对（改了扩展名的 JPG/GIF/文本）
+        # 在构建期就拦下，而不是留给真机「图挂了才回落 TEXT」。
+        if not header_bytes.startswith(PNG_SIGNATURE):
+            sys.stderr.write(
+                f"::error::头图不是合法 PNG（缺少 \\x89PNG\\r\\n\\x1a\\n 签名）：{header_image}\n"
+                f"  → 请提供真正的 PNG 文件（编辑器保存的图已由 DrawerHeaderComposer 统一转 PNG）\n"
+            )
+            return 1
+
     # ── 顺序：先暂存页面 → 再写壳 → 最后原子替换 ──
     # M1：旧实现是"先写壳 → rmtree 旧页面 → 逐个写新页面"，中途抛异常（NUL / 超长名）
     # 会留下「壳是新的、页面是空的」半写入态，且以 traceback 退出（无 ::error::），
@@ -490,6 +540,25 @@ def cmd_inject(src: Path, project: Path | None, build: bool) -> int:
         return 1
     print(f"已注入：{src} → {TARGET}（{len(text)} 字节）")
 
+    # 头图落位（或清理）：IMAGE 有图 → 写 assets 固定名；TEXT → 清掉残留（不留幽灵资产）。
+    if header_bytes is not None:
+        try:
+            HEADER_IMAGE_TARGET.parent.mkdir(parents=True, exist_ok=True)
+            HEADER_IMAGE_TARGET.write_bytes(header_bytes)
+        except OSError as e:
+            sys.stderr.write(
+                f"::error::头图写入失败（{type(e).__name__}）：{e}\n"
+                f"  → 壳已注入；运行期头图会安全回落文字模式，可修正后重新注入以补齐\n"
+            )
+            return 1
+        print(
+            f"已注入抽屉头图：{header_image} → "
+            f"{HEADER_IMAGE_TARGET.relative_to(REPO_ROOT)}（{len(header_bytes)} 字节）"
+        )
+    elif HEADER_IMAGE_TARGET.exists():
+        HEADER_IMAGE_TARGET.unlink()
+        print("抽屉头图：本壳为 TEXT 模式（已清理 assets 残留头图）")
+
     # 页面落位（或清理）：有则原子替换，无则清空残留。
     if staged is not None:
         try:
@@ -513,11 +582,11 @@ def cmd_inject(src: Path, project: Path | None, build: bool) -> int:
         print("本地页面：本壳未引用（已清空 assets/mma_pages 残留）")
 
     if build:
-        return run_build(referenced)
+        return run_build(referenced, needs_header_image=header_bytes is not None)
     return 0
 
 
-def run_build(referenced_pages: list[str] | None = None) -> int:
+def run_build(referenced_pages: list[str] | None = None, needs_header_image: bool = False) -> int:
     referenced_pages = referenced_pages or []
     if not GRADLEW.is_file():
         sys.stderr.write(f"::error::找不到 gradlew（{GRADLEW}）\n")
@@ -548,6 +617,10 @@ def run_build(referenced_pages: list[str] | None = None) -> int:
                 sys.stderr.write(f"::error::本地页面 {p} 未打进 APK\n")
             if not embedded or missing:
                 return 2
+        # 自检：头图模式时 assets 固定名头图确实被打进 APK。
+        if needs_header_image and f"assets/{HEADER_IMAGE_ASSET}" not in names:
+            sys.stderr.write(f"::error::抽屉头图 assets/{HEADER_IMAGE_ASSET} 未打进 APK\n")
+            return 2
         return 0 if embedded else 2
     sys.stderr.write("::error::构建产物缺失 template-debug.apk\n")
     return 2
@@ -599,6 +672,12 @@ def main() -> int:
         type=Path,
         help="项目入口 JSON（RuntimeJson.encodeEntry 产物）：壳含 local_page 时必填，用于注入页面内容",
     )
+    p.add_argument(
+        "--header-image",
+        dest="header_image",
+        type=Path,
+        help="抽屉头图（W2 ⑨）：壳 drawer.headerMode=IMAGE 时必填，写入 assets/mma_drawer_header.png",
+    )
     p.add_argument("--print", action="store_true", help="打印当前工程内已注入的壳")
     p.add_argument("--build", action="store_true", help="注入后构建导出 APK（需配合 --in）")
     args = p.parse_args()
@@ -608,8 +687,8 @@ def main() -> int:
     if args.print:
         return cmd_print()
     if args.src:
-        return cmd_inject(args.src, args.project, args.build)
-    sys.stderr.write("用法：--in <json> [--project <entry.json>] [--build] | --check <json> | --print\n")
+        return cmd_inject(args.src, args.project, args.header_image, args.build)
+    sys.stderr.write("用法：--in <json> [--project <entry.json>] [--header-image <png>] [--build] | --check <json> | --print\n")
     return 2
 
 

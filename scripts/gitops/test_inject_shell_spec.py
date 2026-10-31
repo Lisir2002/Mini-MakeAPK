@@ -80,18 +80,20 @@ class InjectPipelineTestCase(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.root = Path(self.tmp.name)
         self.pages = self.root / "template" / "src" / "main" / "assets" / inj.LOCAL_PAGE_ASSET_DIR
+        self.header_asset = self.root / "template" / "src" / "main" / "assets" / inj.HEADER_IMAGE_ASSET
         self.target = self.root / "template" / "src" / "main" / "res" / "raw" / "shell_spec.json"
         self.target.parent.mkdir(parents=True, exist_ok=True)
 
-        self._saved = (inj.REPO_ROOT, inj.PAGES_TARGET, inj.TARGET)
+        self._saved = (inj.REPO_ROOT, inj.PAGES_TARGET, inj.TARGET, inj.HEADER_IMAGE_TARGET)
         inj.REPO_ROOT = self.root
         inj.PAGES_TARGET = self.pages
         inj.TARGET = self.target
+        inj.HEADER_IMAGE_TARGET = self.header_asset
 
     def tearDown(self) -> None:
         # 门禁：还原前先确认本用例确实把写盘重定向到了临时目录（防止用例偷写真实工程）。
         self.assertEqual(self.pages, inj.PAGES_TARGET, "写盘点被还原过早，本用例可能污染了真实工程")
-        inj.REPO_ROOT, inj.PAGES_TARGET, inj.TARGET = self._saved
+        inj.REPO_ROOT, inj.PAGES_TARGET, inj.TARGET, inj.HEADER_IMAGE_TARGET = self._saved
         self.tmp.cleanup()
 
     # ── 辅助 ────────────────────────────────────────────────────────────
@@ -101,10 +103,10 @@ class InjectPipelineTestCase(unittest.TestCase):
         p.write_text(json.dumps(obj, ensure_ascii=False), encoding="utf-8")
         return p
 
-    def inject(self, spec_obj: dict, project_obj: dict | None) -> int:
+    def inject(self, spec_obj: dict, project_obj: dict | None, header_image: Path | None = None) -> int:
         src = self.write("spec.json", spec_obj)
         proj = self.write("project.json", project_obj) if project_obj is not None else None
-        return inj.cmd_inject(src, proj, build=False)
+        return inj.cmd_inject(src, proj, header_image, build=False)
 
     def injected_files(self) -> list[str]:
         if not self.pages.is_dir():
@@ -213,7 +215,7 @@ class BuildTimeRejectionTest(InjectPipelineTestCase):
         src = self.write("spec.json", spec_with("index.html"))
         proj = self.root / "project.json"
         proj.write_text("{not json", encoding="utf-8")
-        self.assertEqual(1, inj.cmd_inject(src, proj, build=False))
+        self.assertEqual(1, inj.cmd_inject(src, proj, None, build=False))
 
 
 # ── ③ 越界防护 ────────────────────────────────────────────────────────────
@@ -326,7 +328,7 @@ class WriteRobustnessTest(InjectPipelineTestCase):
         from contextlib import redirect_stderr
         buf = io.StringIO()
         with redirect_stderr(buf):
-            rc = inj.cmd_inject(src, proj, build=False)
+            rc = inj.cmd_inject(src, proj, None, build=False)
         return rc, buf.getvalue()
 
     def test_disk_error_becomes_error_line_not_traceback(self) -> None:
@@ -492,6 +494,95 @@ class ApkSelfCheckTest(InjectPipelineTestCase):
     def test_all_local_pages_present_passes_the_gate(self) -> None:
         self.fake_apk(["res/raw/shell_spec.json", "assets/mma_pages/index.html"])
         self.assertEqual(0, inj.run_build(["index.html"]))
+
+
+# ── ⑦ 抽屉头图注入（W2 ⑨）：mode=IMAGE 缺图拒绝 + 固定名落位 + 清理 ──────────
+class DrawerHeaderInjectTest(InjectPipelineTestCase):
+
+    PLAIN_SPEC: dict = {"specVersion": 1}
+
+    def drawer_spec(self, **header: object) -> dict:
+        return {**self.PLAIN_SPEC, "drawer": {"enabled": True, **header}}
+
+    def make_image(self) -> Path:
+        """一张假 PNG（本测试只关心字节搬运与落位，不做图片解码）。"""
+        p = self.root / "header.png"
+        p.write_bytes(b"\x89PNG\r\n\x1a\nfake-header-image-bytes")
+        return p
+
+    def test_image_mode_without_header_image_is_rejected(self) -> None:
+        """headerMode=IMAGE 缺 --header-image：构建期拒绝（不导出「头图丢失」的 APK）。"""
+        rc = self.inject(self.drawer_spec(headerMode="IMAGE"), None)
+        self.assertEqual(1, rc, "IMAGE 模式缺图必须拒绝注入")
+        self.assertFalse(self.target.exists(), "被拒的壳不得写进工程")
+
+    def test_image_mode_with_missing_file_is_rejected(self) -> None:
+        rc = self.inject(self.drawer_spec(headerMode="IMAGE"), None, self.root / "ghost.png")
+        self.assertEqual(1, rc, "头图文件不存在必须拒绝注入")
+        self.assertFalse(self.target.exists(), "被拒的壳不得写进工程")
+
+    def test_image_mode_with_header_image_writes_fixed_asset(self) -> None:
+        """IMAGE + --header-image：同一张图落到 assets 固定名（字节一致）。"""
+        img = self.make_image()
+        self.assertEqual(0, self.inject(self.drawer_spec(headerMode="IMAGE"), None, img))
+        self.assertTrue(self.header_asset.is_file(), "assets 固定名头图未落位")
+        self.assertEqual(img.read_bytes(), self.header_asset.read_bytes(), "头图字节不一致")
+
+    def test_fake_png_without_signature_is_rejected(self) -> None:
+        """伪 PNG（缺 \\x89PNG\\r\\n\\x1a\\n 签名）：构建期拒绝（QA Minor-F4）。"""
+        fake = self.root / "fake.png"
+        fake.write_bytes(b"GIF89a-not-a-png-at-all")  # 改了扩展名的非 PNG 内容
+        rc = self.inject(self.drawer_spec(headerMode="IMAGE"), None, fake)
+        self.assertEqual(1, rc, "缺 PNG 签名的内容必须被拦")
+        self.assertFalse(self.target.exists(), "被拒的壳不得写进工程")
+        self.assertFalse(self.header_asset.exists(), "伪 PNG 不得落进 assets")
+
+    def test_valid_png_signature_passes(self) -> None:
+        """合法 PNG 签名（8 字节魔数 + 任意载荷）：签名检查放行（QA Minor-F4）。"""
+        img = self.root / "sig.png"
+        img.write_bytes(b"\x89PNG\r\n\x1a\nrest-of-image-bytes")
+        rc = self.inject(self.drawer_spec(headerMode="IMAGE"), None, img)
+        self.assertEqual(0, rc, "带合法 PNG 签名的文件应放行")
+        self.assertTrue(self.header_asset.is_file(), "assets 固定名头图未落位")
+        self.assertEqual(img.read_bytes(), self.header_asset.read_bytes(), "头图字节不一致")
+
+    def test_text_mode_clears_stale_header_asset(self) -> None:
+        """TEXT 模式注入：清掉上一项目残留的头图（不留幽灵资产打进 APK）。"""
+        self.header_asset.parent.mkdir(parents=True, exist_ok=True)
+        self.header_asset.write_bytes(b"stale")
+        self.assertEqual(0, self.inject(self.PLAIN_SPEC, None))
+        self.assertFalse(self.header_asset.exists(), "TEXT 模式未清理残留头图")
+
+    def test_invalid_header_mode_is_rejected_by_spec_validation(self) -> None:
+        """headerMode 白名单（与 Kotlin ShellDrawerHeaderMode 对齐）。"""
+        rc = self.inject(self.drawer_spec(headerMode="GIF"), None, self.make_image())
+        self.assertEqual(1, rc, "非法 headerMode 必须被壳校验拦下")
+        self.assertFalse(self.target.exists(), "被拒的壳不得写进工程")
+
+    def test_header_string_fields_must_be_string_or_null(self) -> None:
+        """headerTitle / headerSubtitle / headerImageRef 期望字符串或 null。"""
+        for field in ("headerTitle", "headerSubtitle", "headerImageRef"):
+            with self.subTest(field=field):
+                rc = self.inject(self.drawer_spec(**{field: 123}), None)
+                self.assertEqual(1, rc, f"{field} 传数字必须被拦")
+                self.assertFalse(self.target.exists())
+
+    def test_header_asset_name_matches_exported_shell(self) -> None:
+        """跨语言一致性：脚本的固定名必须与壳 `DrawerHeaderImage.DRAWER_HEADER_ASSET` 字面量一致。
+
+        两边各改一半，导出壳的抽屉头图就是 100% 显示不出（且安全回落 TEXT，不会报错）。
+        """
+        kotlin = (
+            Path(__file__).resolve().parent.parent.parent
+            / "app" / "src" / "main" / "java" / "com" / "make" / "apk" / "ui" / "shell" / "DrawerHeaderImage.kt"
+        )
+        self.assertTrue(kotlin.is_file(), f"缺壳头图解码器源码：{kotlin}")
+        src = kotlin.read_text(encoding="utf-8")
+        self.assertIn(
+            f'DRAWER_HEADER_ASSET: String = "{inj.HEADER_IMAGE_ASSET}"',
+            src,
+            "脚本与导出壳的头图资产固定名已漂移",
+        )
 
 
 if __name__ == "__main__":

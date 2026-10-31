@@ -44,14 +44,26 @@ data class ShellSpec(
         get() = topBar.actions + topTabs.items + bottomBar.items + drawer.items
 
     companion object {
-        /** 当前契约版本。新增字段时 +1，并在此登记升级说明。 */
+        /**
+         * 当前契约版本。
+         *
+         * 升版约定（W1 F4 评估后修正，原"新增字段时 +1"与实际语义不符）：
+         * **仅破坏性变更才升版**——删除 / 改名已有字段、改变字段语义、序列化布局不再
+         * 向后兼容时才 +1；**新增带默认值的可选字段不升版**。理由：新旧两侧在
+         * `ignoreUnknownKeys`（新读旧）+ 默认值回落（旧读新）下天然双向兼容，
+         * 升版只会向消费方（导出壳 / 注入脚本 / 契约测试）错误传递"布局已破坏"的信号，
+         * 迫使其做无意义的版本分支；版本号的语义应是「数据布局代际」而非「改动次数」。
+         */
         const val CURRENT_SPEC_VERSION: Int = 1
 
         /** 契约版本升级说明（写进文档与导出壳的兼容判断）。 */
         const val VERSION_NOTES: String =
             "v1: 四区（topBar/topTabs/bottomBar/drawer）+ ShellAction 可执行两类：" +
                 "NavigateUrl（网页，http/https）与 OpenLocalPage（项目内本地页面，path 为项目文件名）；" +
-                "Native / InternalPage 仅登记不执行，未知 type 降级 Unknown"
+                "Native / InternalPage 仅登记不执行，未知 type 降级 Unknown；" +
+                // W1/W2 向后兼容追加（均带默认值，旧数据不炸、不升版），登记于此供导出壳审计。
+                "v1 兼容追加：bottomBar.selectionStyle、menuItem.useCustomTitle/pageTitle/titleSource、" +
+                "drawer.headerTitle/headerSubtitle/headerMode/headerImageRef（抽屉头部自定义）"
 
         /** 默认壳：四区全关，等价于"裸 WebView"（与阶段 5 现状一致，零回归）。 */
         val DEFAULT: ShellSpec = ShellSpec()
@@ -109,6 +121,19 @@ data class ShellMenuItem(
     val selected: Boolean = false,
     /** 是否为入口根（tab 类区域生效）：标记后该 tab 即「回入口」的目标页与栈根。 */
     val isEntry: Boolean = false,
+    /**
+     * 是否使用「自定义页面标题」覆盖打开该页时的顶栏 / 浏览器标签标题。
+     *
+     * - true → 用 [pageTitle]（留空则回落到 [titleSource]）；
+     * - false → 用 [titleSource] 决定标题来源（项目名称 / 网页 `<title>`）。
+     *
+     * 与条目自身的 [title]（菜单项标签）区分：前者是"打开后页面标题"，后者是"壳里这一项的名字"。
+     */
+    val useCustomTitle: Boolean = false,
+    /** 自定义页面标题文案；仅当 [useCustomTitle] = true 且非空时生效。 */
+    val pageTitle: String = "",
+    /** 页面标题来源（[useCustomTitle] = false 时生效）。 */
+    val titleSource: TitleSource = TitleSource.PROJECT_NAME,
 )
 
 /**
@@ -169,6 +194,25 @@ enum class ShellSelectionStyle {
 }
 
 /**
+ * 条目（顶栏动作 / 顶栏 tab / 底栏 tab / 抽屉菜单项）**页面标题**的来源。
+ *
+ * 影响"打开该页时顶栏 / 浏览器标签显示的标题"（与条目自身的 `title` = 菜单项标签区分）：
+ * - [PROJECT_NAME]：用项目名（L1 `apkName`）；
+ * - [PAGE_TITLE]：用所打开网页的 `<title>`（由渲染内核经 `onReceivedTitle` 回传，见
+ *   [com.make.apk.ui.screens.WebViewScreen] 的 `onTitle` 回调）。
+ *
+ * 旧数据（无该字段）反序列化回落到 [PROJECT_NAME]（与原行为一致：顶栏恒为项目名）。
+ */
+@Serializable
+enum class TitleSource {
+    /** 使用项目名称（L1 `apkName`）。 */
+    PROJECT_NAME,
+
+    /** 使用所打开网页的 `<title>`（实时读取）。 */
+    PAGE_TITLE,
+}
+
+/**
  * 底栏 tab 区。
  *
  * 与顶栏 tab 的差异：**底栏 tab 恒为导航**（无滑动切页语义）；
@@ -184,6 +228,13 @@ data class ShellBottomBar(
     val showLabels: Boolean = true,
     /** 条目数量上限（超出时渲染层截断并告警）。 */
     val maxItems: Int = 5,
+    /**
+     * 选中态呈现方式（与顶栏 tab 同枚举，三档语义一致）。
+     *
+     * 默认 [ShellSelectionStyle.TEXT] = 「仅强调色文字、无背景、无指示条」，
+     * 等价于改造前底栏的既有观感（选中 = 强调色文字），故向后兼容、零回归。
+     */
+    val selectionStyle: ShellSelectionStyle = ShellSelectionStyle.TEXT,
 )
 
 /**
@@ -207,7 +258,41 @@ data class ShellDrawer(
     val width: ShellDrawerWidth = ShellDrawerWidth(),
     /** 打开抽屉时是否暂停内容区 WebView（省资源；Web 覆盖层菜单打开时应暂停）。 */
     val pauseContentWhileOpen: Boolean = true,
+    /**
+     * 抽屉头部标题覆写（W2 ⑨）；blank/null → 回落顶栏标题链
+     * （topBar.titleOverride → 项目名 → "应用菜单"），行为与改动前完全一致。
+     */
+    val headerTitle: String? = null,
+    /**
+     * 抽屉头部副标题（W2 ⑨）；blank/null → 回落现默认副标题（零回归）。
+     */
+    val headerSubtitle: String? = null,
+    /**
+     * 头部展示模式（W2 ⑨）：TEXT（默认，现状）或 IMAGE（2:1 头图）。
+     * IMAGE 模式下头图解析失败（缺图 / 被删）时**安全回落 TEXT**，绝不渲染空块。
+     */
+    val headerMode: ShellDrawerHeaderMode = ShellDrawerHeaderMode.TEXT,
+    /**
+     * 头图逻辑引用（W2 ⑨）：预览侧是 [com.make.apk.storage.DrawerHeaderStore] 落盘的
+     * 绝对路径快照（与 iconRef 同模式，拷贝即隔离）；导出侧注入固定 assets 名
+     * `mma_drawer_header.png`（与 inject_shell_spec.py 的 HEADER_IMAGE_ASSET 对齐）。
+     */
+    val headerImageRef: String? = null,
 )
+
+/**
+ * 抽屉头部展示模式（W2 ⑨）。
+ *
+ * 旧数据（无该字段）反序列化回落 [TEXT]（与原行为一致：恒为文字头部）。
+ */
+@Serializable
+enum class ShellDrawerHeaderMode {
+    /** 文字头部：标题（回落链）+ 副标题（可空回落）。 */
+    TEXT,
+
+    /** 图片头部：2:1 头图；图缺失时渲染层安全回落 [TEXT]。 */
+    IMAGE,
+}
 
 /** 抽屉内容来源。 */
 @Serializable
@@ -253,4 +338,28 @@ enum class ShellDrawerWidthMode {
 fun ShellTopTabs.entryTabItem(): ShellMenuItem? {
     val visible = items.filter { it.visible }
     return visible.firstOrNull { it.isEntry } ?: visible.firstOrNull()
+}
+
+/**
+ * 解析该条目"打开页时"的顶栏 / 浏览器标签标题（与条目自身的 [ShellMenuItem.title] 菜单标签区分）。
+ *
+ * - [useCustomTitle] 且 [pageTitle] 非空 → [pageTitle]（自定义页面标题）；
+ * - 否则 [titleSource] = [TitleSource.PAGE_TITLE] → 取实时网页 `<title>`
+ *   （由 [pageTitleForItem] 提供，取不到时回落 [fallback]）；
+ * - 否则（[TitleSource.PROJECT_NAME]）→ [fallback]（项目名）。
+ *
+ * [pageTitleForItem] 为 null（未接实时标题桥接，如静态快照）时，[TitleSource.PAGE_TITLE]
+ * 安全回落到 [fallback]，绝不抛异常、绝不出现空白标题。
+ */
+fun ShellMenuItem.resolveDisplayTitle(
+    fallback: String,
+    pageTitleForItem: ((String) -> String?)? = null,
+): String {
+    return if (useCustomTitle && pageTitle.isNotBlank()) {
+        pageTitle
+    } else if (titleSource == TitleSource.PAGE_TITLE) {
+        pageTitleForItem?.invoke(id) ?: fallback
+    } else {
+        fallback
+    }
 }

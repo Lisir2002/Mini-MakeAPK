@@ -1,0 +1,50 @@
+sequenceDiagram
+    autonumber
+    participant U as 用户
+    participant DE as DrawerEditor(编辑器)
+    participant DHS as DrawerHeaderStore(新)
+    participant DB as Room库/Workspace镜像
+    participant SPVM as ShellPreviewViewModel(预览)
+    participant POL as UrlOpenPolicy(共享判定)
+    participant NAV as MmaNavHost(事件消费)
+    participant SYS as 系统浏览器
+    participant TA as TemplateActivity(导出壳)
+    participant WVS as WebViewScreen(双侧共享)
+
+    rect rgb(235, 244, 255)
+    Note over U,WVS: 场景A：④ fitToApp=false 的外链语义（预览侧）
+    U->>SPVM: 点击抽屉菜单项(NavigateUrl)
+    SPVM->>POL: resolveUrlOpenTarget(DRAWER_ITEM)
+    POL-->>SPVM: EXTERNAL (fitToApp=false)
+    SPVM->>NAV: ShellPreviewEvent.OpenExternal(url)
+    NAV->>SYS: Intent.ACTION_VIEW
+    Note over WVS: 页内链接分支：InAppWebViewClient 同判定→外跳；<br/>OpenLocalPage/顶栏tab/底栏恒内嵌(骨架)
+    end
+
+    rect rgb(240, 255, 240)
+    Note over U,WVS: 场景B：④ 导出壳同分支（对称）
+    U->>TA: 点击顶栏动作按钮(NavigateUrl)
+    TA->>POL: resolveUrlOpenTarget(ACTION)
+    POL-->>TA: EXTERNAL
+    TA->>SYS: Intent.ACTION_VIEW（同一判定函数，双侧同源）
+    end
+
+    rect rgb(255, 248, 235)
+    Note over U,DB: 场景C：⑨ 头图上传→落库→预览渲染
+    U->>DE: 选择模式=图片，上传横图
+    DE->>DHS: saveFromPicker(uri)
+    DHS->>DHS: DrawerHeaderComposer 居中裁2:1→1024x512 PNG
+    DHS-->>DE: filesDir/drawer/header-<uuid>.png
+    DE->>DB: spec.drawer.headerMode=IMAGE, headerImageRef=绝对路径
+    DB->>SPVM: 项目流重推(shellSpec含新字段)
+    SPVM->>WVS: (图片由 ShellDrawerSection 经 DrawerHeaderImage 解码渲染，缺失→回落TEXT)
+    end
+
+    rect rgb(255, 240, 245)
+    Note over U,DB: 场景D：⑨ 导出注入（参考 mma_pages 先例）
+    DB->>DB: 导出 shell_spec.json + headerImageRef 指向的图
+    DB->>TA: inject_shell_spec.py --header-image
+    TA->>TA: 校验 headerMode/白名单 + 缺图拒绝(构建期拦截)
+    TA->>TA: 写入 assets/mma_drawer_header.png(固定名)
+    TA->>WVS: 运行期 DrawerHeaderImage 读 assets 解码<br/>(与预览同一渲染分支，判定对称)
+    end

@@ -8,6 +8,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -282,6 +283,160 @@ class ShellSpecContractTest {
         val decoded = RuntimeJson.decodeShellSpec(RuntimeJson.encodeShellSpec(spec))
         assertEquals(ShellAction.Native(ShellNativeAction.SHARE), decoded.topBar.actions[0].action)
         assertEquals(ShellAction.InternalPage("settings"), decoded.topBar.actions[1].action)
+    }
+
+    // ── W1 ⑫：条目页面标题自定义字段（向后兼容）────────────────────────────
+
+    @Test
+    fun menuItem_defaultTitleFields_areOffAndProjectName() {
+        val item = ShellMenuItem(id = "a", title = "标题")
+        assertFalse(item.useCustomTitle)
+        assertEquals("", item.pageTitle)
+        assertEquals(TitleSource.PROJECT_NAME, item.titleSource)
+    }
+
+    @Test
+    fun menuItem_oldJson_withoutTitleFields_usesDefaults() {
+        // 老数据（无 useCustomTitle / pageTitle / titleSource）反序列化必须回落默认值，不炸。
+        val raw = """{"id":"a","title":"标题","action":{"type":"url","url":"https://example.com"}}"""
+        val decoded = RuntimeJson.decodeShellSpec(
+            """{"specVersion":1,"topTabs":{"enabled":true,"items":[$raw]}}""",
+        ).topTabs.items.first()
+        assertFalse(decoded.useCustomTitle)
+        assertEquals("", decoded.pageTitle)
+        assertEquals(TitleSource.PROJECT_NAME, decoded.titleSource)
+    }
+
+    @Test
+    fun titleSource_serializesAndRoundTrips() {
+        TitleSource.entries.forEach { source ->
+            val item = ShellMenuItem(id = "a", title = "t", titleSource = source)
+            val decoded = RuntimeJson.decodeShellSpec(
+                RuntimeJson.encodeShellSpec(
+                    ShellSpec(topTabs = ShellTopTabs(enabled = true, items = listOf(item))),
+                ),
+            ).topTabs.items.first()
+            assertEquals(source, decoded.titleSource)
+        }
+    }
+
+    @Test
+    fun resolveDisplayTitle_customTitleWins_whenNonBlank() {
+        val item = ShellMenuItem(
+            id = "a",
+            title = "菜单名",
+            useCustomTitle = true,
+            pageTitle = "自定义页标题",
+        )
+        assertEquals("自定义页标题", item.resolveDisplayTitle(fallback = "项目名"))
+    }
+
+    @Test
+    fun resolveDisplayTitle_customTitleIgnored_whenBlank() {
+        // useCustomTitle=true 但 pageTitle 为空 → 回落到 titleSource 逻辑（本项目名）。
+        val item = ShellMenuItem(
+            id = "a",
+            title = "菜单名",
+            useCustomTitle = true,
+            pageTitle = "",
+        )
+        assertEquals("项目名", item.resolveDisplayTitle(fallback = "项目名"))
+    }
+
+    @Test
+    fun resolveDisplayTitle_pageTitleSource_usesLiveTitle() {
+        val item = ShellMenuItem(id = "tab1", title = "菜单名", titleSource = TitleSource.PAGE_TITLE)
+        assertEquals(
+            "实时网页标题",
+            item.resolveDisplayTitle(fallback = "项目名") { id -> if (id == "tab1") "实时网页标题" else null },
+        )
+    }
+
+    @Test
+    fun resolveDisplayTitle_pageTitleSource_fallsBack_whenNoLiveTitle() {
+        // pageTitleForItem 未提供（null）或查不到 → 安全回落 fallback，绝不空白 / 抛异常。
+        val item = ShellMenuItem(id = "tab1", title = "菜单名", titleSource = TitleSource.PAGE_TITLE)
+        assertEquals("项目名", item.resolveDisplayTitle(fallback = "项目名", pageTitleForItem = null))
+        assertEquals(
+            "项目名",
+            item.resolveDisplayTitle(fallback = "项目名") { null },
+        )
+    }
+
+    @Test
+    fun resolveDisplayTitle_projectNameSource_usesFallback() {
+        val item = ShellMenuItem(id = "a", title = "菜单名", titleSource = TitleSource.PROJECT_NAME)
+        assertEquals("项目名", item.resolveDisplayTitle(fallback = "项目名"))
+    }
+
+    // ── W1 ②：底栏选中态样式（ShellSelectionStyle 三档）向后兼容 ────────────
+
+    @Test
+    fun bottomBar_defaultSelectionStyle_isText_oldBehavior() {
+        // 默认 TEXT = 改造前底栏既有观感（仅强调色文字），老数据零回归。
+        assertEquals(ShellSelectionStyle.TEXT, ShellBottomBar().selectionStyle)
+        assertEquals(ShellSelectionStyle.TEXT, ShellSpec.DEFAULT.bottomBar.selectionStyle)
+    }
+
+    @Test
+    fun bottomBar_oldJson_withoutSelectionStyle_fallsBackToText() {
+        // 老数据（无 selectionStyle 键）反序列化必须回落 TEXT 且不炸。
+        val decoded = RuntimeJson.decodeShellSpec(
+            """{"specVersion":1,"bottomBar":{"enabled":true,"items":[{"id":"a","title":"首页"}]}}""",
+        )
+        assertEquals(ShellSelectionStyle.TEXT, decoded.bottomBar.selectionStyle)
+    }
+
+    @Test
+    fun bottomBar_selectionStyle_roundTripsAllThreeStyles() {
+        ShellSelectionStyle.entries.forEach { style ->
+            val spec = ShellSpec(bottomBar = ShellBottomBar(enabled = true, selectionStyle = style))
+            val decoded = RuntimeJson.decodeShellSpec(RuntimeJson.encodeShellSpec(spec))
+            assertEquals(style, decoded.bottomBar.selectionStyle)
+        }
+    }
+
+    // ── W2 ⑨：抽屉头部自定义字段（向后兼容）──────────────────────────────
+
+    @Test
+    fun drawerHeader_defaultFields_areTextModeWithNoOverrides() {
+        val drawer = ShellSpec.DEFAULT.drawer
+        assertNull(drawer.headerTitle)
+        assertNull(drawer.headerSubtitle)
+        assertEquals(ShellDrawerHeaderMode.TEXT, drawer.headerMode)
+        assertNull(drawer.headerImageRef)
+    }
+
+    @Test
+    fun drawerHeader_oldJson_withoutHeaderFields_fallsBackToTextMode() {
+        // 老数据（无 header* 字段）反序列化必须回落 TEXT 模式 + null 覆写，不炸。
+        val decoded = RuntimeJson.decodeShellSpec(
+            """{"specVersion":1,"drawer":{"enabled":true,"items":[{"id":"a","title":"首页"}]}}""",
+        )
+        assertEquals(ShellDrawerHeaderMode.TEXT, decoded.drawer.headerMode)
+        assertNull(decoded.drawer.headerTitle)
+        assertNull(decoded.drawer.headerSubtitle)
+        assertNull(decoded.drawer.headerImageRef)
+    }
+
+    @Test
+    fun drawerHeader_fields_roundTripAllModes() {
+        ShellDrawerHeaderMode.entries.forEach { mode ->
+            val spec = ShellSpec(
+                drawer = ShellDrawer(
+                    enabled = true,
+                    headerMode = mode,
+                    headerTitle = "自定义标题",
+                    headerSubtitle = "自定义副标题",
+                    headerImageRef = "/storage/emulated/0/header-abc.png",
+                ),
+            )
+            val decoded = RuntimeJson.decodeShellSpec(RuntimeJson.encodeShellSpec(spec))
+            assertEquals(mode, decoded.drawer.headerMode)
+            assertEquals("自定义标题", decoded.drawer.headerTitle)
+            assertEquals("自定义副标题", decoded.drawer.headerSubtitle)
+            assertEquals("/storage/emulated/0/header-abc.png", decoded.drawer.headerImageRef)
+        }
     }
 
     /** 构造一条仅用于壳字段断言的最小实体。 */

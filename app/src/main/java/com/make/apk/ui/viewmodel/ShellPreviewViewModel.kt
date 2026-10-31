@@ -7,6 +7,10 @@ import com.make.apk.data.model.Project
 import com.make.apk.data.model.ProjectEntry
 import com.make.apk.data.model.ShellAction
 import com.make.apk.data.model.ShellMenuItem
+import com.make.apk.data.model.UrlOpenOrigin
+import com.make.apk.data.model.UrlOpenTarget
+import com.make.apk.data.model.WebSettings
+import com.make.apk.data.model.resolveUrlOpenTarget
 import com.make.apk.logging.MmaLogger
 import com.make.apk.ui.editor.ProjectDirectory
 import com.make.apk.ui.editor.RepositoryProjectDirectory
@@ -156,27 +160,40 @@ class ShellPreviewViewModel(
 
     // ── 壳交互 ─────────────────────────────────────────────────────────
 
-    /** 顶栏 tab 选中：更新选中态，并按动作加载目标地址。 */
+    /** 顶栏 tab 选中：更新选中态，并按动作加载目标地址（TOP_TAB 恒内嵌，骨架不外开）。 */
     fun onTopTabSelected(item: ShellMenuItem) {
         _uiState.value = _uiState.value.copy(selectedTopTabId = item.id)
-        applyAction(item.action)
+        applyAction(item.action, UrlOpenOrigin.TOP_TAB)
     }
 
-    /** 底栏条目选中：更新选中态，并按动作加载目标地址。 */
+    /** 底栏条目选中：更新选中态，并按动作加载目标地址（BOTTOM_TAB 恒内嵌，骨架不外开）。 */
     fun onBottomItemSelected(item: ShellMenuItem) {
         _uiState.value = _uiState.value.copy(selectedBottomItemId = item.id)
-        applyAction(item.action)
+        applyAction(item.action, UrlOpenOrigin.BOTTOM_TAB)
     }
 
-    /** 顶栏动作按钮点击（刷新 / 分享 / …）。 */
+    /** 顶栏动作按钮点击（刷新 / 分享 / …）：ACTION 来源，fitToApp=false 时外开。 */
     fun onShellAction(item: ShellMenuItem) {
-        applyAction(item.action)
+        applyAction(item.action, UrlOpenOrigin.ACTION)
     }
 
-    /** 抽屉菜单项点击：更新高亮项，并按动作加载目标地址（收起由渲染层统一回调 [onDrawerOpenChanged]）。 */
+    /** 抽屉菜单项点击：更新高亮项，并按动作加载目标地址（DRAWER_ITEM 来源，fitToApp=false 时外开）。 */
     fun onDrawerItemSelected(item: ShellMenuItem) {
         _uiState.value = _uiState.value.copy(selectedDrawerItemId = item.id)
-        applyAction(item.action)
+        applyAction(item.action, UrlOpenOrigin.DRAWER_ITEM)
+    }
+
+    /**
+     * 顶栏 tab 页面标题回传（网页 `<title>`，来自 `WebViewScreen.onTitle`）。
+     *
+     * 按条目 id 缓存进 [ShellPreviewUiState.pageTitles]，供 [com.make.apk.ui.shell.ShellHost]
+     * 解析「页面标题」来源 = [com.make.apk.data.model.TitleSource.PAGE_TITLE]。
+     * 去重：标题未变化不触发状态更新（避免无谓重组）。
+     */
+    fun updateTopTabPageTitle(itemId: String, title: String) {
+        val current = _uiState.value.pageTitles
+        if (current[itemId] == title) return
+        _uiState.value = _uiState.value.copy(pageTitles = current + (itemId to title))
     }
 
     /**
@@ -191,18 +208,29 @@ class ShellPreviewViewModel(
     }
 
     /**
-     * 执行壳动作。
+     * 执行壳动作（W2 ④：携带 [origin]，按 [resolveUrlOpenTarget] 分流内嵌 / 外开）。
      *
      * 可执行两类（**互不混用**）：
-     * - [ShellAction.NavigateUrl] → 内容区加载目标网址；
-     * - [ShellAction.OpenLocalPage] → 内容区加载项目内的本地页面（HTML 项目文件）；
+     * - [ShellAction.NavigateUrl] → 命中 EXTERNAL（仅 ACTION / DRAWER_ITEM 来源且
+     *   `fitToApp = false`，骨架来源恒内嵌）→ 发一次性事件 [ShellPreviewEvent.OpenExternal]
+     *   由导航层 `startActivity`；否则内容区加载目标网址；
+     * - [ShellAction.OpenLocalPage] → 内容区加载项目内的本地页面（HTML 项目文件），
+     *   **恒内嵌**（本地页面无 URL，类型隔离铁律）。
      *
      * 其余类型（原生动作 / 内置页 / 未知）一律记日志并忽略——**不崩溃、不静默**：
      * 未知动作在预览里表现为"点了没反应"，属于契约已登记但尚未实现的类型。
      */
-    private fun applyAction(action: ShellAction) {
+    private fun applyAction(action: ShellAction, origin: UrlOpenOrigin) {
         when (action) {
-            is ShellAction.NavigateUrl -> navigateTo(action.url)
+            is ShellAction.NavigateUrl -> {
+                // settings 缺失（尚未加载完成）回落默认 fitToApp=true → 内嵌，零回归。
+                val settings = _uiState.value.runtimeConfig?.webSettings ?: WebSettings()
+                if (resolveUrlOpenTarget(settings, origin) == UrlOpenTarget.EXTERNAL) {
+                    eventChannel.trySend(ShellPreviewEvent.OpenExternal(action.url))
+                } else {
+                    navigateTo(action.url)
+                }
+            }
             is ShellAction.OpenLocalPage -> openLocalPage(action.path)
             is ShellAction.Native -> {
                 MmaLogger.operation(
@@ -297,6 +325,12 @@ sealed interface ShellPreviewEvent {
 
     /** 需要给用户一条可见提示（如示例地址提醒）。 */
     data class Message(val text: String) : ShellPreviewEvent
+
+    /**
+     * 外链（W2 ④）：壳动作命中 [resolveUrlOpenTarget] = EXTERNAL 时发出，
+     * 由导航层 `startActivity` 执行（VM 不持 Context）。参数 = 目标网址。
+     */
+    data class OpenExternal(val url: String) : ShellPreviewEvent
 }
 
 /**

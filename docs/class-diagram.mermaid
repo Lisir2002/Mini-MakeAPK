@@ -1,0 +1,95 @@
+classDiagram
+    direction LR
+
+    class WebSettings {
+        +Boolean fitToApp = true
+        +Int cacheMode
+        +String? userAgent
+        ...既有字段
+    }
+
+    class UrlOpenPolicy {
+        <<object 数据模型新文件·纯Kotlin>>
+    }
+    class UrlOpenOrigin {
+        <<enumeration>>
+        ENTRY
+        TOP_TAB
+        BOTTOM_TAB
+        ACTION
+        DRAWER_ITEM
+        IN_PAGE_LINK
+    }
+    class UrlOpenTarget {
+        <<enumeration>>
+        EMBEDDED
+        EXTERNAL
+    }
+
+    class ShellDrawer {
+        +List~ShellMenuItem~ items
+        +ShellDrawerWidth width
+        +String? headerTitle ★新
+        +String? headerSubtitle ★新
+        +ShellDrawerHeaderMode headerMode ★新 = TEXT
+        +String? headerImageRef ★新
+    }
+    class ShellDrawerHeaderMode {
+        <<enumeration>>
+        TEXT
+        IMAGE
+    }
+
+    class ShellDrawerSection {
+        +render(drawer, env, open)
+        -ShellDrawerHeader(header, env, image)
+        -resolveHeaderImageSafe() 安全回落TEXT
+    }
+    class ShellHost {
+        +headerTitle回落链 drawer→topBar→项目名→应用菜单
+    }
+    class DrawerHeaderImage {
+        <<object 新文件 ui/shell>>
+        +load(ref) ImageBitmap?
+    }
+    class DrawerHeaderComposer {
+        <<object 新文件>>
+        +compose(source) Bitmap 居中裁2:1→1024x512
+    }
+    class DrawerHeaderStore {
+        +saveFromPicker(uri) String? 新文件storage
+        filesDir/drawer/header-uuid.png
+    }
+
+    class ExternalUrlLauncher {
+        <<object 新文件 ui/screens>>
+        +openExternal(context, url) Boolean
+    }
+    class InAppWebViewClient {
+        +fitToApp经viewTag
+        +IN_PAGE_LINK分支→EXTERNAL
+    }
+    class ShellPreviewViewModel {
+        +applyAction() 分流
+        +OpenExternal事件★新
+    }
+    class TemplateActivity {
+        +handleAction() 同分支
+    }
+
+    UrlOpenPolicy ..> WebSettings : 读取 fitToApp
+    UrlOpenPolicy ..> UrlOpenOrigin
+    UrlOpenPolicy ..> UrlOpenTarget
+    ShellPreviewViewModel ..> UrlOpenPolicy : 判定
+    TemplateActivity ..> UrlOpenPolicy : 判定
+    InAppWebViewClient ..> UrlOpenPolicy : 判定
+    ShellPreviewViewModel ..> ExternalUrlLauncher : 经事件消费
+    TemplateActivity ..> ExternalUrlLauncher
+    InAppWebViewClient ..> ExternalUrlLauncher
+
+    ShellHost --> ShellDrawerSection : 组合
+    ShellDrawer --> ShellDrawerSection : 契约
+    ShellDrawerSection ..> ShellDrawerHeaderMode
+    ShellDrawerSection ..> DrawerHeaderImage : 解码
+    DrawerHeaderStore ..> DrawerHeaderComposer : 裁剪
+    ShellDrawer ..> ShellDrawerHeaderMode

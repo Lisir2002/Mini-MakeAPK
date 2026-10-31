@@ -233,9 +233,93 @@ class ShellItemDialogLocalPageUiTest {
         assertFalse("已选文件被删后确定必须不可点（不留悬空引用）", confirmClickable())
     }
 
+    // ── W1 ⑫ 回归：条目「页面标题」字段在编辑往返中不得丢失 ─────────────
+
+    /**
+     * 编辑既有条目并确认后，[com.make.apk.data.model.ShellMenuItem] 的三个
+     * 「页面标题」字段（useCustomTitle / pageTitle / titleSource）必须原样保留。
+     *
+     * 用户只改了地址（或什么都不改），弹窗确认不应把他配置过的页面标题
+     * 静默抹回默认值——否则"编辑一次 = 页面标题配置全丢"。
+     */
+    @Test
+    fun editExistingItem_preservesPageTitleFields() {
+        val seed = ShellMenuItem(
+            id = "itm_1",
+            title = "首页",
+            action = ShellAction.NavigateUrl("https://example.com"),
+            useCustomTitle = true,
+            pageTitle = "我的自定义页标题",
+            titleSource = com.make.apk.data.model.TitleSource.PAGE_TITLE,
+        )
+        setEditor(initial = listOf(seed), pages = listOf("index.html"))
+        openEditDialog()
+
+        assertTrue("原值有效时确定可点", confirmClickable())
+        composeRule.onNodeWithText("确定").performClick()
+        settle()
+
+        val saved = items.value.single()
+        assertEquals("首页", saved.title)
+        assertTrue("useCustomTitle 不得被编辑弹窗冲掉", saved.useCustomTitle)
+        assertEquals("pageTitle 不得被编辑弹窗冲掉", "我的自定义页标题", saved.pageTitle)
+        assertEquals(
+            "titleSource 不得被编辑弹窗冲掉",
+            com.make.apk.data.model.TitleSource.PAGE_TITLE,
+            saved.titleSource,
+        )
+    }
+
     private companion object {
         const val LOCAL_PAGE_TAB: String = "本地页面"
         const val WEB_URL_TAB: String = "网页链接"
         const val NO_LOCAL_PAGE_HINT: String = "暂无本地页面，请先在项目代码页添加 .html 文件"
+    }
+
+    // ── W1 ⑫/F2 回归：弹窗「自定义页面标题」交互 ─────────────────────────
+
+    /**
+     * 新建条目：打开「自定义页面标题」开关 → 输入文案（带首尾空格）→ 确认，
+     * 落库必须为 useCustomTitle=true + trim 后的文案（与 onConfirm 透传逻辑一致）。
+     */
+    @Test
+    fun newItem_customPageTitleToggleOn_savesTrimmedTitle() {
+        setEditor(initial = emptyList(), pages = listOf("index.html"))
+        openNewItemDialog()
+
+        composeRule.onAllNodes(hasSetTextAction())[0].performTextInput("首页")
+        composeRule.onAllNodes(hasSetTextAction())[1].performTextInput("example.com")
+        // MmaSwitch 的 contentDescription 会追加「：开/关」状态后缀。
+        composeRule.onNodeWithContentDescription("自定义页面标题：关").performClick()
+        settle()
+        // 开关打开后出现第三个文本输入框（页面标题文案）。
+        composeRule.onAllNodes(hasSetTextAction())[2].performTextInput("  自定义页题  ")
+        settle()
+
+        composeRule.onNodeWithText("确定").performClick()
+        settle()
+
+        val saved = items.value.single()
+        assertTrue("开关打开后 useCustomTitle 必须落库为 true", saved.useCustomTitle)
+        assertEquals("页面标题文案必须 trim 后落库", "自定义页题", saved.pageTitle)
+    }
+
+    /**
+     * 编辑回填：已开启自定义标题的条目再次打开弹窗，开关必须处于开态
+     * （状态区回填初值，F1 修复的 UI 侧证据）。
+     */
+    @Test
+    fun editItem_customPageTitle_switchReflectsInitialValue() {
+        val seed = ShellMenuItem(
+            id = "itm_1",
+            title = "首页",
+            action = ShellAction.NavigateUrl("https://example.com"),
+            useCustomTitle = true,
+            pageTitle = "页题",
+        )
+        setEditor(initial = listOf(seed), pages = listOf("index.html"))
+        openEditDialog()
+
+        composeRule.onNodeWithText("页面标题文案").assertExists()
     }
 }

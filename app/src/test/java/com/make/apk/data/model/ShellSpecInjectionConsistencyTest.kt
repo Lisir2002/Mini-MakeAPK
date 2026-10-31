@@ -134,7 +134,7 @@ class ShellSpecInjectionConsistencyTest {
     }
 
     @Test
-    fun topTabsStyle_andDrawerSource_areWithinContractEnums() {
+    fun topTabsStyle_andDrawerSource_andDrawerHeaderMode_areWithinContractEnums() {
         // 枚举落到非法取值时，渲染层会静默回落 —— 在契约层先拦住。
         assertTrue(
             "topTabs.selectionStyle 非法：${spec.topTabs.selectionStyle}",
@@ -144,6 +144,18 @@ class ShellSpecInjectionConsistencyTest {
             "drawer.contentSource 非法：${spec.drawer.contentSource}",
             spec.drawer.contentSource in ShellDrawerSource.entries,
         )
+        // W2 ⑨：头部模式同样受枚举白名单约束（非法值由注入管线拒绝，这里锁契约层）。
+        assertTrue(
+            "drawer.headerMode 非法：${spec.drawer.headerMode}",
+            spec.drawer.headerMode in ShellDrawerHeaderMode.entries,
+        )
+        // 配了 IMAGE 却不带 ref 是悬空配置：注入管线构建期拦截，契约层兜底断言。
+        if (spec.drawer.headerMode == ShellDrawerHeaderMode.IMAGE) {
+            assertTrue(
+                "drawer.headerMode=IMAGE 但 headerImageRef 为空（悬空配置）",
+                !spec.drawer.headerImageRef.isNullOrBlank(),
+            )
+        }
     }
 
     /** 仓库根（从 user.dir 向上找 settings.gradle.kts，与 [locateInjectedSpec] 同一套定位）。 */

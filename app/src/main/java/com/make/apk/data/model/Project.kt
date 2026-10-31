@@ -42,7 +42,10 @@ data class Project(
      * **不参与** [toRuntimeConfig]：L1 是"内容运行时"，L2 是"壳形态"，两者不混。
      */
     val shellSpec: ShellSpec = ShellSpec.DEFAULT,
-    /** 本地多实例数据隔离目录后缀（`webapp_<id>`）。 */
+    /**
+     * 本地多实例数据隔离目录后缀（W3 ⑬ 新格式，**仅用于新建**）：
+     * `MakeApk_<yyyyMMdd_HHmmss>_item<id>`；存量 `webapp_<id>` 不迁移。
+     */
     val isolationId: String,
     /** 创建时间（epoch ms）。 */
     val createdAt: Long,
@@ -96,8 +99,27 @@ object ProjectDefaults {
         VersionScheme.THREE_SEGMENT -> "1.0.0"
     }
 
-    /** 本地多实例数据隔离目录后缀（§2.6）：`webapp_<id>`。 */
-    fun isolationIdOf(projectId: Long): String = "webapp_$projectId"
+    /**
+     * 本地多实例数据隔离目录后缀（W3 ⑬ 新格式，**仅用于新建项目**）：
+     * `MakeApk_<yyyyMMdd_HHmmss>_item<id>`。
+     *
+     * - **存量不迁移**（主控拍板）：已存在的 `webapp_<id>` 目录 / 数据库行原样保留，
+     *   兼容性由「新格式仅用于新建」保证；TemplateActivity 的 `"webapp_template"`
+     *   占位同样不动。
+     * - 旧签名 `isolationIdOf(projectId)` 已移除：同秒创建的多个项目靠 `_item<id>`
+     *   尾段去重（id 单调递增），不再依赖时间戳抖动。
+     */
+    fun isolationIdOf(projectId: Long, createdAtMs: Long): String =
+        "MakeApk_${formatIsolationTimestamp(createdAtMs)}_item$projectId"
+
+    /**
+     * 隔离名的时间戳段（纯函数，**本地时区**）。
+     *
+     * 文件名安全铁律：格式 `yyyyMMdd_HHmmss`——只含数字与下划线，
+     * **绝不含 `:` / `/` / 空格**（冒号在 Windows 同步盘 / 部分 FAT 掛载上是非法字符）。
+     */
+    fun formatIsolationTimestamp(epochMs: Long): String =
+        java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.US).format(java.util.Date(epochMs))
 }
 
 /**

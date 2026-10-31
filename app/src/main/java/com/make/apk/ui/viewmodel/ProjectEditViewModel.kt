@@ -10,13 +10,20 @@ import com.make.apk.data.model.ProjectDefaults
 import com.make.apk.data.model.ProjectEntry
 import com.make.apk.data.model.ProjectFile
 import com.make.apk.data.model.ProjectType
+import com.make.apk.data.model.ProgressColorToken
 import com.make.apk.data.model.ProgressPosition
+import com.make.apk.data.model.ProgressThickness
+import com.make.apk.data.model.ShellBottomBar
+import com.make.apk.data.model.ShellDrawer
 import com.make.apk.data.model.ShellSpec
+import com.make.apk.data.model.ShellTopBar
+import com.make.apk.data.model.ShellTopTabs
 import com.make.apk.data.model.VersionScheme
 import com.make.apk.data.model.WebSettings
 import com.make.apk.data.repository.ExportRunRepository
 import com.make.apk.data.repository.ProjectRepository
 import com.make.apk.logging.LogFields
+import com.make.apk.logging.MmaEventLogger
 import com.make.apk.logging.MmaLogger
 import com.make.apk.ui.fs.normalizePath
 import com.make.apk.ui.fs.resolveCopyName
@@ -342,6 +349,8 @@ class ProjectEditViewModel(
         }
         if (filtered.size == current.projectFiles.size) return
         _uiState.value = current.copy(projectFiles = filtered, dirty = true)
+        // W3 埋点：项目文件删除审计（实际删除入口在编辑页 VM，非文件编辑器——见类 KDoc）。
+        MmaEventLogger.crud("project_file", "delete", targetId = projectId, success = true, extra = mapOf("path" to norm))
         MmaLogger.operation(
             event = "project_file_deleted",
             message = "删除文件",
@@ -425,9 +434,50 @@ class ProjectEditViewModel(
      *
      * 任意区域改动都通过 [com.make.apk.ui.editor.ShellEditorTab] 上抛**新的整份** [ShellSpec]，
      * 这里只做"替换 + 标脏"，不关心内部差异——保持壳是不可变值对象的单一事实源。
+     *
+     * W3 埋点（零阻断、未安装时空操作）：与旧值做**区块差分**——
+     * - 变化的区块各记一条 `shell_section_update`（section = topBar/topTabs/bottomBar/drawer）；
+     * - 条目数变化的区块追加 `shell_slot_add` / `shell_slot_remove`（带 delta）。
      */
     fun onShellSpecChanged(spec: ShellSpec) {
+        val old = _uiState.value.shellSpec
         _uiState.value = _uiState.value.copy(shellSpec = spec, dirty = true)
+        if (old == spec) return
+        val sections = listOf(
+            "topBar" to (old.topBar to spec.topBar),
+            "topTabs" to (old.topTabs to spec.topTabs),
+            "bottomBar" to (old.bottomBar to spec.bottomBar),
+            "drawer" to (old.drawer to spec.drawer),
+        )
+        sections.forEach { (name, pair) ->
+            val (before, after) = pair
+            if (before == after) return@forEach
+            MmaEventLogger.crud(
+                "shell_section",
+                "update",
+                targetId = projectId,
+                success = true,
+                extra = mapOf("section" to name),
+            )
+            val beforeCount = before.itemCount()
+            val afterCount = after.itemCount()
+            when {
+                afterCount > beforeCount -> MmaEventLogger.crud(
+                    "shell_slot",
+                    "add",
+                    targetId = projectId,
+                    success = true,
+                    extra = mapOf("section" to name, "delta" to (afterCount - beforeCount)),
+                )
+                afterCount < beforeCount -> MmaEventLogger.crud(
+                    "shell_slot",
+                    "remove",
+                    targetId = projectId,
+                    success = true,
+                    extra = mapOf("section" to name, "delta" to (beforeCount - afterCount)),
+                )
+            }
+        }
     }
 
     // ── Web 渲染配置（六字段）──────────────────────────────────────────
@@ -467,6 +517,14 @@ class ProjectEditViewModel(
     /** 功能加载进度条位置（顶部 / 底部）。 */
     fun onLoadingProgressPositionChanged(position: ProgressPosition) =
         updateWebSettings { it.copy(loadingProgressPosition = position) }
+
+    /** 功能加载进度条色彩令牌（跟随主题，不硬编码色值）。 */
+    fun onProgressColorTokenChanged(token: ProgressColorToken) =
+        updateWebSettings { it.copy(progressColorToken = token) }
+
+    /** 功能加载进度条粗细（细 / 中 / 粗 三档预设）。 */
+    fun onProgressThicknessChanged(thickness: ProgressThickness) =
+        updateWebSettings { it.copy(progressThickness = thickness) }
 
     // ── 页面态（不落库）────────────────────────────────────────────────
 
@@ -531,6 +589,8 @@ class ProjectEditViewModel(
                         message = "更新项目",
                         fields = mapOf(LogFields.SUCCESS to true, "project_id" to projectId),
                     )
+                    // W3 埋点：项目设置保存审计（含壳契约 / Web 配置 / 基本信息的整次保存）。
+                    MmaEventLogger.crud("project", "settings_saved", targetId = projectId, success = true)
                     _uiState.value = _uiState.value.copy(saving = false, dirty = false)
                     eventChannel.send(ProjectEditEvent.Saved(projectId))
                 }
@@ -686,4 +746,13 @@ class ProjectEditViewModelFactory(
             validator = ProjectValidator(),
             exportRuns = exportRunRepository?.observeByProject(projectId),
         ) as T
+}
+
+/** 壳四区条目计数（W3 埋点的 slot 增减差分用；非四区类型恒 0）。 */
+private fun Any.itemCount(): Int = when (this) {
+    is ShellTopBar -> actions.size
+    is ShellTopTabs -> items.size
+    is ShellBottomBar -> items.size
+    is ShellDrawer -> items.size
+    else -> 0
 }

@@ -20,6 +20,17 @@ data class LogConfig(
     val fileMinLevel: LogLevel = LogLevel.INFO,
     val maxFileSizeBytes: Long = 2L * 1024 * 1024,
     val maxFiles: Int = 5,
+    /**
+     * 会话化多文件布局（W3 ⑦）：true 时 [fileDirectory] 下建
+     * `yyyy-MM-dd/session-HHmmss_<短码>/` 会话目录，并按类别路由
+     * operations.log / preview.log / app.log（[SessionFileSink]）；
+     * false（默认）保持单一大 `mma.log`（完全兼容旧路径）。
+     */
+    val sessionLogLayout: Boolean = false,
+    /** 会话日期目录保留天数（W3 ⑦，启动清理用；仅清理合法日期目录名）。 */
+    val logRetentionDays: Int = 14,
+    /** 会话布局下单个路由文件的历史轮转数上限（主控拍板：20）。 */
+    val maxFilesPerSessionFile: Int = 20,
     /** 是否安装 Java 崩溃处理器。 */
     val enableCrashHandler: Boolean = true,
     /** 是否启动 ANR 看门狗。 */
@@ -62,6 +73,12 @@ object MmaLogger {
     private var fileSinkSettings: FileSinkSettings? = null
 
     @Volatile
+    private var sessionSink: SessionFileSink? = null
+
+    /** SessionFileSink 构造参数快照（redirect 后按原 sessionDirName 重建，不改路由）。 */
+    private var sessionSinkSettings: SessionSinkSettings? = null
+
+    @Volatile
     private var crashHandler: CrashHandler? = null
 
     @Volatile
@@ -69,6 +86,9 @@ object MmaLogger {
 
     private var limiter = RateLimiter(windowMs = 60_000L, maxPerWindow = 30)
     private val droppedByLimit = AtomicLong(0)
+
+    /** 门面自诊断的 Logcat 标签（见 [logW]）。 */
+    private const val TAG_SELF = "mma-logger-self"
 
     // ── 安装 ──────────────────────────────────────────────────────────
 
@@ -83,19 +103,42 @@ object MmaLogger {
         config.logcatMinLevel?.let { level -> sinks.add(LogcatSink(level)) }
 
         config.fileDirectory?.let { dir ->
-            val sink = FileSink(
-                directory = dir,
-                maxFileSizeBytes = config.maxFileSizeBytes,
-                maxFiles = config.maxFiles,
-                minLevel = config.fileMinLevel,
-            )
-            fileSink = sink
-            sinks.add(sink)
-            fileSinkSettings = FileSinkSettings(
-                maxFileSizeBytes = config.maxFileSizeBytes,
-                maxFiles = config.maxFiles,
-                minLevel = config.fileMinLevel,
-            )
+            if (config.sessionLogLayout) {
+                // 会话布局（W3 ⑦）：目录名在安装时刻定格（跨午夜归属启动日）。
+                val sessionDirName = SessionLogPolicy.sessionDirName(
+                    System.currentTimeMillis(),
+                    TraceContext.sessionId,
+                )
+                val sink = SessionFileSink(
+                    root = dir,
+                    sessionDirName = sessionDirName,
+                    maxFileSizeBytes = config.maxFileSizeBytes,
+                    maxFilesPerFile = config.maxFilesPerSessionFile,
+                    minLevel = config.fileMinLevel,
+                )
+                sessionSink = sink
+                sinks.add(sink)
+                sessionSinkSettings = SessionSinkSettings(
+                    sessionDirName = sessionDirName,
+                    maxFileSizeBytes = config.maxFileSizeBytes,
+                    maxFilesPerFile = config.maxFilesPerSessionFile,
+                    minLevel = config.fileMinLevel,
+                )
+            } else {
+                val sink = FileSink(
+                    directory = dir,
+                    maxFileSizeBytes = config.maxFileSizeBytes,
+                    maxFiles = config.maxFiles,
+                    minLevel = config.fileMinLevel,
+                )
+                fileSink = sink
+                sinks.add(sink)
+                fileSinkSettings = FileSinkSettings(
+                    maxFileSizeBytes = config.maxFileSizeBytes,
+                    maxFiles = config.maxFiles,
+                    minLevel = config.fileMinLevel,
+                )
+            }
         }
 
         val dbSink = DatabaseSink(config.minLevel)
@@ -143,6 +186,9 @@ object MmaLogger {
      * @return 是否迁移成功；未安装文件出口或迁移失败返回 false（旧 sink 复位，不丢日志）。
      */
     fun redirectFileSink(newDirectory: File): Boolean {
+        // 会话布局（W3 ⑦）：整体搬迁当前会话目录（保留 sessionDirName，路由不变）。
+        sessionSink?.let { session -> return redirectSessionSink(session, newDirectory) }
+
         val old = fileSink ?: return false
         val settings = fileSinkSettings ?: return false
 
@@ -203,6 +249,95 @@ object MmaLogger {
         return true
     }
 
+    /**
+     * 门面自诊断出口（F2/F3）：直接走 android.util.Log，**绝不回调本门面**（防自吞递归）；
+     * runCatching 兜底——纯 JVM 单测环境 android.util.Log 未打桩时静默跳过，不抛。
+     */
+    private fun logW(tag: String, msg: String) {
+        runCatching { android.util.Log.w(tag, msg) }
+    }
+
+    /**
+     * 历史日期目录搬迁（F3，QA Minor）：会话布局迁移只搬当前会话目录的话，
+     * 旧根下**之前日期目录的历史会话**会永久滞留。主迁移成功后，对旧根下
+     * `SessionLogPolicy.isValidDateDirName` 的目录逐一 rename 到新根（保留相对结构）；
+     * - 非法名（用户自建 / 形似日期）**一律不动**；
+     * - 单个目录搬迁失败（如新根同名冲突、跨设备）只留 Logcat 痕迹，**不阻断主迁移**；
+     * - 本函数自身整体吞异常。
+     */
+    private fun migrateLegacyDateDirs(oldRoot: File, newRoot: File) {
+        runCatching {
+            oldRoot.listFiles()
+                ?.filter { it.isDirectory && SessionLogPolicy.isValidDateDirName(it.name) }
+                ?.forEach { dir ->
+                    val target = File(newRoot, dir.name)
+                    if (target.exists()) {
+                        logW(TAG_SELF, "legacy_dir_move_skipped_exists: ${dir.name}")
+                        return@forEach
+                    }
+                    if (!dir.renameTo(target)) {
+                        logW(TAG_SELF, "legacy_dir_move_failed: ${dir.name}")
+                    }
+                }
+        }.onFailure { logW(TAG_SELF, "legacy_dir_move_scan_failed: ${it.javaClass.simpleName}") }
+    }
+
+    /**
+     * 会话布局迁移（W3 ⑦）：把**当前会话目录整体**搬到新根下（目录名保持不变）。
+     * 优先 `renameTo`（同分区瞬时完成）；失败（跨挂载点等）逐文件追加拷贝。
+     * 任何一步失败返回 false（**旧目录不动**，调用方复位旧 sink，可安全重试）。
+     */
+    private fun redirectSessionSink(session: SessionFileSink, newRoot: File): Boolean {
+        val settings = sessionSinkSettings ?: return false
+        // 同根重定向是空操作（安装时已授权的典型场景），短路防误搬。
+        if (session.root.canonicalPath == newRoot.canonicalPath) return true
+
+        sinks.remove(session)
+        AsyncLogDispatcher.drain(1_000L)
+
+        val moved = runCatching { migrateSessionDirectory(session.sessionDirectory, newRoot) }
+            .onFailure { error("session_sink_redirect_failed", it) }
+            .getOrDefault(false)
+        if (!moved) {
+            // 搬迁失败：旧 sink 复位（旧目录数据完整），应用继续用原根目录。
+            sinks.add(session)
+            return false
+        }
+
+        // F3（QA Minor）：主迁移成功后，旧根下历史日期目录一并随迁（失败不阻断）。
+        migrateLegacyDateDirs(session.root, newRoot)
+
+        val newSink = SessionFileSink(
+            root = newRoot,
+            sessionDirName = settings.sessionDirName,
+            maxFileSizeBytes = settings.maxFileSizeBytes,
+            maxFilesPerFile = settings.maxFilesPerFile,
+            minLevel = settings.minLevel,
+        )
+        sinks.add(newSink)
+        sessionSink = newSink
+        return true
+    }
+
+    /** 会话目录整体搬迁：优先 rename；失败逐文件拷贝，全部成功后才删旧目录。 */
+    private fun migrateSessionDirectory(oldDir: File, newRoot: File): Boolean {
+        if (!newRoot.mkdirs() && !(newRoot.isDirectory && newRoot.canWrite())) return false
+        val target = File(newRoot, oldDir.name)
+        if (!target.exists() && oldDir.renameTo(target)) return true
+        if (!target.isDirectory && !target.mkdirs()) return false
+        val files = oldDir.listFiles() ?: return true // 空会话目录：无需搬运
+        val allCopied = files.all { file ->
+            !file.isFile || runCatching {
+                file.inputStream().use { input ->
+                    File(target, file.name).outputStream().use { output -> input.copyTo(output) }
+                }
+            }.isSuccess
+        }
+        if (!allCopied) return false
+        runCatching { oldDir.deleteRecursively() }
+        return true
+    }
+
     fun addSink(sink: LogSink) {
         sinks.add(sink)
     }
@@ -243,13 +378,17 @@ object MmaLogger {
         val osVersion = LogContext.osVersion
         val osSdk = LogContext.osSdk
 
-        val logEvent = LogEvent(
-            timestampMs = System.currentTimeMillis(),
-            level = level,
-            category = category,
-            event = event,
-            message = Sanitizer.sanitizeMessage(message),
-            fields = Sanitizer.sanitizeFields(
+        // F2（QA Minor）：脱敏在 runCatching 防线**之外**——fields 里的恶意对象
+        // （如 toString() 抛异常）曾把异常逃逸出 log()，违背「日志永不抛」硬约束。
+        // 现在脱敏失败降级为**空字段**（时间/级别/类别是 LogEvent 独立属性，天然保留），
+        // 诊断走 android.util.Log（runCatching 兜底，纯 JVM 测试无桩也不炸；不回调本门面防自吞）。
+        val sanitizedMessage = runCatching { Sanitizer.sanitizeMessage(message) }
+            .onFailure {
+                logW(TAG_SELF, "sanitize_message_failed: ${it.javaClass.simpleName}")
+            }
+            .getOrNull()
+        val sanitizedFields = runCatching {
+            Sanitizer.sanitizeFields(
                 fields + mapOf(
                     LogFields.APP_VERSION to appVersion,
                     LogFields.APP_VERSION_CODE to appVersionCode,
@@ -259,7 +398,19 @@ object MmaLogger {
                     LogFields.OS_VERSION to osVersion,
                     LogFields.OS_SDK to osSdk,
                 ),
-            ),
+            )
+        }.getOrElse {
+            logW(TAG_SELF, "sanitize_fields_failed: ${it.javaClass.simpleName}")
+            emptyMap()
+        }
+
+        val logEvent = LogEvent(
+            timestampMs = System.currentTimeMillis(),
+            level = level,
+            category = category,
+            event = event,
+            message = sanitizedMessage,
+            fields = sanitizedFields,
             throwable = throwable,
         )
 
@@ -388,8 +539,22 @@ object MmaLogger {
         AsyncLogDispatcher.drain(timeoutMs)
     }
 
-    /** 日志文件列表（活跃 + 历史），供导出诊断包。 */
-    fun logFiles(): List<File> = fileSink?.logFiles() ?: emptyList()
+    /** 日志文件列表（活跃 + 历史），供导出诊断包（会话布局时聚合全部路由文件）。 */
+    fun logFiles(): List<File> = buildList {
+        sessionSink?.let { addAll(it.logFiles()) }
+        fileSink?.let { addAll(it.logFiles()) }
+    }
+
+    /** 当前会话日志目录（会话布局时非 null）；DB 回灌等落位用，未装文件出口返回 null。 */
+    fun currentSessionLogDirectory(): File? = sessionSink?.sessionDirectory
+
+    /**
+     * 当前会话布局的**日志根**（W3 收口 F1）：会话目录、日期目录的公共父级——
+     * 启动过期清理必须扫这一层（扫会话目录的 parent 会错位到单个日期目录，
+     * 其下全是 session 目录、永不匹配日期正则，保留策略沦为死代码）。
+     * 未装会话布局返回 null。
+     */
+    fun currentSessionLogRoot(): File? = sessionSink?.root
 
     /** 被限流丢弃的条数：定期自检，避免"静默丢日志"。 */
     fun droppedByRateLimit(): Long = droppedByLimit.get()
@@ -406,6 +571,8 @@ object MmaLogger {
         installed = false
         fileSink = null
         fileSinkSettings = null
+        sessionSink = null
+        sessionSinkSettings = null
     }
 }
 
@@ -413,5 +580,13 @@ object MmaLogger {
 private data class FileSinkSettings(
     val maxFileSizeBytes: Long,
     val maxFiles: Int,
+    val minLevel: LogLevel,
+)
+
+/** [SessionFileSink] 构造参数快照（redirect 后保持同一 sessionDirName 与路由参数）。 */
+private data class SessionSinkSettings(
+    val sessionDirName: String,
+    val maxFileSizeBytes: Long,
+    val maxFilesPerFile: Int,
     val minLevel: LogLevel,
 )

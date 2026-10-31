@@ -21,10 +21,14 @@ import com.make.apk.data.model.ShellAction
 import com.make.apk.data.model.ShellIconKeys
 import com.make.apk.data.model.ShellMenuItem
 import com.make.apk.data.model.ShellPresets
+import com.make.apk.data.model.TitleSource
 import com.make.apk.ui.components.CuteButton
+import com.make.apk.ui.components.IconPickerCategory
+import com.make.apk.ui.components.IconPickerEntry
 import com.make.apk.ui.components.MmaDialog
 import com.make.apk.ui.components.MmaDropdownField
 import com.make.apk.ui.components.MmaIconAction
+import com.make.apk.ui.components.MmaIconPicker
 import com.make.apk.ui.components.MmaOption
 import com.make.apk.ui.components.MmaSegmentedChoice
 import com.make.apk.ui.components.MmaSwitch
@@ -296,6 +300,14 @@ private fun ShellItemCard(
  * **校验前置**：标题必填、地址须 http(s) 开头，不通过时确认按钮处于禁用态——
  * 比"允许确定、点了才报错"少一次无效往返。地址错误只在**非空且非法**时提示，
  * 避免弹窗刚打开就一片红。
+ *
+ * ## 「页面标题」（W1 ⑫）
+ *
+ * 开关「自定义页面标题」（[ShellMenuItem.useCustomTitle]）：
+ * - **关**：显示「标题来源」分段选择（[ShellMenuItem.titleSource]，项目名称 / 网页标题）；
+ * - **开**：显示标题文案输入框（[ShellMenuItem.pageTitle]，可留空）+ 下方保留来源选择——
+ *   留空时运行期按 [com.make.apk.data.model.resolveDisplayTitle] 回退到该来源，绝不出现空白标题。
+ * 编辑既有条目时三字段**回填初值**，确认时透传（编辑往返不丢配置，F1 回归已钉）。
  */
 @Composable
 private fun ShellItemDialog(
@@ -315,6 +327,11 @@ private fun ShellItemDialog(
     }
     var url by remember { mutableStateOf((initial?.action as? ShellAction.NavigateUrl)?.url ?: "") }
     var visible by remember { mutableStateOf(initial?.visible ?: true) }
+    // 「页面标题」三字段（W1 ⑫/F1）：编辑既有条目时**必须回填初值**，
+    // 否则确认重建 ShellMenuItem 会把用户配置过的页面标题静默抹回默认（数据丢失）。
+    var useCustomTitle by remember { mutableStateOf(initial?.useCustomTitle ?: false) }
+    var pageTitle by remember { mutableStateOf(initial?.pageTitle ?: "") }
+    var titleSource by remember { mutableStateOf(initial?.titleSource ?: TitleSource.PROJECT_NAME) }
 
     val titleError = title.isBlank()
     val urlError = url.isNotBlank() && hasUnsupportedScheme(url)
@@ -345,6 +362,10 @@ private fun ShellItemDialog(
                     },
                     visible = visible,
                     selected = initial?.selected ?: false,
+                    // 「页面标题」三字段透传（F1）：编辑往返绝不静默丢配置。
+                    useCustomTitle = useCustomTitle,
+                    pageTitle = pageTitle.trim(),
+                    titleSource = titleSource,
                 ),
             )
         },
@@ -358,10 +379,10 @@ private fun ShellItemDialog(
                     modifier = Modifier.fillMaxWidth(),
                     message = if (titleError) FieldMessage(TITLE_REQUIRED, FieldMessage.Severity.ERROR) else null,
                 )
-                MmaDropdownField(
+                MmaIconPicker(
                     label = "图标",
-                    selectedLabel = ICON_OPTIONS.firstOrNull { it.value == iconKey }?.label ?: "无图标",
-                    options = ICON_OPTIONS,
+                    selectedKey = iconKey,
+                    catalog = ICON_PICKER_CATALOG,
                     onSelected = { iconKey = it },
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -419,6 +440,39 @@ private fun ShellItemDialog(
                         },
                     )
                 }
+                // ── 页面标题（W1 ⑫）：「打开该页时」的标题，与条目自身的「标题」（菜单标签）区分 ──
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(
+                        text = "自定义页面标题",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    MmaSwitch(
+                        checked = useCustomTitle,
+                        onCheckedChange = { useCustomTitle = it },
+                        contentDescription = "自定义页面标题",
+                    )
+                }
+                if (useCustomTitle) {
+                    ProjectTextField(
+                        value = pageTitle,
+                        onValueChange = { pageTitle = it },
+                        label = "页面标题文案",
+                        // 留空不阻断确认：运行期按 resolveDisplayTitle 回退到下方来源选择。
+                        hint = PAGE_TITLE_BLANK_HINT,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+                MmaSegmentedChoice(
+                    label = if (useCustomTitle) "留空时的标题来源" else "标题来源",
+                    options = TITLE_SOURCE_OPTIONS,
+                    selectedValue = titleSource,
+                    onSelected = { titleSource = it },
+                )
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
@@ -462,6 +516,12 @@ private fun initialModeOf(initial: ShellMenuItem?): LoadMode =
 private val LOAD_MODE_OPTIONS: List<MmaOption<LoadMode>> = listOf(
     MmaOption(LoadMode.LOCAL_PAGE, "本地页面"),
     MmaOption(LoadMode.WEB_URL, "网页链接"),
+)
+
+/** 「标题来源」分段选项（值即 [TitleSource]，语义见 [ShellMenuItem.resolveDisplayTitle]）。 */
+private val TITLE_SOURCE_OPTIONS: List<MmaOption<TitleSource>> = listOf(
+    MmaOption(TitleSource.PROJECT_NAME, "项目名称"),
+    MmaOption(TitleSource.PAGE_TITLE, "网页标题"),
 )
 
 /** 地址是否写了**不被支持的协议**（http/https 之外仍要拦；无协议不拦——确认时自动补 https）。 */
@@ -523,14 +583,51 @@ private fun swapItems(list: List<ShellMenuItem>, from: Int, to: Int): List<Shell
     return mutable
 }
 
-/** 图标下拉选项（含矢量图标预览）。 */
-private val ICON_OPTIONS: List<MmaOption<String?>> = listOf(
-    MmaOption(null, "无图标"),
-    MmaOption(ShellIconKeys.REFRESH, "刷新", MmaShellIconResolver.resolve(ShellIconKeys.REFRESH)),
-    MmaOption(ShellIconKeys.ADD, "新增", MmaShellIconResolver.resolve(ShellIconKeys.ADD)),
-    MmaOption(ShellIconKeys.HOME, "首页", MmaShellIconResolver.resolve(ShellIconKeys.HOME)),
-    MmaOption(ShellIconKeys.DISCOVER, "发现", MmaShellIconResolver.resolve(ShellIconKeys.DISCOVER)),
-    MmaOption(ShellIconKeys.PROFILE, "我的", MmaShellIconResolver.resolve(ShellIconKeys.PROFILE)),
+/**
+ * 图标选择器目录（分类，与 [MmaShellIconResolver] 的逻辑键对齐）。
+ *
+ * 覆盖弹层按分类陈列网格；每项存**逻辑键**（null = 无图标），渲染时由解析器落具体
+ * drawable，保证预览侧与导出侧同键同形（"预览 == 导出"铁律）。
+ */
+private val ICON_PICKER_CATALOG: List<IconPickerCategory> = listOf(
+    IconPickerCategory(
+        title = "通用",
+        items = listOf(
+            IconPickerEntry(null, "无图标"),
+            IconPickerEntry(ShellIconKeys.HOME, "首页"),
+            IconPickerEntry(ShellIconKeys.DISCOVER, "发现"),
+            IconPickerEntry(ShellIconKeys.PROFILE, "我的"),
+            IconPickerEntry(ShellIconKeys.REFRESH, "刷新"),
+            IconPickerEntry(ShellIconKeys.ADD, "新增"),
+        ),
+    ),
+    IconPickerCategory(
+        title = "编辑",
+        items = listOf(
+            IconPickerEntry(MmaShellIconResolver.KEY_EDIT, "编辑"),
+            IconPickerEntry(MmaShellIconResolver.KEY_COPY, "复制"),
+            IconPickerEntry(MmaShellIconResolver.KEY_DELETE, "删除"),
+            IconPickerEntry(MmaShellIconResolver.KEY_MORE, "更多"),
+        ),
+    ),
+    IconPickerCategory(
+        title = "文件",
+        items = listOf(
+            IconPickerEntry(MmaShellIconResolver.KEY_FILE, "文件"),
+            IconPickerEntry(MmaShellIconResolver.KEY_DOCUMENT, "文档"),
+            IconPickerEntry(MmaShellIconResolver.KEY_FOLDER, "文件夹"),
+            IconPickerEntry(MmaShellIconResolver.KEY_FOLDER_OPEN, "打开的文件夹"),
+            IconPickerEntry(MmaShellIconResolver.KEY_CODE, "代码"),
+            IconPickerEntry(MmaShellIconResolver.KEY_CONFIG, "配置"),
+        ),
+    ),
+    IconPickerCategory(
+        title = "媒体",
+        items = listOf(
+            IconPickerEntry(MmaShellIconResolver.KEY_PLAY, "播放"),
+            IconPickerEntry(MmaShellIconResolver.KEY_NOTIFICATIONS, "通知"),
+        ),
+    ),
 )
 
 /** 上移箭头旋转角（[MmaIcons.Collapse] 默认向下，转 180° 即向上）。 */
@@ -548,6 +645,8 @@ private const val DELETE_CONFIRM: String = "删除"
 private const val TITLE_REQUIRED: String = "标题不能为空"
 private const val URL_SCHEME_HINT: String = "地址需以 http:// 或 https:// 开头"
 private const val URL_PLACEHOLDER: String = "https://"
+/** 页面标题输入框的留空提示（留空 → 运行期按下方来源选择回退，见 resolveDisplayTitle）。 */
+private const val PAGE_TITLE_BLANK_HINT: String = "留空则使用下方来源"
 /** 条目卡片里本地页面的目标摘要前缀（与网址区分开）。 */
 private const val LOCAL_PAGE_PREFIX: String = "本地页面 · "
 /** 本地页面下拉的空态值文案（项目内无页面文件）。 */

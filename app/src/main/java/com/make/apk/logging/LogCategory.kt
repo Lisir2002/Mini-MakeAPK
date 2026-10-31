@@ -29,8 +29,12 @@ enum class LogCategory(
     /** 已捕获异常、操作失败。 */
     ERROR(true, true, 90, "错误", LogGroup.PROBLEM),
 
-    /** 操作 / 审计：用户做了什么（启动构建、导出、删除历史、权限、设置）。合规要求 ≥180 天。 */
-    OPERATION(true, false, 180, "操作", LogGroup.BEHAVIOR),
+    /**
+     * 操作 / 审计：用户做了什么（启动构建、导出、删除历史、权限、设置）。合规要求 ≥180 天。
+     * W3 ⑦：落盘开关打开——会话布局下经 [SessionFileSink] 路由到 operations.log
+     * （单文件布局时写入 mma.log），审计证据同时具备加密库与文件两份载体。
+     */
+    OPERATION(true, true, 180, "操作", LogGroup.BEHAVIOR),
 
     /** 启动：冷/温/热型 + 各阶段耗时 + 首帧。 */
     STARTUP(true, true, 90, "启动", LogGroup.BEHAVIOR),
@@ -46,6 +50,13 @@ enum class LogCategory(
 
     /** 调试 / 逐帧诊断。仅 debug，不落盘。 */
     TRACE(false, false, 0, "调试", LogGroup.DIAGNOSTIC),
+
+    /**
+     * 预览诊断（W3 ⑬）：预览加载（preview_loaded）、白屏探测链（blank_confirmed /
+     * self_heal / root_cause 四级根因）。落加密 DB（展示组=诊断）+ preview.log 文件，
+     * 保留 90 天——白屏是"用户看到了但描述不清"的典型问题，结构化根因才能聚合定位。
+     */
+    PREVIEW(true, true, 90, "预览", LogGroup.DIAGNOSTIC),
 
     /** 安全审计：口令生成、加解密异常、**谁在何时导出了日志**。合规要求 3 年。 */
     SECURITY(true, true, 1095, "安全", LogGroup.SECURITY),

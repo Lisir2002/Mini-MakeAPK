@@ -185,7 +185,12 @@ class ProjectMapperTest {
         assertEquals("1.0.0", ProjectDefaults.defaultVersionName(VersionScheme.THREE_SEGMENT))
         assertEquals("1.0", ProjectDefaults.defaultVersionName(VersionScheme.TWO_SEGMENT))
         assertEquals(1, ProjectDefaults.DEFAULT_VERSION_CODE)
-        assertEquals("webapp_42", ProjectDefaults.isolationIdOf(42))
+        // W3 ⑬ 新格式：MakeApk_<yyyyMMdd_HHmmss>_item<id>（时间戳本地时区，断言形态与 id 尾段）。
+        val isolation = ProjectDefaults.isolationIdOf(42, createdAtMs = 1_770_000_000_000L)
+        assertTrue(
+            "新格式应符合 MakeApk_<ts>_item42：$isolation",
+            isolation.matches(Regex("""MakeApk_\d{8}_\d{6}_item42""")),
+        )
         // 主题色 = 设计语言主色蓝 #2563EB 的 ARGB（旧默认珊瑚粉 #E39E97 已废弃，黑名单门禁拦截）
         assertEquals(0xFF2563EB.toInt(), ProjectDefaults.DEFAULT_THEME_COLOR)
     }

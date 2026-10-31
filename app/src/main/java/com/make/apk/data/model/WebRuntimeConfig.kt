@@ -37,6 +37,6 @@ data class WebRuntimeConfig(
     val entry: ProjectEntry,
     /** Web 渲染配置（本地与导出共用），默认全集开启。 */
     val webSettings: WebSettings = WebSettings(),
-    /** 本地多实例数据隔离目录后缀（`webapp_<id>`）。 */
+    /** 本地多实例数据隔离目录后缀（W3 ⑬ 新格式 `MakeApk_<yyyyMMdd_HHmmss>_item<id>`；存量 `webapp_<id>` 不迁移）。 */
     val isolationId: String,
 )

@@ -8,6 +8,7 @@ import com.make.apk.data.model.ProjectDefaults
 import com.make.apk.data.model.ShellMenuItem
 import com.make.apk.data.model.ShellSpec
 import com.make.apk.data.model.ShellTopTabs
+import com.make.apk.data.model.resolveDisplayTitle
 
 /**
  * 壳渲染入口（阶段 6.2 · L3，阶段 6.5 增抽屉区）——**整个壳只有一个组合根**。
@@ -104,6 +105,14 @@ fun ShellHost(
     onDrawerOpenChanged: (Boolean) -> Unit = {},
     onDrawerItemSelected: (ShellMenuItem) -> Unit = {},
     onOverflow: (Int) -> Unit = {},
+    /**
+     * 实时页面标题查询（按条目 id 查当前页 `<title>`）。
+     *
+     * 用于条目「页面标题」来源 = [com.make.apk.data.model.TitleSource.PAGE_TITLE] 时，
+     * 由渲染内核经 `WebViewScreen.onTitle` 回传、宿主缓存后在此注入。为 null（未接桥接）时，
+     * 该来源安全回落到项目名，绝不出现空白标题。预览与导出两侧对称注入，保证一致。
+     */
+    pageTitleForItem: ((String) -> String?)? = null,
     contentHeader: (@Composable () -> Unit)? = null,
     pagedContent: (@Composable (Int, Modifier) -> Unit)? = null,
     content: @Composable (Modifier) -> Unit,
@@ -127,6 +136,16 @@ fun ShellHost(
     }
 
     val effectiveTopTabId = resolveTopTabSelectedId(visibleTopTabs, selectedTopTabId)
+
+    // 顶栏标题回退：若当前选中的顶栏 tab 条目配置了「自定义页面标题」或「网页标题」来源，
+    // 则按其配置解析（[resolveDisplayTitle]）；否则沿用项目名。该逻辑只影响"顶栏 tab 区启用"
+    // 的壳（非 tabbed 壳顶栏恒为项目名），且与预览/导出同源，不破坏一致性。
+    val topBarTitleOverride: String? = run {
+        if (!spec.topTabs.enabled) null
+        else visibleTopTabs.firstOrNull { it.id == effectiveTopTabId }
+            ?.resolveDisplayTitle(title, pageTitleForItem)
+    }
+
     // 选中态下标基于**可见条目列表**反查：隐藏条目不会让选中态错位。
     val selectedTopTabIndex = visibleTopTabs.indexOfFirst { it.id == effectiveTopTabId }
     // 滑动切页的四个前提条件（缺一即回落到单页内容区，保证 DEFAULT 壳零回归）。
@@ -140,7 +159,7 @@ fun ShellHost(
                 ShellTopBarSection(
                     topBar = spec.topBar,
                     env = env,
-                    title = title,
+                    title = topBarTitleOverride ?: title,
                     iconResolver = iconResolver,
                     onBack = onBack,
                     onShellAction = onShellAction,
@@ -196,7 +215,14 @@ fun ShellHost(
             onOpenChanged = onDrawerOpenChanged,
             selectedItemId = selectedDrawerItemId,
             onItemSelected = onDrawerItemSelected,
-            headerTitle = spec.topBar.titleOverride ?: title,
+            // 头部标题回落链（W2 ⑨，双侧同源收敛于此）：
+            // drawer.headerTitle → topBar.titleOverride → 项目名（title）→（仍空）"应用菜单"。
+            headerTitle = spec.drawer.headerTitle?.takeIf { it.isNotBlank() }
+                ?: spec.topBar.titleOverride?.takeIf { it.isNotBlank() }
+                ?: title,
+            headerSubtitle = spec.drawer.headerSubtitle,
+            headerMode = spec.drawer.headerMode,
+            headerImageRef = spec.drawer.headerImageRef,
             modifier = modifier,
             content = { frame(Modifier) },
         )

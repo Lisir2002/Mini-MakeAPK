@@ -14,6 +14,7 @@ import com.make.apk.data.model.ProjectType
 import com.make.apk.data.model.ShellSpec
 import com.make.apk.data.model.VersionScheme
 import com.make.apk.data.model.WebSettings
+import com.make.apk.logging.MmaEventLogger
 import com.make.apk.logging.MmaLogger
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
@@ -111,10 +112,13 @@ class ProjectRepository(
             isolationId = "",
         )
         val id = dao.insert(draft.toEntity())
-        val isolated = draft.copy(id = id, isolationId = ProjectDefaults.isolationIdOf(id))
+        // W3 ⑬：隔离名新格式（含创建时间戳，仅用于新建；存量 webapp_<id> 不迁移）。
+        val isolated = draft.copy(id = id, isolationId = ProjectDefaults.isolationIdOf(id, draft.createdAt))
         dao.update(isolated.toEntity())
         // 外部镜像与建库同批创建（rc9 用户需求：内外一起创建）；失败不回滚库（启动对账会补）。
         workspace?.onCreate(isolated)
+        // W3 埋点：项目创建审计（未安装日志时为空操作，不阻断业务）。
+        MmaEventLogger.crud("project", "create", targetId = id, success = true)
         return id
     }
 
@@ -129,12 +133,16 @@ class ProjectRepository(
         val updated = project.copy(updatedAt = now)
         dao.update(updated.toEntity())
         workspace?.onUpdate(updated)
+        // W3 埋点：项目更新审计。
+        MmaEventLogger.crud("project", "update", targetId = project.id, success = true)
     }
 
     /** 删除项目：其导出运行记录由外键 `ON DELETE CASCADE` 一并清除；外部镜像同步移除。 */
     suspend fun delete(id: Long) {
         dao.deleteById(id)
         workspace?.onDelete(id)
+        // W3 埋点：项目删除审计。
+        MmaEventLogger.crud("project", "delete", targetId = id, success = true)
     }
 
     /**
@@ -214,8 +222,9 @@ class ProjectRepository(
     }
 
     companion object {
-        /** 本地多实例数据隔离目录后缀（§2.6）。 */
-        fun isolationIdOf(projectId: Long): String = ProjectDefaults.isolationIdOf(projectId)
+        /** 本地多实例数据隔离目录后缀（W3 ⑬ 新格式转发 [ProjectDefaults]，存量不迁移）。 */
+        fun isolationIdOf(projectId: Long, createdAtMs: Long): String =
+            ProjectDefaults.isolationIdOf(projectId, createdAtMs)
 
         /** 默认主题色：设计语言主色蓝 `#2563EB`（转发 [ProjectDefaults]，勿在此另立魔数）。 */
         const val DEFAULT_THEME_COLOR: Int = ProjectDefaults.DEFAULT_THEME_COLOR

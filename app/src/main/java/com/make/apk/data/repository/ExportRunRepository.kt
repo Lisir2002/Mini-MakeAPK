@@ -6,6 +6,7 @@ import com.make.apk.data.mapper.toDomain
 import com.make.apk.data.mapper.toEntity
 import com.make.apk.data.model.ExportRun
 import com.make.apk.data.model.ExportStatus
+import com.make.apk.logging.MmaEventLogger
 import com.make.apk.logging.MmaLogger
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
@@ -79,7 +80,7 @@ class ExportRunRepository(
     /** 登记一次新导出，返回其 id（后续用于更新状态）。 */
     suspend fun start(projectId: Long, status: ExportStatus = ExportStatus.RUNNING): Long {
         val now = clock()
-        return dao.insert(
+        val id = dao.insert(
             ExportRunEntity(
                 projectId = projectId,
                 createdAt = now,
@@ -87,6 +88,9 @@ class ExportRunRepository(
                 status = status,
             ),
         )
+        // W3 埋点：导出登记审计。
+        MmaEventLogger.exportRunRecorded(runId = id, projectId = projectId, status = status.name)
+        return id
     }
 
     /**
@@ -106,6 +110,13 @@ class ExportRunRepository(
                 errorMessage = null,
             ),
         )
+        // W3 埋点：导出终态（成功）。
+        MmaEventLogger.exportRunStatus(
+            runId = id,
+            status = "SUCCESS",
+            durationMs = now - entity.createdAt,
+            success = true,
+        )
     }
 
     /** 标记失败。同样带终态守卫——取消后协程的收尾逻辑不得把记录刷成失败。 */
@@ -120,6 +131,14 @@ class ExportRunRepository(
                 durationMs = now - entity.createdAt,
                 errorMessage = errorMessage,
             ),
+        )
+        // W3 埋点：导出终态（失败，原因经门面脱敏）。
+        MmaEventLogger.exportRunStatus(
+            runId = id,
+            status = "FAILED",
+            durationMs = now - entity.createdAt,
+            success = false,
+            reason = errorMessage,
         )
     }
 
@@ -136,6 +155,8 @@ class ExportRunRepository(
                 errorMessage = null,
             ),
         )
+        // W3 埋点：导出终态（用户取消，不计成败）。
+        MmaEventLogger.exportRunStatus(runId = id, status = "CANCELLED", durationMs = now - entity.createdAt)
     }
 
     suspend fun remove(id: Long) {

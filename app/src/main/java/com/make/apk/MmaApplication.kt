@@ -14,10 +14,13 @@ import com.make.apk.data.repository.ProjectRepository
 import com.make.apk.logging.LogConfig
 import com.make.apk.logging.LogFields
 import com.make.apk.logging.LogLevel
+import com.make.apk.logging.MmaEventLogger
 import com.make.apk.logging.MmaLogger
+import com.make.apk.logging.SessionLogPolicy
 import com.make.apk.logging.StartupTracer
 import com.make.apk.storage.MmaStorage
 import com.make.apk.storage.ProjectWorkspaceStore
+import com.make.apk.webcore.diagnostics.WebViewEventHook
 import java.io.File
 import kotlin.concurrent.thread
 
@@ -99,8 +102,14 @@ class MmaApplication : Application() {
                 // 此处必须同步决策：attachBaseContext 阶段无 UI，绝不能等授权。
                 fileDirectory = logDirectory,
                 fileMinLevel = LogLevel.INFO,
+                // W3 ⑦：会话化多文件布局（yyyy-MM-dd/session-HHmmss_xxx/ 分 operations/
+                // preview/app 三文件）；保留期 14 天、单文件轮转 20 份均走 LogConfig 默认。
+                sessionLogLayout = true,
+                logRetentionDays = LOG_RETENTION_DAYS,
             ),
         )
+        // W3 ⑬：WebView 探测链埋点桥接（模板侧经共享 WebViewEventHook 解耦，此处装出口）。
+        WebViewEventHook.reporter = { event, fields -> MmaEventLogger.webViewEvent(event, fields) }
         MmaLogger.security(
             event = "logging_installed",
             message = "日志系统就绪",
@@ -148,7 +157,10 @@ class MmaApplication : Application() {
                 MmaLogger.startup("log_database_ready", "日志库就绪")
                 // 专用守护线程内 runBlocking：一次性启动对账（无 UI 生命周期语义，
                 // 不值得为它建协程作用域）；阻塞只影响本线程，不影响主线程。
-                kotlinx.coroutines.runBlocking { restoreExternalMirrors() }
+                kotlinx.coroutines.runBlocking {
+                    restoreExternalMirrors()
+                    cleanupExpiredSessionLogDirs()
+                }
             }.onFailure { throwable ->
                 MmaLogger.error("log_database_ready_failed", throwable)
             }
@@ -179,14 +191,18 @@ class MmaApplication : Application() {
 
     /** 外部日志目录为空但库里有日志 → 回灌近 [RESTORE_LOG_DAYS] 天（幂等：有文件就跳过）。 */
     private suspend fun restoreLogFilesFromDatabase() {
-        val dir = MmaStorage.resolveLogDirectory(this)
+        // W3 ⑦：优先落当前会话目录（app.restored-<ts>.log 与三路由文件同目录，
+        // 排障时一个会话一个现场）；会话布局未生效（如单测/异常兜底）回落日志根。
+        val dir = MmaLogger.currentSessionLogDirectory()
+            ?: MmaStorage.resolveLogDirectory(this)
         if (!dir.isDirectory) return
         val hasActiveLogs = dir.listFiles()?.any { it.isFile && it.name.endsWith(".log") } == true
         if (hasActiveLogs) return
         val since = System.currentTimeMillis() - RESTORE_LOG_DAYS * 24L * 60 * 60 * 1000
         val entries = runCatching { logRepository.querySince(since) }.getOrDefault(emptyList())
         if (entries.isEmpty()) return
-        val restored = File(dir, "restored-${System.currentTimeMillis()}.log")
+        // 文件名安全铁律：时间戳数字 + 点与字母，绝无 `:` / `/` / 空格。
+        val restored = File(dir, "app.restored-${System.currentTimeMillis()}.log")
         restored.bufferedWriter(Charsets.UTF_8).use { writer ->
             entries.forEach { entry -> writer.write(entry.formatLine()); writer.newLine() }
         }
@@ -195,6 +211,41 @@ class MmaApplication : Application() {
             message = "外部日志目录缺失，已从数据库回灌",
             fields = mapOf(LogFields.COUNT to entries.size, LogFields.SUCCESS to true),
         )
+    }
+
+    /**
+     * 会话日志目录清理（W3 ⑦，主控拍板 logRetentionDays=14）：
+     * 只删 `SessionLogPolicy.isValidDateDirName` 为 true **且**早于保留期的日期目录——
+     * 用户自建的任意目录（含形似日期的非法名）永不触碰。
+     * 整体吞异常：清理失败只留日志，绝不影响启动。
+     *
+     * `internal` = Robolectric 集成测试缝（`MmaSessionLogCleanupTest` 直调触发真实扫描路径）。
+     */
+    internal fun cleanupExpiredSessionLogDirs() {
+        // F1（QA Major）：必须扫**日志根**（currentSessionLogRoot）——
+        // 曾误用会话目录的 parentFile（= 单个日期目录），其下全是 session 目录、
+        // 永不匹配日期正则，expiredDateDirs 恒空 → 14 天保留策略死代码。
+        val root = runCatching { MmaLogger.currentSessionLogRoot() }
+            .getOrNull() ?: return
+        if (!root.isDirectory) return
+        val existing = root.listFiles()?.filter { it.isDirectory }?.map { it.name } ?: return
+        val today = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
+            .format(java.util.Date(System.currentTimeMillis()))
+        val doomed = runCatching {
+            SessionLogPolicy.expiredDateDirs(existing, today, LOG_RETENTION_DAYS)
+        }.getOrDefault(emptyList())
+        if (doomed.isEmpty()) return
+        var removed = 0
+        doomed.forEach { name ->
+            if (runCatching { File(root, name).deleteRecursively() }.getOrDefault(false)) removed++
+        }
+        if (removed > 0) {
+            MmaLogger.operation(
+                event = "session_log_dirs_pruned",
+                message = "过期会话日志目录已清理",
+                fields = mapOf(LogFields.COUNT to removed, LogFields.SUCCESS to true),
+            )
+        }
     }
 
     private fun registerLifecycleLogging() {
@@ -222,6 +273,9 @@ class MmaApplication : Application() {
 
         /** 日志回灌窗口（天）：外部日志目录被删后从库恢复最近多少天。 */
         private const val RESTORE_LOG_DAYS: Long = 3
+
+        /** 会话日志目录保留天数（W3 ⑦，主控拍板：14 天）。 */
+        private const val LOG_RETENTION_DAYS: Int = 14
     }
 }
 

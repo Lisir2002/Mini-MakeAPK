@@ -128,8 +128,14 @@ title/onBack 随之失效）+ `content`（页面内容，**必须消费 innerPad
 /storage/emulated/0/MMAFile/
 ├── APK/       安装包（Phase-2 安装链路）
 ├── Log/       运行日志（授权后 FileSink 主目录）
-├── Items/     项目数据（Phase-2）
-├── Setting/   设置的用户向展示（内容镜像钩子 SettingMirror，Phase-2）
+├── Items/     项目工作区镜像（rc9 已落地，ProjectWorkspaceStore；W3 ⑧ 参数见 ProjectWorkspaceParams）：
+│              manifest.json（entry/webSettings/shellSpec 全量内联快照——HTML 源码全文内联，
+│              冗余换「单文件可独立还原」；iconRef/headerImageRef 为本机绝对路径，跨设备不可移植；
+│              W3 起 manifest 带 structureVersion=2，读旧缺省=1）
+│              + src/ 源码 + assets/icon.png 图标副本；export//backups/ 子目录仅预留约定（Phase-2）；
+│              删除后启动对账自愈（数据库为唯一事实源）
+├── Setting/   设置的用户向展示（内容镜像钩子 SettingMirror，Phase-2：sync(context) 挂
+│              MmaApplication 启动链、文件按 settings.<节名>.json 分组）
 └── Backup/    本地备份与备份导入检测（Phase-2）
 ```
 
@@ -144,6 +150,9 @@ title/onBack 随之失效）+ `content`（页面内容，**必须消费 innerPad
 **降级路径**：未授权/外部存储不可写 → 日志留 `filesDir/logs`（免权限、卸载即清理），
 应用功能不中断；授权成功后 `MmaLogger.redirectFileSink` 把历史日志合并进 `MMAFile/Log`
 （先摘 sink → drain → 合并 → 换新 sink；同目录短路，防误删活跃日志）。
+W3 ⑦ 起日志为**会话布局**：`MMAFile/Log/yyyy-MM-dd/session-HHmmss_<短码>/` 下按类别路由
+`operations.log`（OPERATION+SECURITY）/ `preview.log`（PREVIEW）/ `app.log`（其余），
+日期目录保留 14 天（启动清理只删合法日期名，用户自建目录永不触碰）——详见 `docs/logging.md` §3.1。
 
 **扩展方式**：新增子目录 = `MmaDir` 加一个枚举值，`ensureDirs` 遍历 `entries` 自动创建；
 路径必须经 `MmaStorage` 获取，禁止散落 `File(...)`（CODE_STYLE §3.1 已立规约）。

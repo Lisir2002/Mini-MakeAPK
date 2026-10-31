@@ -18,7 +18,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import com.make.apk.data.model.ProjectFile
 import com.make.apk.data.model.ProjectType
+import com.make.apk.data.model.ProgressColorToken
 import com.make.apk.data.model.ProgressPosition
+import com.make.apk.data.model.ProgressThickness
 import com.make.apk.data.model.ShellSpec
 import com.make.apk.data.model.VersionScheme
 import com.make.apk.ui.components.MmaScreen
@@ -83,6 +85,8 @@ fun ProjectEditScreen(
     onIgnoreSslErrorsChanged: (Boolean) -> Unit,
     onShowLoadingProgressChanged: (Boolean) -> Unit = {},
     onLoadingProgressPositionChanged: (ProgressPosition) -> Unit = {},
+    onProgressColorTokenChanged: (ProgressColorToken) -> Unit = {},
+    onProgressThicknessChanged: (ProgressThickness) -> Unit = {},
     /** 打开文件（rc11：文件目录树 → 独立编辑器页；NavHost 接线导航）。 */
     onOpenFile: (String) -> Unit = {},
     /** 新增附加文件（文件目录树）。 */
@@ -260,8 +264,12 @@ fun ProjectEditScreen(
                             LoadingProgressCard(
                                 showLoadingProgress = state.webSettings.showLoadingProgress,
                                 loadingProgressPosition = state.webSettings.loadingProgressPosition,
+                                progressColorToken = state.webSettings.progressColorToken,
+                                progressThickness = state.webSettings.progressThickness,
                                 onShowLoadingProgressChanged = onShowLoadingProgressChanged,
                                 onLoadingProgressPositionChanged = onLoadingProgressPositionChanged,
+                                onProgressColorTokenChanged = onProgressColorTokenChanged,
+                                onProgressThicknessChanged = onProgressThicknessChanged,
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(horizontal = Spacing.space5, vertical = Spacing.space4),

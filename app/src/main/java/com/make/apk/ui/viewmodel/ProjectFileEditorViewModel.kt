@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.make.apk.data.model.ProjectEntry
 import com.make.apk.logging.LogFields
+import com.make.apk.logging.MmaEventLogger
 import com.make.apk.logging.MmaLogger
 import com.make.apk.ui.editor.ProjectDirectory
 import com.make.apk.ui.editor.RepositoryProjectDirectory
@@ -78,10 +79,13 @@ class ProjectFileEditorViewModel(
                 directory.update(project.copy(entry = entry.withFile(fileName, content)))
             }
                 .onSuccess {
-                    MmaLogger.operation(
-                        event = "project_file_saved",
-                        message = "保存项目文件",
-                        fields = mapOf(LogFields.SUCCESS to true, "project_id" to projectId, "file" to fileName),
+                    // W3 埋点：项目文件保存审计（crud 收口 `<domain>_<action>` 事件名）。
+                    MmaEventLogger.crud(
+                        "project_file",
+                        "save",
+                        targetId = projectId,
+                        success = true,
+                        extra = mapOf("file" to fileName),
                     )
                     _uiState.value = _uiState.value.copy(saving = false, content = content)
                     savedChannel.send(Unit)

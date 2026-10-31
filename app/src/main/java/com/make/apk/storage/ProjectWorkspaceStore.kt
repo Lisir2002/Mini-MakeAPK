@@ -4,7 +4,10 @@ import android.content.Context
 import com.make.apk.data.model.Project
 import com.make.apk.data.model.ProjectEntry
 import com.make.apk.data.model.ProjectType
+import com.make.apk.logging.LogCategory
 import com.make.apk.logging.LogFields
+import com.make.apk.logging.LogLevel
+import com.make.apk.logging.MmaEventLogger
 import com.make.apk.logging.MmaLogger
 import java.io.File
 import kotlinx.coroutines.Dispatchers
@@ -25,13 +28,20 @@ import kotlinx.serialization.json.Json
  * - [reconcileAll] 启动对账：目录缺失 → 从库重建并记 OPERATION 审计（谁的项目被自愈了）；
  * - 未授权存储时全部操作是**安全的空操作**（不报错、不降级功能，授权后启动对账自然补全）。
  *
- * 目录结构：
+ * 目录结构（⑥ 审计勘误后的口径，见各条内注）：
  * ```
  * MMAFile/Items/project-<id>/
- *   manifest.json          # 项目全量快照（含 entry / webSettings / shellSpec，可独立还原）
+ *   manifest.json          # 项目全量快照（entry / webSettings / shellSpec 全量内联——
+ *                          #   HTML 源码**全文内联**进 entry，此前"无内联"认知与事实不符；
+ *                          #   内联冗余换取「单文件可独立还原」，主控已拍板保持现状，
+ *                          #   如需引用形态化另立 Phase）
  *   src/<入口文件>          # HTML：源码；URL：entry.url 文本；Archive：资产引用说明
- *   assets/icon.png        # 图标副本（iconRef 指向本地文件时）
+ *   assets/icon.png        # 图标副本（iconRef 指向本地文件时；用户向镜像，非还原事实源）
  * ```
+ *
+ * 移植性口径：manifest 里的 `iconRef`（及 ShellSpec 的 `headerImageRef`）是**本机绝对路径**，
+ * 跨设备/跨安装不可移植——「可独立还原」指领域配置（含 HTML 全文）；
+ * 图标/头图在换设备还原时需重新选择（或经 Backup 链路打包二进制，Phase-2）。
  */
 class ProjectWorkspaceStore(
     private val appContext: Context,
@@ -57,6 +67,11 @@ class ProjectWorkspaceStore(
         val createdAt: Long,
         val updatedAt: Long,
         val syncedAt: Long,
+        /**
+         * 目录结构版本（W3 ⑧）：可选字段，**读旧写新**——旧 manifest 无该键时反序列化
+         * 缺省回落 1（v1 布局）；本轮起 [ProjectWorkspaceParams.STRUCTURE_VERSION] 恒写 2。
+         */
+        val structureVersion: Int = 1,
     )
 
     private val json = Json {
@@ -147,16 +162,36 @@ class ProjectWorkspaceStore(
                 createdAt = project.createdAt,
                 updatedAt = project.updatedAt,
                 syncedAt = clock(),
+                // W3 ⑧：新写入恒为当前结构版本（读旧写新：旧 manifest 缺键回落 1）。
+                structureVersion = ProjectWorkspaceParams.STRUCTURE_VERSION,
             )
-            File(dir, MANIFEST_FILE).writeText(json.encodeToString(Manifest.serializer(), manifest), Charsets.UTF_8)
+            val manifestText = json.encodeToString(Manifest.serializer(), manifest)
+            // manifest 体积告警（W3 ⑧，本轮生效）：HTML 全文内联可能撑大 manifest，
+            // 超阈值记 WARN 提醒（不阻断——镜像写入照常完成）。
+            if (manifestText.toByteArray(Charsets.UTF_8).size > ProjectWorkspaceParams.MANIFEST_WARN_BYTES) {
+                MmaLogger.log(
+                    LogLevel.WARN,
+                    LogCategory.OPERATION,
+                    "workspace_manifest_oversized",
+                    message = "manifest 超过告警阈值（HTML 源码内联所致）",
+                    fields = mapOf(
+                        "project_id" to project.id,
+                        LogFields.SIZE_BYTES to manifestText.toByteArray(Charsets.UTF_8).size,
+                    ),
+                )
+            }
+            File(dir, MANIFEST_FILE).writeText(manifestText, Charsets.UTF_8)
             true
         }.onSuccess {
-            MmaLogger.operation(
+            // W3 埋点对齐：workspace_created / workspace_updated / workspace_restored
+            // 统一走 MmaEventLogger（事件名保持不变，审计口径单一事实源）。
+            MmaEventLogger.operation(
                 event = reason,
                 message = "项目工作区镜像写入",
                 fields = mapOf(
                     "project_id" to project.id,
                     LogFields.SUCCESS to true,
+                    "structure_version" to ProjectWorkspaceParams.STRUCTURE_VERSION,
                 ),
             )
         }.onFailure { e ->

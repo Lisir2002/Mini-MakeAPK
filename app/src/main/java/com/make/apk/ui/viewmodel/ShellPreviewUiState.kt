@@ -92,4 +92,12 @@ data class ShellPreviewUiState(
     val currentUrl: String? = null,
     /** 当前内容是否为预置模板的**示例地址**（`example.com` 保留域）。 */
     val isExampleContent: Boolean = false,
+    /**
+     * 各顶栏 tab 条目的实时页面标题（网页 `<title>`），按条目 id 索引。
+     *
+     * 由渲染内核经 `WebViewScreen.onTitle` 回传、本 VM 缓存；供 `ShellHost` 解析
+     * 「页面标题」来源 = [com.make.apk.data.model.TitleSource.PAGE_TITLE] 时使用。
+     * 运行态、**不回写** [ShellSpec]（与壳运行态不污染契约的不变式一致）。
+     */
+    val pageTitles: Map<String, String> = emptyMap(),
 )

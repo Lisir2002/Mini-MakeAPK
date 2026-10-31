@@ -1,8 +1,10 @@
 package com.make.apk.ui.components
 
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -15,6 +17,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.style.TextOverflow
 import com.make.apk.ui.icons.MmaIcon
 import com.make.apk.ui.icons.MmaIcons
@@ -52,32 +55,41 @@ fun MmaTopBar(
         shape = RectangleShape,
         color = MaterialTheme.colorScheme.background,
     ) {
-        Row(
-            modifier = Modifier
-                .statusBarsPadding()
-                .heightIn(min = LocalMmaDesign.current.chrome.topBarHeight)
-                .padding(horizontal = Spacing.space2, vertical = Spacing.space2),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            if (onBack != null) {
-                IconButton(onClick = onBack) {
-                    MmaIcon(
-                        iconRes = MmaIcons.ArrowBack,
-                        contentDescription = "返回",
-                        tint = MaterialTheme.colorScheme.primary,
-                    )
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier
+                    .statusBarsPadding()
+                    .heightIn(min = LocalMmaDesign.current.chrome.topBarHeight)
+                    .padding(horizontal = Spacing.space2, vertical = Spacing.space2),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (onBack != null) {
+                    IconButton(onClick = onBack) {
+                        MmaIcon(
+                            iconRes = MmaIcons.ArrowBack,
+                            contentDescription = "返回",
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(Spacing.space1))
                 }
-                Spacer(modifier = Modifier.width(Spacing.space1))
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(modifier = Modifier.weight(1f))
+                actions()
             }
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+            // 顶栏与内容区之间的视觉分割（M3 Expressive 前沿做法）：一条 1dp 描边色分隔线，
+            // 颜色走 colorScheme.outline 令牌，避免硬编码色块。
+            HorizontalDivider(
+                modifier = Modifier.fillMaxWidth(),
+                thickness = 1.dp,
+                color = MaterialTheme.colorScheme.outline,
             )
-            Spacer(modifier = Modifier.weight(1f))
-            actions()
         }
     }
 }

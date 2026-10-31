@@ -52,6 +52,25 @@ object MmaShellIconResolver : ShellIconResolver {
     /** 回入口键（壳 chrome，指向被标记为入口根的 tab）。 */
     const val KEY_HOME: String = ShellIconKeys.HOME
 
+    // ── 以下为用户可配置条目的图标逻辑键（与图标选择器目录 [ICON_PICKER_CATALOG] 对齐）──
+    const val KEY_REFRESH: String = ShellIconKeys.REFRESH
+    const val KEY_ADD: String = ShellIconKeys.ADD
+    const val KEY_HOME_ITEM: String = ShellIconKeys.HOME
+    const val KEY_DISCOVER: String = ShellIconKeys.DISCOVER
+    const val KEY_PROFILE: String = ShellIconKeys.PROFILE
+    const val KEY_EDIT: String = "edit"
+    const val KEY_DELETE: String = "delete"
+    const val KEY_COPY: String = "copy"
+    const val KEY_MORE: String = "more"
+    const val KEY_FILE: String = "file"
+    const val KEY_DOCUMENT: String = "document"
+    const val KEY_FOLDER: String = "folder"
+    const val KEY_FOLDER_OPEN: String = "folder_open"
+    const val KEY_CODE: String = "code"
+    const val KEY_PLAY: String = "play"
+    const val KEY_CONFIG: String = "config"
+    const val KEY_NOTIFICATIONS: String = "notifications"
+
     /** 逻辑键 → drawable 资源 id（唯一映射表）。 */
     private val ICONS: Map<String, Int> = mapOf(
         ShellIconKeys.REFRESH to R.drawable.ic_refresh,
@@ -62,6 +81,18 @@ object MmaShellIconResolver : ShellIconResolver {
         KEY_BACK to R.drawable.ic_arrow_back,
         KEY_MENU to R.drawable.ic_menu,
         KEY_HOME to R.drawable.ic_home,
+        KEY_EDIT to R.drawable.ic_edit,
+        KEY_DELETE to R.drawable.ic_delete,
+        KEY_COPY to R.drawable.ic_content_copy,
+        KEY_MORE to R.drawable.ic_more_vert,
+        KEY_FILE to R.drawable.ic_file,
+        KEY_DOCUMENT to R.drawable.ic_document,
+        KEY_FOLDER to R.drawable.ic_folder,
+        KEY_FOLDER_OPEN to R.drawable.ic_folder_open,
+        KEY_CODE to R.drawable.ic_code,
+        KEY_PLAY to R.drawable.ic_play,
+        KEY_CONFIG to R.drawable.ic_config,
+        KEY_NOTIFICATIONS to R.drawable.ic_notifications,
     )
 
     /** 无图标时的兜底图标（动作按钮至少给一个可点图形，不出现"空按钮"）。 */

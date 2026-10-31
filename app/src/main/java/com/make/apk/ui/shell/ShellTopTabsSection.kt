@@ -6,8 +6,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
@@ -84,6 +86,10 @@ fun ShellTopTabsSection(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                // 固定最小高度占位：首屏即按最终布局占位，避免"被切一半"的闪烁
+                // （行内 tab 用 weight(1f) 布局、无固定高度时，首帧测量瞬态会让整排塌缩再弹起）。
+                // 48dp 为顶栏 tab 栏规范高度（组件尺寸语义，落在令牌白名单）。
+                .heightIn(min = TOP_TABS_MIN_HEIGHT)
                 .padding(horizontal = env.spaceSm),
             verticalAlignment = Alignment.Top,
         ) {
@@ -96,7 +102,7 @@ fun ShellTopTabsSection(
                     env = env,
                     iconResolver = iconResolver,
                     onClick = { onItemSelected(item) },
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
                 )
             }
         }
@@ -245,3 +251,6 @@ internal fun resolveTopTabSelectedId(items: List<ShellMenuItem>, selectedItemId:
 
 /** 壳 tab 图标尺寸（与 app 侧 MmaIcon 默认一致：24dp）。 */
 private val SHELL_TAB_ICON_SIZE = 24.dp
+
+/** 顶栏 tab 栏最小高度（组件尺寸语义，与 M3 TabRow 规范值同量级，落在令牌白名单）。 */
+private val TOP_TABS_MIN_HEIGHT = 48.dp // token-gate: allow:顶栏tab栏规范高度（组件尺寸语义，非间距）

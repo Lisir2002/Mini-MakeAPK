@@ -21,6 +21,11 @@ internal class FileSink(
     private val maxFileSizeBytes: Long = DEFAULT_MAX_FILE_SIZE_BYTES,
     private val maxFiles: Int = DEFAULT_MAX_FILES,
     private val minLevel: LogLevel = LogLevel.INFO,
+    /**
+     * 活跃文件名（W3 ⑦ 参数化）：默认 `mma.log` 与历史路径**完全兼容**；
+     * SessionFileSink 按类别路由时传入 `operations.log` / `preview.log` / `app.log`。
+     */
+    private val activeFileName: String = ACTIVE_FILE_NAME,
 ) : LogSink {
 
     private val lock = Any()
@@ -44,7 +49,7 @@ internal class FileSink(
 
     /** 当前活跃文件 + 历史文件（旧的排前面），供导出诊断包使用。 */
     fun logFiles(): List<File> {
-        val active = File(directory, ACTIVE_FILE_NAME)
+        val active = File(directory, activeFileName)
         val rotated = rotatedFiles()
         return buildList {
             addAll(rotated.sortedBy { RotationPolicy.indexOf(it.name) })
@@ -58,7 +63,7 @@ internal class FileSink(
             // 幂等重建（mkdirs），失败不抛——写不进去只丢这一条，绝不拖垮日志系统。
             if (!directory.isDirectory) runCatching { directory.mkdirs() }
             val payload = buildPayload(event).toByteArray(Charsets.UTF_8)
-            val active = File(directory, ACTIVE_FILE_NAME)
+            val active = File(directory, activeFileName)
             val currentSize = if (active.exists()) active.length() else 0L
             if (RotationPolicy.shouldRotate(currentSize, payload.size.toLong(), maxFileSizeBytes)) {
                 rotateLocked(active)
@@ -78,7 +83,7 @@ internal class FileSink(
 
     private fun rotateLocked(active: File) {
         if (!active.exists()) return
-        val target = File(directory, RotationPolicy.rotatedName(ACTIVE_FILE_NAME, nextRotationIndex()))
+        val target = File(directory, RotationPolicy.rotatedName(activeFileName, nextRotationIndex()))
         if (active.renameTo(target)) pruneLocked()
     }
 
@@ -91,7 +96,7 @@ internal class FileSink(
 
     private fun rotatedFiles(): List<File> =
         directory.listFiles { file ->
-            file.isFile && file.name.startsWith(ACTIVE_FILE_NAME + ".")
+            file.isFile && file.name.startsWith("$activeFileName.")
         }?.toList() ?: emptyList()
 
     private fun pruneLocked() {

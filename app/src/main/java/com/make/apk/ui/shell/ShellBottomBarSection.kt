@@ -5,9 +5,11 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -20,11 +22,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.make.apk.data.model.ShellBottomBar
 import com.make.apk.data.model.ShellMenuItem
+import com.make.apk.data.model.ShellSelectionStyle
 
 /**
  * 壳底栏区（[ShellBottomBar] → 原生底部导航栏等价物）。
@@ -80,6 +84,7 @@ fun ShellBottomBarSection(
                     item = item,
                     selected = item.id == effectiveSelectedId,
                     showLabel = bottomBar.showLabels,
+                    selectionStyle = bottomBar.selectionStyle,
                     env = env,
                     iconResolver = iconResolver,
                     onClick = { onItemSelected(item) },
@@ -92,28 +97,36 @@ fun ShellBottomBarSection(
 /**
  * 单个底栏条目：图标 + 文字标签（可选）。
  *
- * 选中态恒开：选中项图标与文字用强调色，未选中用次要色。
+ * 选中态恒开，且按 [selectionStyle] 呈现三档（与顶栏 tab 同语义）：
+ * - [ShellSelectionStyle.TEXT]：仅强调色文字（改造前底栏既有观感，默认值）；
+ * - [ShellSelectionStyle.INDICATOR]：强调色文字 + 底部指示条（占位透明，未选中不画）；
+ * - [ShellSelectionStyle.PILL]：强调容器色药丸背景 + 容器色上的前景色文字。
  */
 @Composable
 private fun RowScope.ShellBottomBarItem(
     item: ShellMenuItem,
     selected: Boolean,
     showLabel: Boolean,
+    selectionStyle: ShellSelectionStyle,
     env: ShellRenderEnv,
     iconResolver: ShellIconResolver,
     onClick: () -> Unit,
 ) {
-    val contentColor = if (selected) env.accent else env.onSurfaceVariant
     val iconRes = iconResolver.resolve(item.iconRef)
 
-    Column(
-        modifier = Modifier
-            .weight(1f)
-            .clickable(onClick = onClick)
-            .padding(vertical = env.spaceXs),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
+    // 选中态视觉：PILL 档用容器色前景；其余档用强调色文字，未选中用次要色。
+    val contentColor = when (selectionStyle) {
+        ShellSelectionStyle.PILL -> if (selected) env.onAccentContainer else env.onSurfaceVariant
+        else -> if (selected) env.accent else env.onSurfaceVariant
+    }
+    // PILL 档选中时的药丸背景色；其余档无背景。
+    val containerColor = if (selectionStyle == ShellSelectionStyle.PILL && selected) {
+        env.accentContainer
+    } else {
+        Color.Transparent
+    }
+
+    val itemContent: @Composable ColumnScope.() -> Unit = {
         if (iconRes != null) {
             Icon(
                 painter = painterResource(id = iconRes),
@@ -130,6 +143,42 @@ private fun RowScope.ShellBottomBarItem(
                 color = contentColor,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .weight(1f)
+            .fillMaxHeight()
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (selectionStyle == ShellSelectionStyle.PILL) {
+            // 药丸背景包住整组内容（padding 走 env 间距令牌，与顶栏 tab PILL 档一致）。
+            Column(
+                modifier = Modifier
+                    .background(color = containerColor, shape = env.shapes.extraLarge)
+                    .padding(horizontal = env.spaceSm, vertical = env.spaceXs),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+                content = itemContent,
+            )
+        } else {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+                content = itemContent,
+            )
+        }
+        // 底部指示条：仅 INDICTOR 档绘制（占位透明，未选中不画），整排高度不跳动。
+        if (selectionStyle == ShellSelectionStyle.INDICATOR) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .height(env.indicatorHeight)
+                    .background(color = if (selected) env.accent else Color.Transparent),
             )
         }
     }

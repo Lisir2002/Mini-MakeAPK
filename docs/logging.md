@@ -18,18 +18,19 @@
 
 ---
 
-## 2. 九大类别（不止 bug）
+## 2. 十大类别（不止 bug）
 
 | 类别 | 记什么 | 加密 DB | 文件 | 保留期 |
 |------|--------|:------:|:----:|:------:|
 | `CRASH` | Java 崩溃栈、ANR 主线程栈 | ✅ | ✅ | 90 天 |
 | `ERROR` | 已捕获异常、操作失败 | ✅ | ✅ | 90 天 |
-| `OPERATION` | **用户做了什么**：启动构建、导出、删除历史、权限、设置 | ✅ | — | **180 天**（合规 ≥6 个月） |
+| `OPERATION` | **用户做了什么**：启动构建、导出、删除历史、权限、设置 | ✅ | ✅ | **180 天**（合规 ≥6 个月） |
 | `STARTUP` | 冷/温/热型、阶段耗时、首帧 | ✅ | ✅ | 90 天 |
 | `PERFORMANCE` | 耗时、慢查询、采样埋点 | ✅ | — | 30 天 |
 | `NETWORK` | 端点路径 / 状态码 / 耗时 / 重试（**不记 body 与 token**） | ✅ | — | 30 天 |
 | `LIFECYCLE` | 前后台切换、Activity 状态 | — | — | 不落盘 |
 | `TRACE` | 分支决策、状态转储（仅 debug） | — | — | 不落盘 |
+| `PREVIEW` | **预览诊断（W3 ⑬）**：preview_loaded / 白屏探测链（blank_confirmed / self_heal / root_cause 四级根因） | ✅ | ✅ | 90 天 |
 | `SECURITY` | 口令生成、加解密异常、**谁在何时导出了日志** | ✅ | ✅ | **1095 天**（3 年） |
 
 级别契约：`VERBOSE/DEBUG` 仅本地；`INFO` 业务结果；`WARN` 降级已自愈；`ERROR` 需人介入；`FATAL` 崩溃/ANR。
@@ -54,7 +55,8 @@
 ```
 com.make.apk.logging/
 ├── MmaLogger.kt        # 统一门面：构造事件 → 强制脱敏 → 分发（含限流）
-├── LogConfig.kt        # 按构建类型差异化配置
+├── MmaEventLogger.kt   # 业务事件埋点门面（W3）：crud / preview_* / setting / export_run 收口
+├── LogConfig.kt        # 按构建类型差异化配置（含 sessionLogLayout / logRetentionDays）
 ├── LogLevel / LogCategory / LogEvent / LogFields
 ├── Sanitizer.kt        # deny-list 脱敏（敏感键 / PII / URL / 邮箱 / key=value 凭据）
 ├── TraceContext.kt     # sessionId + traceId + 单调序号（不透明、临时）
@@ -62,8 +64,40 @@ com.make.apk.logging/
 ├── AsyncLogDispatcher  # 单后台线程 + 有界队列（满则丢弃，绝不阻塞调用方）
 ├── JsonLite.kt         # 极简 JSON（避免 org.json 在 JVM 单测里"未打桩"）
 ├── StartupTracer.kt    # 冷/温/热分型 + 阶段耗时
-└── sink/  LogcatSink · FileSink(+RotationPolicy) · DatabaseSink · CrashHandler · AnrWatchdog
+├── SessionLogPolicy.kt # 会话目录命名 / 日期目录合法性 / 过期清理判据（W3 ⑦，纯 JVM）
+└── sink/  LogcatSink · FileSink(+RotationPolicy) · SessionFileSink · DatabaseSink · CrashHandler · AnrWatchdog
 ```
+
+### 3.1 会话目录布局与路由（W3 ⑦）
+
+```
+<日志根>/yyyy-MM-dd/session-HHmmss_<sessionId前4位hex>/
+├── operations.log   # OPERATION + SECURITY（审计，合规保留期最长）
+├── preview.log      # PREVIEW（预览白屏诊断专用）
+├── app.log          # 其余全部类别（默认兜底）
+└── app.restored-<ts>.log  # 外部日志目录缺失时从加密库回灌（幂等）
+```
+
+路由表（`SessionFileSink.defaultRoute`，**唯一事实源**）：
+
+| 类别 | 文件 |
+|------|------|
+| `OPERATION` / `SECURITY` | `operations.log` |
+| `PREVIEW` | `preview.log` |
+| 其余（含未来新增类别） | `app.log` |
+
+参数表（`LogConfig`，主控拍板）：
+
+| 参数 | 默认 | 说明 |
+|------|------|------|
+| `sessionLogLayout` | false（生产安装传 true） | 会话化多文件布局；false 保持单一大 `mma.log`（旧路径完全兼容） |
+| `logRetentionDays` | 14 | 日期目录保留天数；启动清理**只删合法日期目录名**，用户自建目录永不触碰 |
+| `maxFilesPerSessionFile` | 20 | 单个路由文件的历史轮转数上限 |
+| `maxFileSizeBytes` | 2MB | 单文件轮转阈值 |
+| 跨午夜归属 | — | 会话目录名取**启动日**，之后不切目录 |
+
+命名安全铁律：时间戳 `yyyyMMdd_HHmmss` / 会话短码（十六进制）/ 文件名（`[a-z.]`）——
+**绝不含 `:` / `/`（段内）/ 空格**；`SessionFileSink.sinkFor` 对路由产物做防御性校验。
 
 **三条不可动摇的原则**：
 
@@ -115,7 +149,8 @@ MmaLogger.error("build_failed", throwable, fields = mapOf(LogFields.REASON to "T
 | Sink | 关键设计 |
 |------|---------|
 | `LogcatSink` | 仅 debug 启用；标签 `MMA-<类别>`；异常栈单独一行避免被截断 |
-| `FileSink` | 单线程顺序追加；按大小滚动 + 按数量裁剪（默认 2MB×5）；目录由 `MmaStorage.resolveLogDirectory` 决策：已授权且可写 → `MMAFile/Log`，否则私有兜底 `filesDir/logs`（免权限、卸载即清）；运行中授权成功经 `MmaLogger.redirectFileSink` 迁移（历史日志合并、同目录短路） |
+| `FileSink` | 单线程顺序追加；按大小滚动 + 按数量裁剪（默认 2MB×5）；活跃文件名已参数化（默认 `mma.log` 兼容旧路径）；目录由 `MmaStorage.resolveLogDirectory` 决策：已授权且可写 → `MMAFile/Log`，否则私有兜底 `filesDir/logs`（免权限、卸载即清）；运行中授权成功经 `MmaLogger.redirectFileSink` 迁移（历史日志合并、同目录短路） |
+| `SessionFileSink`（W3 ⑦） | 按类别路由的组合出口（见 §3.1）；写前 `mkdirs` 自愈；`redirectFileSink` 对会话布局是**整体搬迁会话目录**（保留 sessionDirName，失败回退旧 sink）；日期目录过期清理在启动后台执行（只删合法日期名） |
 | `DatabaseSink` | **解决"日志早于数据库就绪"**：DB 需 Keystore+SQLCipher 打开必然迟到，故 attach 前先入有界缓冲，attach 后回灌 |
 | `CrashHandler` / `AnrWatchdog` | 见 §7 |
 

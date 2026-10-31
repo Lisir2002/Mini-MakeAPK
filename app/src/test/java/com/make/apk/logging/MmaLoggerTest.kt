@@ -5,6 +5,7 @@ import java.io.File
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -252,5 +253,81 @@ class MmaLoggerTest {
         assertTrue("fieldsJson 应含 app_version", fieldsJson.contains("\"app_version\""))
         assertTrue("fieldsJson 应含 device_model", fieldsJson.contains("\"device_model\""))
         assertTrue("fieldsJson 应含 build_type", fieldsJson.contains("\"build_type\""))
+    }
+
+    // ── W3 收口 F2：脱敏逃逸防护 ─────────────────────────────────────
+
+    /** toString() 必抛的恶意对象（模拟第三方库字段对象污染）。 */
+    private class PoisonedField {
+        override fun toString(): String = throw IllegalStateException("boom")
+    }
+
+    @Test
+    fun poisonedFields_doNotEscapeLog_andDegradeToEmptyFields() {
+        installForTest()
+        // 修复前：sanitizeFields 在 runCatching 之外，toString 抛异常直接逃逸出 log()。
+        val written = MmaLogger.operation(
+            "poisoned_event",
+            fields = mapOf("bad" to PoisonedField(), LogFields.SUCCESS to true),
+        )
+        assertTrue("降级后事件仍应写出（时间/级别/类别天然保留）", written)
+        val event = sink.events.single()
+        assertEquals("poisoned_event", event.event)
+        assertTrue("降级字段应为空（不携带未脱敏内容）", event.fields.isEmpty())
+    }
+
+    @Test
+    fun poisonedMessage_doesNotEscapeLog() {
+        installForTest()
+        // message 走同一条 sanitize 防线：字符串本身不会抛，但防线必须对两者一致。
+        val written = MmaLogger.operation("msg_event", message = "正常文本")
+        assertTrue(written)
+        assertEquals("正常文本", sink.events.single().message)
+    }
+
+    // ── W3 收口 F3：会话搬迁不遗弃历史日期目录 ────────────────────────
+
+    @Test
+    fun redirectSessionSink_movesLegacyDateDirsButLeavesUserDirs() {
+        val dirA = temporaryFolder.newFolder("private_root")
+        val dirB = temporaryFolder.newFolder("mmafile_root")
+        MmaLogger.install(
+            LogConfig(
+                minLevel = LogLevel.DEBUG,
+                logcatMinLevel = null,
+                fileDirectory = dirA,
+                fileMinLevel = LogLevel.DEBUG,
+                sessionLogLayout = true,
+                enableCrashHandler = false,
+                enableAnrWatchdog = false,
+                rateLimitMaxPerWindow = 1_000,
+            ),
+        )
+        try {
+            assertTrue(MmaLogger.startup("before_redirect"))
+            MmaLogger.flushBlocking()
+
+            // 旧根下播种：历史日期目录（应随迁）+ 用户自建目录（应原地不动）
+            val legacy = File(dirA, "2020-01-01/session-080000_abcd").apply { mkdirs() }
+            File(legacy, "app.log").writeText("legacy session log")
+            val userDir = File(dirA, "user-stuff").apply { mkdirs() }
+
+            assertTrue("会话布局重定向应成功", MmaLogger.redirectFileSink(dirB))
+
+            // 当前会话目录整体迁到 B
+            val movedSession = MmaLogger.currentSessionLogDirectory()
+            assertNotNull(movedSession)
+            assertTrue("当前会话应在新根下", movedSession!!.canonicalPath.startsWith(dirB.canonicalPath))
+            assertTrue("当前会话目录应随迁", movedSession.isDirectory)
+            // 历史日期目录保留相对结构 <date>/session-x/ 随迁
+            val movedLegacy = File(dirB, "2020-01-01/session-080000_abcd/app.log")
+            assertTrue("历史日期目录应随迁新根", movedLegacy.isFile)
+            assertTrue(movedLegacy.readText().contains("legacy session log"))
+            assertFalse("旧根不应再留历史日期目录", File(dirA, "2020-01-01").exists())
+            // 非法名目录原样保留在旧根
+            assertTrue("用户自建目录不随迁、不删除", File(dirA, "user-stuff").isDirectory)
+        } finally {
+            MmaLogger.shutdown()
+        }
     }
 }

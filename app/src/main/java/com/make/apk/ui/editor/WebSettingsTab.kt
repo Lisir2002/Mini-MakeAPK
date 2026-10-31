@@ -64,13 +64,26 @@ fun WebSettingsTab(
                 onCheckedChange = onDomStorageEnabledChanged,
             )
 
-            // 打开方式：WebView 内嵌 / Custom Tabs 外链（互斥，画成一段）
+            // 打开方式：WebView 内嵌 / 外部浏览器打开（互斥，画成一段）；W2 ④ 主控拍板：
+            // 外链走 Intent.ACTION_VIEW（零依赖），文案同步更正，不再提 Custom Tabs。
             MmaSegmentedChoice(
                 label = OPEN_MODE_LABEL,
                 options = OPEN_MODE_OPTIONS,
                 selectedValue = webSettings.fitToApp,
                 onSelected = onFitToAppChanged,
                 modifier = Modifier.fillMaxWidth(),
+            )
+            // 分段控件不带 description（不为其扩 API），说明区用两行中性文案补足，
+            // 让用户在选择前就知道两档各自的行为与适用场景。
+            Text(
+                text = OPEN_MODE_EMBEDDED_HINT,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = OPEN_MODE_EXTERNAL_HINT,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
             MmaSwitchRow(
@@ -125,7 +138,12 @@ private fun UserAgentRow(
     modifier: Modifier = Modifier,
 ) {
     // 真实值以 webSettings.userAgent 为准；输入框只持有一份本地草稿，随外部值变化重置。
-    var customValue by remember(userAgent) { mutableStateOf(userAgent ?: "") }
+    // 关键修复：切到 DESKTOP 时 userAgent == DESKTOP_USER_AGENT，若直接用它做草稿初值，
+    // 再点「自定义」会回写桌面串 → 下一帧 mode 重算成 DESKTOP → 自定义输入框永远不出现。
+    // 故草稿只吸纳"真·自定义值"（非 null 且非桌面串），桌面串与默认串回落到空草稿。
+    var customValue by remember(userAgent) {
+        mutableStateOf(if (userAgent != null && userAgent != DESKTOP_USER_AGENT) userAgent else "")
+    }
     val mode = when (userAgent) {
         null -> UaMode.DEFAULT
         DESKTOP_USER_AGENT -> UaMode.DESKTOP
@@ -182,7 +200,14 @@ private val CACHE_MODE_OPTIONS: List<MmaSelectOption<Int>> = listOf(
 
 private const val OPEN_MODE_LABEL: String = "应用内打开方式"
 private const val OPEN_MODE_WEBVIEW: String = "WebView 内嵌"
-private const val OPEN_MODE_CUSTOM_TABS: String = "Custom Tabs 外链"
+/** W2 ④ 主控拍板：外链 = Intent.ACTION_VIEW 系统浏览器（零依赖），文案不再提 Custom Tabs。 */
+private const val OPEN_MODE_CUSTOM_TABS: String = "外部浏览器打开"
+/** 内嵌档说明（分段控件下两行解释之一）。 */
+private const val OPEN_MODE_EMBEDDED_HINT: String =
+    "WebView 内嵌：不离开应用即可浏览；能加载项目内的本地页面；配合顶栏 / 底栏 / 抽屉，浏览过程不被跳转打断。适合以自己的网页 / 站点为主体的项目。"
+/** 外链档说明（分段控件下两行解释之一）：触发语义=骨架留应用内，内容跳转交外部。 */
+private const val OPEN_MODE_EXTERNAL_HINT: String =
+    "外部浏览器打开：交给系统浏览器，多标签、书签、密码填充、复杂登录态完整可用，也不占用应用内存；仅顶栏动作按钮、抽屉菜单与页内链接会跳出，导航骨架仍留在应用内。适合登录、支付流程复杂或重型外部页面。"
 private const val THIRD_PARTY_HINT: String = "OAuth / 支付等场景需开启"
 private const val CACHE_MODE_LABEL: String = "缓存模式"
 private const val UA_LABEL: String = "用户代理 (UA)"

@@ -70,6 +70,9 @@ android {
             "../app/src/main/java/com/make/apk/data/model",
             // WebViewScreen 单文件（不整目录引入其它 screen，避免导航/主题依赖）
             "../app/src/main/java/com/make/apk/ui/screens",
+            // W4 内核重写：webcore（config/engine/navigation/diagnostics/chrome）
+            // —— 编译期禁 ui/Room/ViewModel/主题依赖，模板同套源码（预览 == 导出）。
+            "../app/src/main/java/com/make/apk/webcore",
         )
 
         // ── 剔除非壳类与无关 screen ──

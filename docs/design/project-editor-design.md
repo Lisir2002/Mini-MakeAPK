@@ -121,7 +121,7 @@ data class WebSettings(
 | `themeColor` | 否 | ARGB 整数 | 设计语言主色珊瑚粉 `OKLCH(0.78 0.10 25)` ≈ `#E39E97` |
 | `entry` | 是 | URL→`https?://` 合法且非 `javascript:` 等危险 scheme；HTML→非空且含标签；Archive→zip 存在且 ≤100MB | 由 projectType + 来源输入派生，保存后锁死 |
 | `webSettings` | 否 | — | JS=true / DOM=true / 第三方Cookie=true / cacheMode=LOAD_DEFAULT / UA=null / fitToApp=true |
-| `isolationId` | 系统 | 仅 `[a-z0-9_]`、≤64 | `webapp_<id>`（本地多实例数据隔离用） |
+| `isolationId` | 系统 | 仅 `[A-Za-z0-9_]`、≤64、无 `:` `/` 空格 | 新建（W3 ⑬）：`MakeApk_<yyyyMMdd_HHmmss>_item<id>`；存量 `webapp_<id>` 不迁移 |
 | `createdAt` / `updatedAt` | 系统 | epoch ms | 创建 / 更新时写入 |
 
 **校验时机**：添加页各字段 `onValueChange` 实时校验，错误以 Material3 `isError` + **人话**支持文本就地提示；**顶栏「保存」仅在全部必填合法时可点**。
@@ -240,7 +240,7 @@ data class WebSettings(
   - `apkName` ← `appName`（空则 `sourceLabel`）；`packageName` ← 原值（空则生成占位 `com.make.user.app<id>` 满足 NOT NULL）。
   - `versionScheme/versionName/versionCode` ← 默认 `THREE_SEGMENT` / `1.0.0` / `1`。
   - `entry_json` ← 由 `inputType`+`sourceRef` 构造（`Url(sourceRef)` / `BundledHtml(sourceRef)` / `Archive(sourceRef,VUE)`）。
-  - `webSettings_json` ← 默认全集；`isolationId` ← `webapp_<id>`；`themeColor` ← `#E39E97`。
+  - `webSettings_json` ← 默认全集；`isolationId` ← 新建走 `MakeApk_<yyyyMMdd_HHmmss>_item<id>`（W3 ⑬；迁移存量行保持 `webapp_<id>` 不改写）；`themeColor` ← `#E39E97`。
   - `export_runs`：整行搬 `status/outputApkPath/...`，`projectId = build_records.id`（不含 `engine`）。
 - ⚠️ 早期 rc4 用户 `build_records` 几乎为空，数据保全优先级低；见 §8.5 可走"破坏性重建"捷径。
 
@@ -317,7 +317,7 @@ data class WebSettings(
 | | 主题色 | `themeColor` | 颜色选择（默认珊瑚粉 `#E39E97`） |
 | **进阶配置** | 模版应用自定义（占位） | — | 主题 / 顶栏 / 底栏 / tab 槽位控制（见 §10.5） |
 | **高级配置** | 导出方式 | — | 固定展示「本地注入（设备端 WebView 封装 / 资产注入）」，无选择（见 §11） |
-| | 本地隔离 | `isolationId` | 只读：`webapp_<id>` |
+| | 本地隔离 | `isolationId` | 只读：新建项目 `MakeApk_<yyyyMMdd_HHmmss>_item<id>`（W3 ⑬），存量项目保持 `webapp_<id>` |
 | | 导出格式 / 签名 | — | 占位（APK/AAB、调试 / 正式签名），待 Phase 2 |
 | | 危险操作 | — | 删除项目（红色，二次确认） |
 

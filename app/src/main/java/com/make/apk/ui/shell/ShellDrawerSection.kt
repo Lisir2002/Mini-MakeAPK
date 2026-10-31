@@ -1,9 +1,11 @@
 package com.make.apk.ui.shell
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -21,13 +23,19 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.make.apk.data.model.ShellDrawer
+import com.make.apk.data.model.ShellDrawerHeaderMode
 import com.make.apk.data.model.ShellDrawerSource
 import com.make.apk.data.model.ShellDrawerWidthMode
 import com.make.apk.data.model.ShellMenuItem
@@ -63,7 +71,12 @@ import com.make.apk.data.model.ShellMenuItem
  * @param onOpenChanged 开合变化回调（含手势展开 / 遮罩点击 / 条目点击后自动收起）。
  * @param selectedItemId 当前选中菜单项 id；null 时回退到契约里 `selected = true` 的条目。
  * @param onItemSelected 菜单项点击回调（**先回调，再收起抽屉**）。
- * @param headerTitle 抽屉头部标题（宿主传入；与顶栏标题同源，缺省回落文案"应用菜单"）。
+ * @param headerTitle 抽屉头部标题（宿主传入；回落链 drawer.headerTitle → topBar.titleOverride →
+ *   项目名由 [ShellHost] 收敛，仍空则回落文案"应用菜单"）。
+ * @param headerSubtitle 头部副标题（W2 ⑨）；blank/null 回落默认文案。
+ * @param headerMode 头部展示模式（W2 ⑨）：TEXT（现状）或 IMAGE（2:1 头图，缺图安全回落 TEXT）。
+ * @param headerImageRef 头图引用（预览=文件路径；导出=注入管线的 assets 固定名，见
+ *   [decodeDrawerHeaderImage] 双态解析）。
  * @param content 被抽屉包裹的页面主体。
  */
 @Composable
@@ -77,6 +90,9 @@ fun ShellDrawerSection(
     onItemSelected: (ShellMenuItem) -> Unit,
     headerTitle: String = "",
     modifier: Modifier = Modifier,
+    headerSubtitle: String? = null,
+    headerMode: ShellDrawerHeaderMode = ShellDrawerHeaderMode.TEXT,
+    headerImageRef: String? = null,
     content: @Composable () -> Unit,
 ) {
     val drawerState = rememberDrawerState(
@@ -103,7 +119,13 @@ fun ShellDrawerSection(
                     .fillMaxHeight()
                     .width(resolveDrawerWidth(drawer = drawer, env = env)),
             ) {
-                ShellDrawerHeader(title = headerTitle, env = env)
+                ShellDrawerHeader(
+                    title = headerTitle,
+                    subtitle = headerSubtitle,
+                    mode = headerMode,
+                    imageRef = headerImageRef,
+                    env = env,
+                )
                 HorizontalDivider(color = env.outline)
                 when (drawer.contentSource) {
                     ShellDrawerSource.NATIVE -> ShellDrawerNativeMenu(
@@ -128,12 +150,42 @@ fun ShellDrawerSection(
     )
 }
 
-/** 抽屉头部：项目名 + 说明（固定两行，切换菜单不跳动）。 */
+/**
+ * 抽屉头部（W2 ⑨ 双模式）：
+ *
+ * - **IMAGE**：2:1 头图（[decodeDrawerHeaderImage] 异步解码，`ContentScale.Crop` 铺满），
+ *   头图上**不再叠字**（避免对比度问题）；**缺图安全回落 TEXT**——图被删 / 解码失败
+ *   绝不渲染空块，也绝不崩；
+ * - **TEXT**（默认，与改造前完全一致）：标题（回落链由宿主收敛，仍空回落"应用菜单"）+
+ *   副标题（blank/null 回落默认文案）。
+ */
 @Composable
 private fun ShellDrawerHeader(
     title: String?,
+    subtitle: String?,
+    mode: ShellDrawerHeaderMode,
+    imageRef: String?,
     env: ShellRenderEnv,
 ) {
+    if (mode == ShellDrawerHeaderMode.IMAGE) {
+        val context = LocalContext.current
+        // 异步解码：首帧回落 TEXT（与快照基线一致），图可解码后换真图。
+        val image by produceState<ImageBitmap?>(initialValue = null, key1 = imageRef) {
+            value = decodeDrawerHeaderImage(context, imageRef)
+        }
+        image?.let { bitmap ->
+            Image(
+                bitmap = bitmap,
+                contentDescription = "抽屉头图",
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(DRAWER_HEADER_ASPECT_RATIO),
+                contentScale = ContentScale.Crop,
+            )
+            return
+        }
+    }
+    // TEXT 分支：固定两行（标题 + 副标题），切换菜单不跳动。
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -148,7 +200,7 @@ private fun ShellDrawerHeader(
         )
         Spacer(modifier = Modifier.height(env.spaceXs))
         Text(
-            text = DRAWER_SUBTITLE,
+            text = subtitle?.takeIf { it.isNotBlank() } ?: DRAWER_SUBTITLE,
             style = env.typography.bodySmall,
             color = env.onSurfaceVariant,
         )
@@ -305,8 +357,11 @@ internal fun resolveDrawerWidth(drawer: ShellDrawer, env: ShellRenderEnv): Dp {
 /** 抽屉头部标题缺省文案。 */
 private const val DRAWER_DEFAULT_TITLE: String = "应用菜单"
 
-/** 抽屉头部副标题。 */
+/** 抽屉头部副标题缺省文案（W2 ⑨ 主控拍板：保留现文案作回落，零回归）。 */
 private const val DRAWER_SUBTITLE: String = "原生抽屉 · 与导出壳同源"
+
+/** 头图宽高比（2:1，W2 ⑨ 主控拍板；窄抽屉下 16:9 偏矮）。 */
+private const val DRAWER_HEADER_ASPECT_RATIO: Float = 2f
 
 /** 抽屉无菜单项时的占位文案。 */
 private const val DRAWER_EMPTY_TEXT: String = "暂无菜单项"

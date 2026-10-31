@@ -245,7 +245,9 @@ private fun migrateBuildRecords(db: SupportSQLiteDatabase) {
                 ProjectDefaults.DEFAULT_THEME_COLOR,
                 RuntimeJson.encodeEntry(entry),
                 RuntimeJson.encodeSettings(ProjectDefaults.DEFAULT_WEB_SETTINGS),
-                ProjectDefaults.isolationIdOf(projectId),
+                // W3 ⑬：迁移播种属「存量重建」——保持 v1 格式（主控拍板：存量不迁移，
+                // 新格式 MakeApk_<ts>_item<id> 仅用于新建，见 ProjectDefaults.isolationIdOf）。
+                "webapp_$projectId",
             ),
         )
 

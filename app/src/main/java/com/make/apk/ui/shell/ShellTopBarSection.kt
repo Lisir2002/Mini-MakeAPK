@@ -1,5 +1,6 @@
 package com.make.apk.ui.shell
 
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -8,6 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
@@ -59,13 +61,14 @@ fun ShellTopBarSection(
         modifier = modifier.fillMaxWidth(),
         color = env.surface,
     ) {
-        Row(
-            modifier = Modifier
-                .statusBarsPadding()
-                .height(env.topBarHeight)
-                .padding(horizontal = env.spaceSm),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier
+                    .statusBarsPadding()
+                    .height(env.topBarHeight)
+                    .padding(horizontal = env.spaceSm),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
             if (onOpenDrawer != null) {
                 // 抽屉入口：仅当契约里抽屉区开启时宿主才传本回调，
                 // 故"顶栏是否出现汉堡按钮"完全由 ShellSpec 决定（预览 == 导出）。
@@ -119,6 +122,14 @@ fun ShellTopBarSection(
                         onClick = { onShellAction(action) },
                     )
                 }
+            }
+            // 顶栏与内容区之间的视觉分割：一条 1dp 描边色分隔线（令牌 env.outline，
+            // 与 app 顶栏（MmaTopBar）同源，保证预览 == 导出两侧一致）。
+            HorizontalDivider(
+                modifier = Modifier.fillMaxWidth(),
+                thickness = 1.dp,
+                color = env.outline,
+            )
         }
     }
 }

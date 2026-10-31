@@ -40,6 +40,7 @@ import com.make.apk.ui.screens.DevelopingScreen
 import com.make.apk.ui.screens.LogViewerScreen
 import com.make.apk.ui.screens.ProfileScreen
 import com.make.apk.ui.screens.ProjectEditScreen
+import com.make.apk.ui.screens.openExternal
 import com.make.apk.ui.screens.ProjectFileEditorScreen
 import com.make.apk.ui.screens.ProjectsScreen
 import com.make.apk.ui.screens.ShellPreviewScreen
@@ -333,6 +334,8 @@ fun MmaNavHost(
                     onIgnoreSslErrorsChanged = vm::onIgnoreSslErrorsChanged,
                     onShowLoadingProgressChanged = vm::onShowLoadingProgressChanged,
                     onLoadingProgressPositionChanged = vm::onLoadingProgressPositionChanged,
+                    onProgressColorTokenChanged = vm::onProgressColorTokenChanged,
+                    onProgressThicknessChanged = vm::onProgressThicknessChanged,
                     // 文件目录树（rc12 重构）：打开 / 新增 / 删除 / 重命名 / 复制剪切粘贴。
                     onOpenFile = { name ->
                         navController.navigate(MmaRoute.ProjectFileEditor.create(projectId, name))
@@ -379,11 +382,18 @@ fun MmaNavHost(
             val state by vm.uiState.collectAsStateWithLifecycle()
             val snackbarHostState = remember { SnackbarHostState() }
             val scope = rememberCoroutineScope()
+            // 外链执行需要 Context（W2 ④）：VM 只发事件，startActivity 在导航层做。
+            val context = LocalContext.current
             LaunchedEffect(Unit) {
                 vm.events.collect { event ->
                     when (event) {
                         is ShellPreviewEvent.Message ->
                             snackbarHostState.showSnackbar(event.text)
+
+                        is ShellPreviewEvent.OpenExternal ->
+                            if (!openExternal(context, event.url)) {
+                                snackbarHostState.showSnackbar("无法在外部打开该链接")
+                            }
                     }
                 }
             }
@@ -396,6 +406,7 @@ fun MmaNavHost(
                     onDrawerItemSelected = vm::onDrawerItemSelected,
                     onDrawerOpenChanged = vm::onDrawerOpenChanged,
                     onShellAction = vm::onShellAction,
+                    onTopTabTitle = vm::updateTopTabPageTitle,
                     onError = { message -> scope.launch { snackbarHostState.showSnackbar(message) } },
                 )
                 SnackbarHost(

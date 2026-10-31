@@ -1,4 +1,4 @@
-package com.make.apk.ui.screens
+package com.make.apk.webcore.chrome
 
 import android.widget.FrameLayout
 import app.cash.paparazzi.Paparazzi
@@ -12,14 +12,14 @@ import org.junit.Rule
 import org.junit.Test
 
 /**
- * WebView 封装屏「外壳」截图回归测试（Paparazzi，纯 JVM）。
+ * WebView 渲染面「外壳」截图回归测试（Paparazzi，纯 JVM，W4 内核重写后继任）。
  *
  * 注意：真实 WebView 无法在 JVM 上渲染网页内容，故注入 FrameLayout 桩仅验证
  * 组合接线（modifier / 主题绑定）不漂移。完整网页视觉验证走两条路（见 docs/qa/screenshot-testing.md）：
  *   1) Roborazzi（JVM + Robolectric shadow WebView，可截图外壳）；
  *   2) 设备/模拟器插桩截图（真正渲染网页，最权威）。
  */
-class WebViewScreenTest {
+class WebViewSurfaceTest {
 
     @get:Rule
     val paparazzi = Paparazzi(
@@ -29,7 +29,7 @@ class WebViewScreenTest {
     @Test
     fun shellLight() = paparazzi.snapshot {
         MmaTheme(darkTheme = false) {
-            WebViewScreen(
+            WebViewSurface(
                 config = SAMPLE_CONFIG,
                 webViewFactory = { FrameLayout(it) },
             )
