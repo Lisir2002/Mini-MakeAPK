@@ -44,7 +44,23 @@ internal class BlankDetector(
         if (!view.settings.javaScriptEnabled) return
         val pageUrl = view.url ?: ""
         val generation = engine.probeGeneration
+        val loadId = engine.loadTraceId
         Handler(Looper.getMainLooper()).postDelayed({
+            // 期间已有新加载：本探测作废。
+            // rc17 起必须留痕：此前作废是**完全静默**的，导致"日志里没有 blank_confirmed"
+            // 既可能是页面没白、也可能是探测根本没跑，二者无法区分（用户在 13 秒里
+            // 连续跳转 6 次，6 次探测全部在 2 秒到期前被作废，日志里一条痕迹都没有）。
+            if (engine.probeGeneration != generation) {
+                WebViewEventHook.report(
+                    "preview_probe_discarded",
+                    mapOf(
+                        "phase" to "first",
+                        // 对应 LogFields.PREVIEW_LOAD_ID（webcore 零依赖，只能写字面量）。
+                        "preview_load_id" to loadId,
+                    ),
+                )
+                return@postDelayed
+            }
             runCatching {
                 view.evaluateJavascript(BLANK_PROBE_JS) { result ->
                     // 期间已有新加载：本探测作废
@@ -55,6 +71,14 @@ internal class BlankDetector(
                         runCatching {
                             view.evaluateJavascript(BLANK_PROBE_JS) { again ->
                                 if (engine.probeGeneration != generation) {
+                                    WebViewEventHook.report(
+                                        "preview_probe_discarded",
+                                        mapOf(
+                                            "phase" to "reprobe",
+                                            // 对应 LogFields.PREVIEW_LOAD_ID（webcore 零依赖，只能写字面量）。
+                                            "preview_load_id" to loadId,
+                                        ),
+                                    )
                                     return@evaluateJavascript
                                 }
                                 if (again?.trim('"') == "1") handleBlankConfirmed(view, pageUrl)
@@ -74,8 +98,13 @@ internal class BlankDetector(
      * - 自愈过仍空 → 才认定真白屏，做根因三级判定并上报（[reportRootCause]）。
      */
     private fun handleBlankConfirmed(view: WebView, pageUrl: String) {
-        if (engine.blankHandledUrl == pageUrl) return
-        engine.blankHandledUrl = pageUrl
+        // 去重按**本次加载的 load_id**，不再按 URL（rc17 修复）。
+        // 旧实现 `blankHandledUrl == pageUrl` 会让"同一地址第二次进仍白"被静默跳过：
+        // 标记还停在上一次的值，直接 return，既不报 blank_confirmed 也不自愈。
+        // 同一页面重进是新的一次加载，必须重新判定。
+        val loadId = engine.loadTraceId
+        if (loadId.isNotEmpty() && engine.blankHandledLoadId == loadId) return
+        engine.blankHandledLoadId = loadId
         // W3 ⑬ 埋点：两段式探测都为空 = 白屏最终确认（自愈与否由后续链路细分）。
         WebViewEventHook.report(
             "preview_blank_confirmed",

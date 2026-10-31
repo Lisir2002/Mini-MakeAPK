@@ -31,8 +31,8 @@ internal class SelfHealController(
     fun maybeSelfHeal(view: WebView, reason: String) {
         if (engine.selfHealed) return
         engine.selfHealed = true
-        // 自愈即新一轮处理窗口：清空去重地址，重载后仍空才上报根因。
-        engine.blankHandledUrl = null
+        // 自愈即新一轮处理窗口：清空去重标记，重载后仍空才上报根因。
+        engine.blankHandledLoadId = ""
         engine.nextProbeGeneration()
         // W3 ⑬ 埋点：自愈触发（结构化 reason 字段）。
         WebViewEventHook.report(

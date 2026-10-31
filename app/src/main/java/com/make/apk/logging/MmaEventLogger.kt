@@ -151,8 +151,19 @@ object MmaEventLogger {
         // 加载起点：补齐「没开始加载」vs「开始但没完成」的区分（此前只打 logcat）。
         "preview_load_started" to LogLevel.INFO,
         "preview_loaded" to LogLevel.INFO,
+        // 首帧提交（rc17）：success 口径的唯一依据。-1 表示本次加载从未绘制。
+        "preview_first_paint" to LogLevel.INFO,
+        // 服务端 302 跳（rc17）：白屏时长归因的关键——区分"等网络"与"渲染失败"。
+        "preview_redirect" to LogLevel.INFO,
+        // UA 指纹自检（rc17）：站点视角下是否仍残留 wv / Version/4.0 / Android WebView brand。
+        // 这组数据是「某些链接永远白」判定 UA 因素是否已排除的硬证据。
+        "preview_ua_probe" to LogLevel.INFO,
+        // 空内容探测被作废（rc17）：此前完全静默，"探测没跑"与"页面没白"无法区分。
+        "preview_probe_discarded" to LogLevel.INFO,
         "preview_blank_confirmed" to LogLevel.WARN,
         "preview_self_heal" to LogLevel.WARN,
+        // SSL 协议错误自动降级明文 http 重试（rc17）：已自动恢复，但仍需关注站点质量。
+        "preview_ssl_downgrade" to LogLevel.WARN,
         "preview_blank_root_cause" to LogLevel.ERROR,
         // 内核加载失败面（此前只打 logcat，重启即丢）
         "webview_ssl_error" to LogLevel.ERROR,

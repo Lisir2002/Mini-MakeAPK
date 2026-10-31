@@ -88,3 +88,23 @@ val md_errorContainer_light        = Color(0xFFFBE9E9) // 派生于 --error #DC2
 val md_onErrorContainer_light      = Color(0xFF7F1D1D) // 派生于 --error #DC2626（压暗）
 val md_errorContainer_dark         = Color(0xFF4E1517) // 派生于 --error #F87171（压暗）
 val md_onErrorContainer_dark       = Color(0xFFFFDAD6) // 派生于 --error #F87171（提亮）
+
+// ── 警告容器对：M3 ColorScheme 没有 warning 槽，故按 error 的同一套派生法自建 ──
+// 来源：design-tokens.json `--warning` 亮 #D97706 / 暗 #F59E0B（同色相 58°/70°，
+// 仅调明度与彩度，不发明新色相）。此前日志徽标的 WARN 借用 `tertiaryContainer`
+// （品牌蓝 #DBE6FF）——警告比信息还像"正常"，语义直接反了。
+// 对比度：亮 7.1:1、暗 10.2:1（WCAG AA 正文 4.5:1 的两倍余量）。
+val md_warnContainer_light         = Color(0xFFFBEFDC) // 派生于 --warning #D97706（提亮）
+val md_onWarnContainer_light       = Color(0xFF7A4200) // 派生于 --warning #D97706（压暗）
+val md_warnContainer_dark          = Color(0xFF3D2A0C) // 派生于 --warning #F59E0B（压暗）
+val md_onWarnContainer_dark        = Color(0xFFFFD9A3) // 派生于 --warning #F59E0B（提亮）
+
+// ── 成功容器对：同为 M3 缺失槽，按同一套派生法自建 ──
+// 来源 design-tokens.json `--success` 亮 #16A34A / 暗 #22C55E。
+// 修的是同一个病：提示气泡曾把「成功」也涂成 primaryContainer（蓝），
+// 于是「成功」与「信息」同色——四个语义三类颜色，分级形同虚设。
+// 对比度：亮 8.3:1、暗 11:1。
+val md_successContainer_light      = Color(0xFFE7F6EC) // 派生于 --success #16A34A（提亮）
+val md_onSuccessContainer_light    = Color(0xFF14532D) // 派生于 --success #16A34A（压暗）
+val md_successContainer_dark       = Color(0xFF11301D) // 派生于 --success #22C55E（压暗）
+val md_onSuccessContainer_dark     = Color(0xFFA7F3C0) // 派生于 --success #22C55E（提亮）

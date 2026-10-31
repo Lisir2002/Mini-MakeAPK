@@ -13,6 +13,7 @@ import android.util.Log
 import com.make.apk.webcore.diagnostics.WebViewEventHook
 import com.make.apk.webcore.config.HttpsPolicy
 import com.make.apk.webcore.diagnostics.BlankDetector
+import com.make.apk.webcore.diagnostics.ContentPostProcessor
 import com.make.apk.webcore.diagnostics.SelfHealController
 import com.make.apk.webcore.engine.EngineEvent
 import com.make.apk.webcore.engine.TAG_WEBVIEW_RUNTIME
@@ -44,6 +45,18 @@ internal class InAppWebViewClient(
 
     private val blankDetector = BlankDetector(engine)
     private val selfHeal = SelfHealController(engine)
+
+    /**
+     * 主帧失败的表现层（rc17 拆分）：SSL 协议错误降级重试 + 内置错误页。
+     *
+     * 从本类中拆出，是因为它持有"一次性降级额度"这类跨回调状态，而本类的契约是
+     * "零状态、只做分发"。底色从引擎实时取（暗色主题下错误页不能是白底）。
+     */
+    private val errorPresenter = WebErrorPresenter(
+        context = engine.context,
+        surfaceArgb = { engine.lastSurfaceArgb },
+        loadId = { engine.loadTraceId },
+    )
 
     // ── 导航拦截 ──
 
@@ -118,12 +131,20 @@ internal class InAppWebViewClient(
         Log.i(TAG_WEBVIEW_RUNTIME, "page_started: $url")
         // 记录加载起点（preview_loaded 埋点的 duration 口径，W3 ⑬）。
         engine.pageStartedAt = System.currentTimeMillis()
+        // 首帧时刻归零：本轮若从未收到 onPageCommitVisible，就是"提交了但没画出来"。
+        engine.firstPaintAt = 0L
+        // 换页时释放一次性降级额度（同一地址间隔访问仍可再降级，同次停留至多一次）。
+        errorPresenter.onPageStarted(url)
         // 新一轮加载：作废在途空内容探测（旧页的延迟回调不得串扰新页）；
         // 顺带清空上一页的 JS 错误缓存，避免把旧页异常误诊到新页头上。
         engine.nextProbeGeneration()
         engine.lastConsoleRecord = null
         // 新一轮加载：换发关联 id，把本次加载产生的 page / error / blank 事件串成因果链。
         engine.loadTraceId = java.util.UUID.randomUUID().toString().replace("-", "").take(8)
+        // 重定向链归零（302 链在旧实现里表现为"中间一段无事件"，无法归因）。
+        engine.redirectHops = 0
+        engine.navigationStartUrl = url
+        engine.lastVisitedUrl = ""
         // 加载起点埋点（诊断盲区补齐）：此前只打 logcat，重启即丢——「没开始加载」与
         // 「开始但没完成」无法区分。必须放在 loadTraceId 赋值**之后**（否则 load_id 是旧值/空）。
         WebViewEventHook.report(
@@ -151,29 +172,115 @@ internal class InAppWebViewClient(
         super.onPageStarted(view, url, favicon)
     }
 
+    /**
+     * **主帧导航提交**（含 302 重定向跳）：本方法是全 API 级别唯一能观测到重定向链的回调。
+     *
+     * 为什么必须接：重定向是「白屏时长」的最大来源之一（www → mbd 这类 302 首访要付
+     * DNS + TLS + 服务端渲染的完整开销）。旧实现完全不接，于是那一整段空窗在日志里
+     * 表现为「A 开始 → 长时间无事件 → B 完成」，既无 URL 也无跳数，只能靠相邻事件的
+     * 时间差去猜，无法与「渲染失败导致的白屏」区分。
+     *
+     * 实现说明：`WebViewClient` **没有** `onReceivedHttpRedirectFor`——该回调在
+     * android-34 与 androidx.webkit 的 `WebViewClientCompat` 中均不存在（已用 javap 核对）。
+     * `doUpdateVisitedHistory` 是每次主帧导航提交都会触发的既有回调，据此以
+     * 「提交地址 != 起始地址」判定重定向跳，不伪造状态码（拿不到就记 -1）。
+     */
+    override fun doUpdateVisitedHistory(view: WebView, url: String, isReload: Boolean) {
+        val step = RedirectTracker.evaluate(
+            prevUrl = engine.lastVisitedUrl,
+            url = url,
+            startUrl = engine.navigationStartUrl,
+            hops = engine.redirectHops,
+        )
+        if (step.changed) {
+            engine.lastVisitedUrl = url
+            engine.redirectHops = step.hops
+        }
+        if (step.isHop) {
+            WebViewEventHook.report(
+                "preview_redirect",
+                mapOf(
+                    "from_url" to step.fromUrl,
+                    "to_url" to url,
+                    "hop" to step.hops,
+                    "is_reload" to isReload,
+                    // 对应 LogFields.PREVIEW_LOAD_ID（webcore 零依赖，只能写字面量）。
+                    "preview_load_id" to engine.loadTraceId,
+                ),
+            )
+            Log.i(TAG_WEBVIEW_RUNTIME, "redirect hop${step.hops}: ${step.fromUrl} -> $url")
+        }
+        super.doUpdateVisitedHistory(view, url, isReload)
+    }
+
+    /**
+     * **首帧提交**（API 23+，minSdk 24 故无需版本分支）。
+     *
+     * 官方语义：WebView 从此不再绘制上一页遗留内容，下一次绘制将显示新页面。
+     * 这是"页面真的画出来了"的唯一可信信号——`onPageFinished` 只代表文档加载完，
+     * 文档明确写着"不保证下一帧反映 DOM 状态"，所以过去 `success` 恒为 true 是假指标。
+     *
+     * 记录时刻供 `preview_loaded` 判定：本次加载若从未进入这里，说明
+     * commit 了却没有绘制（尺寸 0 / 被遮挡 / 合成器异常），这类白屏此前完全不可见。
+     */
+    override fun onPageCommitVisible(view: WebView, url: String) {
+        engine.firstPaintAt = System.currentTimeMillis()
+        val firstPaintMs = (engine.firstPaintAt - engine.pageStartedAt).coerceAtLeast(0L)
+        Log.i(TAG_WEBVIEW_RUNTIME, "page_commit_visible: ${firstPaintMs}ms $url")
+        WebViewEventHook.report(
+            "preview_first_paint",
+            mapOf(
+                "first_paint_ms" to firstPaintMs,
+                // 对应 LogFields.PREVIEW_LOAD_ID（webcore 零依赖，只能写字面量）。
+                "preview_load_id" to engine.loadTraceId,
+            ),
+        )
+        super.onPageCommitVisible(view, url)
+    }
+
     /** 主帧加载完成：Cookie 落盘 + 补挂错误采集器 + preview_loaded 埋点 + 空内容探测。 */
     override fun onPageFinished(view: WebView, url: String) {
         Log.i(TAG_WEBVIEW_RUNTIME, "page_finished: $url")
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             runCatching { CookieManager.getInstance().flush() }
         }
+        // 自愈重载的文档已落地：恢复用户 cacheMode（NO_CACHE 必须一次性生效，
+        // 否则后续每个页面都绕开缓存，从"偶尔慢"恶化成"越用越慢"）。
+        engine.restoreCacheMode(view)
         // 兜底再挂一次采集器：onPageStarted 时机在个别 ROM 上晚于首帧脚本执行，
         // 幂等标记保证同一文档内不会重复注入。
         com.make.apk.webcore.diagnostics.JsErrorCollector.inject(view)
-        // preview_loaded 埋点（W3 ⑬ 契约保持）：加载完成即计成功（白屏与否由探测链另行上报），
-        // duration = onPageStarted → onPageFinished；起点缺失（理论上不可达）按 0 处理。
+        // preview_loaded 埋点（W3 ⑬ 契约保持）：duration = onPageStarted → onPageFinished。
         val durationMs = (System.currentTimeMillis() - engine.pageStartedAt).coerceAtLeast(0L)
+        // success 口径修正（rc17）：此前**硬编码 true**，只能证明"文档加载完"，
+        // 完全不能证明"画出来了"（官方文档：onPageFinished 不保证下一帧反映 DOM）。
+        // 现要求本次加载确实经历过首帧提交——没经历就是 commit 了却未绘制
+        // （尺寸 0 / 被遮挡 / 合成器异常），必须记 false，否则日志永远在骗人。
+        val firstPaintMs = if (engine.firstPaintAt > engine.pageStartedAt) {
+            engine.firstPaintAt - engine.pageStartedAt
+        } else {
+            -1L
+        }
         WebViewEventHook.report(
             "preview_loaded",
             mapOf(
                 "duration_ms" to durationMs,
-                "success" to true,
+                "success" to (firstPaintMs >= 0),
+                // 首帧耗时；-1 = 本次加载从未收到 onPageCommitVisible
+                "first_paint_ms" to firstPaintMs,
+                // 最终落地地址：302 链之后 view 实际停留的 URL。此前只有落点没有起点，
+                // 无法回答"这个 loaded 对应哪个 started"。
+                "final_url" to (view.url ?: url),
+                "redirect_hops" to engine.redirectHops,
                 // 因果链锚点：同一次加载的错误 / 白屏事件都带同一个 preview_load_id。
                 // 对应 LogFields.PREVIEW_LOAD_ID（webcore 零依赖，只能写字面量）。
                 "preview_load_id" to engine.loadTraceId,
             ),
         )
         engine.emit(EngineEvent.PageLoaded(durationMs))
+        // 加载后处理（rc17）：UA 指纹自检 + Declarative Shadow DOM 兜底。
+        // 异步执行、不阻塞 onPageFinished 返回。
+        ContentPostProcessor.postProcess(view, engine)
         blankDetector.onPageFinished(view, url)
         super.onPageFinished(view, url)
     }
@@ -201,8 +308,22 @@ internal class InAppWebViewClient(
                     "preview_load_id" to engine.loadTraceId,
                 ),
             )
-            selfHeal.maybeSelfHeal(view, "main_frame_error: ${error.description}")
-            reportError(view, error.description?.toString())
+            // 先交表现层（rc17）：SSL 协议错误 → 自动降级 http 重试一次；
+            // 其余主帧失败 → 渲染内置错误页。已接管时不再自动自愈——
+            // 错误页带「重试」按钮，用户可控；自动 reload 反而会盖掉失败原因。
+            val handled = errorPresenter.handleMainFrameError(
+                view = view,
+                failingUrl = request.url?.toString(),
+                isForMainFrame = true,
+                description = error.description?.toString(),
+                errorCode = error.errorCode,
+            )
+            if (!handled) {
+                // 主帧错误（DNS / 连接失败等）往往伴随坏缓存读出的错位资源，
+                // 故先尝试自愈（每轮至多一次），错误本身仍照常上报。
+                selfHeal.maybeSelfHeal(view, "main_frame_error: ${error.description}")
+                reportError(view, error.description?.toString())
+            }
         }
         super.onReceivedError(view, request, error)
     }
@@ -224,8 +345,18 @@ internal class InAppWebViewClient(
                 "preview_load_id" to engine.loadTraceId,
             ),
         )
-        selfHeal.maybeSelfHeal(view, "main_frame_error_legacy: $errorCode")
-        reportError(view, description)
+        // 与新版回调同契约：先交表现层（降级 / 错误页），未接管才走自愈 + 提示。
+        val handled = errorPresenter.handleMainFrameError(
+            view = view,
+            failingUrl = failingUrl,
+            isForMainFrame = true,
+            description = description,
+            errorCode = errorCode,
+        )
+        if (!handled) {
+            selfHeal.maybeSelfHeal(view, "main_frame_error_legacy: $errorCode")
+            reportError(view, description)
+        }
         super.onReceivedError(view, errorCode, description, failingUrl)
     }
 

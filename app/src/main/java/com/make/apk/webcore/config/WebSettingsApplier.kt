@@ -56,11 +56,23 @@ object WebSettingsApplier {
         }
         // 允许 JS 通过 window.open 开新窗口：部分站点缺此会静默失败（按钮点了没反应/白屏）。
         view.settings.javaScriptCanOpenWindowsAutomatically = true
-        // UA 归一化：系统 WebView 默认 UA 带 "; wv)" 标记，大量站点（OAuth / 支付 / 部分 SPA）
-        // 会据此降级或直接返回空页。去掉该标记即与 Chrome 一致（不伪造版本，避免被识别为假 UA）；
-        // 用户自定义 UA 时以其为准。
-        view.settings.userAgentString = web.userAgent?.takeIf { it.isNotBlank() }
-            ?: view.settings.userAgentString.replace("; wv)", ")")
+        // UA 归一化（rc17 重做）：旧实现只 `replace("; wv)", ")")`，但系统 UA 里还有
+        // `Version/4.0`——那是真 Chrome 没有的**第二个** WebView 指纹，站点照样能识别并降级。
+        // 现改为整段前缀替换 + 清除 Version/4.0（见 [UserAgentProfile]），
+        // 并补 Client Hints 修补：只改 UA 字符串躲不掉 `Sec-CH-UA-Mobile` 与
+        // `navigator.userAgentData.brands` 里的 "Android WebView"。
+        // 用户自定义 UA 时以其为准，但仍按最终 UA 对齐 hints 的 mobile 标记。
+        val customUa = web.userAgent?.takeIf { it.isNotBlank() }
+        if (customUa != null) {
+            view.settings.userAgentString = customUa
+        } else {
+            val normalized = UserAgentProfile.mobileUserAgent(view.context)
+            if (normalized.isNotBlank()) view.settings.userAgentString = normalized
+        }
+        UserAgentProfile.applyClientHints(
+            view,
+            isMobile = view.settings.userAgentString?.contains("Mobile") == true,
+        )
         // 第三方 Cookie：Android 11+ 默认关闭，需显式开启以支持 OAuth / 支付等场景；
         // 同时显式打开全局 Cookie 接受（个别 ROM 默认关闭）→ 跨域登录回跳才不丢态。
         CookieManager.getInstance().setAcceptCookie(true)

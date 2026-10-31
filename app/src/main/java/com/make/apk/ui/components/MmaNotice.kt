@@ -30,6 +30,9 @@ import com.make.apk.ui.icons.MmaIcon
 import com.make.apk.ui.icons.MmaIcons
 import com.make.apk.ui.theme.ControlShapes
 import com.make.apk.ui.theme.LocalMmaDesign
+import com.make.apk.ui.theme.ToneColors
+import com.make.apk.ui.theme.successColors
+import com.make.apk.ui.theme.warnColors
 import com.make.apk.ui.theme.Spacing
 import kotlinx.coroutines.delay
 
@@ -112,18 +115,24 @@ fun MmaNoticeHost(
         hostState.dismiss()
     }
 
-    val containerColor = when (data.category) {
-        MmaNoticeCategory.Success -> colorScheme.primaryContainer
-        MmaNoticeCategory.Warn -> colorScheme.tertiaryContainer
-        MmaNoticeCategory.Error -> colorScheme.errorContainer
-        MmaNoticeCategory.Info -> colorScheme.secondaryContainer
+    // 四类各得其所：成功=绿、警告=琥珀、错误=红、信息=蓝。
+    // 修复前是「成功=蓝、警告=品牌蓝、信息=灰」——四类只有三种颜色，
+    // 且"警告"与"信息"同属品牌蓝，最该被注意的一类反而最不显眼。
+    // 容器色对统一由 theme/LogToneColors.kt 提供，与日志级别徽标同源。
+    val toneColors = when (data.category) {
+        MmaNoticeCategory.Success -> successColors()
+        MmaNoticeCategory.Warn -> warnColors()
+        MmaNoticeCategory.Error -> ToneColors(
+            container = colorScheme.errorContainer,
+            content = colorScheme.onErrorContainer,
+        )
+        MmaNoticeCategory.Info -> ToneColors(
+            container = colorScheme.primaryContainer,
+            content = colorScheme.onPrimaryContainer,
+        )
     }
-    val contentColor = when (data.category) {
-        MmaNoticeCategory.Success -> colorScheme.onPrimaryContainer
-        MmaNoticeCategory.Warn -> colorScheme.onTertiaryContainer
-        MmaNoticeCategory.Error -> colorScheme.onErrorContainer
-        MmaNoticeCategory.Info -> colorScheme.onSecondaryContainer
-    }
+    val containerColor = toneColors.container
+    val contentColor = toneColors.content
     val iconRes = when (data.category) {
         MmaNoticeCategory.Success -> MmaIcons.CheckCircle
         MmaNoticeCategory.Warn -> MmaIcons.Notifications

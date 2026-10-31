@@ -81,14 +81,32 @@ class WebViewEngine(
     /** 坏缓存自愈标记（旧 TAG_SELF_HEAL_KEY 替代；每轮加载至多自愈一次，防死循环）。 */
     internal var selfHealed: Boolean = false
 
-    /** 空内容处理去重地址（旧 TAG_BLANK_HANDLED_KEY 替代；onPageFinished 多次触发不重复处理）。 */
-    internal var blankHandledUrl: String? = null
+    /**
+     * 空内容处理去重标记（rc17 由"URL"改为"load_id"）。
+     *
+     * 旧实现按 URL 去重，导致**同一地址第二次进仍然白屏时被静默跳过**——
+     * 因为 `blankHandledUrl` 还停在上一次的值，`handleBlankConfirmed` 直接 return，
+     * 既不报 `preview_blank_confirmed` 也不自愈。按每次加载的 load_id 去重才是对的：
+     * 同一页面重进是新的一次加载，理应重新判定。
+     */
+    internal var blankHandledLoadId: String = ""
 
     /** 空内容探测代次（旧 TAG_PROBE_GEN_KEY 替代；每次新加载 +1，作废在途延迟探测）。 */
     internal var probeGeneration: Int = 0
 
     /** 页面加载起点时间戳（旧 TAG_PAGE_START_KEY 替代；preview_loaded 埋点 duration 口径）。 */
     internal var pageStartedAt: Long = 0L
+
+    /**
+     * 本次加载的**首帧提交**时刻（rc17 新增，`onPageCommitVisible` 写入；0 = 未到达）。
+     *
+     * 这是判断"页面到底画出来没有"的唯一可信信号：`onPageFinished` 只说明文档加载完，
+     * 官方文档明确"不保证下一帧会反映 DOM 状态"。`onPageCommitVisible` 则保证
+     * WebView 不再绘制上一页内容、下一次绘制将显示新页面——首帧的准确时刻。
+     *
+     * 用途：preview_loaded 的 success 口径（此值 <= pageStartedAt 即"提交了但没画"）。
+     */
+    internal var firstPaintAt: Long = 0L
 
     /**
      * 一次页面加载的短期关联 id（8 位十六进制，[com.make.apk.webcore.navigation.InAppWebViewClient]
@@ -98,6 +116,28 @@ class WebViewEngine(
      */
     internal var loadTraceId: String = ""
 
+    /**
+     * 本次加载经历的**重定向跳数**（rc17 新增，`onReceivedHttpRedirectFor` 累加，
+     * `onPageStarted` 归零）。
+     *
+     * 存在意义：此前一次 302 链在日志里只表现为「A 开始 → 中间长时间无事件 → B 加载完成」，
+     * 中间那一段既无埋点也无 URL，只能靠相邻事件的时间差去猜。有了跳数，
+     * 「白屏时长」就能归因到「服务端重定向」而不是「渲染失败」。
+     */
+    internal var redirectHops: Int = 0
+
+    /**
+     * 是否待恢复用户 cacheMode（[reloadNoCache] 置位，`onPageFinished` 消费）。
+     * 见 [reloadNoCache] 注释：这是 NO_CACHE 一次性生效的收口，不恢复会让后续所有加载绕开缓存。
+     */
+    internal var pendingCacheRestore: Boolean = false
+
+    /** 本次加载的**起始地址**（`onPageStarted` 写入；判定重定向跳的基准）。 */
+    internal var navigationStartUrl: String = ""
+
+    /** 最近一次主帧导航提交地址（`doUpdateVisitedHistory` 维护；用于识别跳变）。 */
+    internal var lastVisitedUrl: String = ""
+
     /** 当前虚拟文件集（旧 TAG_FILES_KEY 替代；name → content，随每次加载刷新）。 */
     internal var virtualFiles: Map<String, String> = emptyMap()
 
@@ -105,7 +145,13 @@ class WebViewEngine(
     private var pendingRestore: Bundle? = null
 
     /** 最近一次记录的主题底色（首装 / 重建装配时应用；旧单体每次 update 捕获等价）。 */
-    private var lastSurfaceArgb: Int = 0
+    /**
+     * 当前底色（主题 surface）。错误页渲染时实时读取——暗色主题下错误页不能是白底。
+     *
+     * internal 而非 private：rc17 起 [com.make.apk.webcore.navigation.WebErrorPresenter]
+     * 需要它来推导错误页配色，但仍不允许在本包外改写。
+     */
+    internal var lastSurfaceArgb: Int = 0
 
     /**
      * onCreateWindow 的一次性子 WebView（W4 收口 F4）：transport 转发完成后它不再
@@ -160,9 +206,9 @@ class WebViewEngine(
         }
         config = newConfig
         if (view == null) return
-        // 新一轮加载：自愈标记复位、清空去重地址、作废在途探测（旧 update 等价序列）。
+        // 新一轮加载：自愈标记复位、清空去重标记、作废在途探测（旧 update 等价序列）。
         selfHealed = false
-        blankHandledUrl = null
+        blankHandledLoadId = ""
         nextProbeGeneration()
         // 新一次加载：进度归零，避免复用旧 WebView 时残留上一页满格进度。
         emit(EngineEvent.ProgressChanged(0))
@@ -223,14 +269,38 @@ class WebViewEngine(
         }
     }
 
-    /** 自愈专用：跳过缓存重载（NO_CACHE 保留至下一次 applyRuntime 恢复用户配置）。 */
+    /**
+     * 自愈专用：跳过缓存重载。
+     *
+     * **必须恢复用户 cacheMode**（rc17 修复）。旧实现注释写着"NO_CACHE 保留至下一次
+     * applyRuntime 恢复用户配置"，但 [applyConfig] 开头就是 `if (newConfig == config) return`
+     * ——配置没变时根本走不到 [WebSettingsApplier]，于是 `LOAD_NO_CACHE` 会**整个会话残留**：
+     * 自愈过一次之后，后续每个页面都绕开缓存全走网络，从"偶尔慢"恶化成"越用越慢"。
+     *
+     * 恢复时机：**本次重载的文档落地时**（[restoreCacheMode] 由 `onPageFinished` 调用）。
+     * 不用 `view.post`——[WebView.reload] 只是同步入队导航，真正的网络请求由内核异步发起，
+     * 下一帧的 post 很可能**早于**请求发出，那样 NO_CACHE 就白设了，自愈等于没做。
+     * 放到 onPageFinished 则主文档请求必然已完成，语义确定。
+     */
     internal fun reloadNoCache(): Boolean {
         val view = _web ?: return false
         return runCatching {
             view.settings.cacheMode = WebSettings.LOAD_NO_CACHE
+            pendingCacheRestore = true
             view.reload()
             true
         }.getOrDefault(false)
+    }
+
+    /**
+     * 恢复用户 cacheMode（文档落地后调用；未处于待恢复态时无副作用）。
+     *
+     * 之所以放在这里而不是 [applyConfig]：后者在配置未变时直接 return，永远等不到调用。
+     */
+    internal fun restoreCacheMode(view: WebView) {
+        if (!pendingCacheRestore) return
+        pendingCacheRestore = false
+        runCatching { view.settings.cacheMode = config.webSettings.cacheMode }
     }
 
     /**

@@ -53,9 +53,18 @@ kotlinxSerialization = "1.6.3"
 # 编译的稳定版（CMP 1.6.11）；1.0.0+ 起 Kotlin 2.x 元数据，本项目 Kotlin
 # 1.9.24 编译器读不了，升级须随 Kotlin 整体演进。
 haze = "0.7.3"
+# androidx.webkit：WebView 兼容层（WebSettingsCompat / WebViewFeature）。
+# 用途：修补 Client Hints（setUserAgentMetadata），把 brand 列表里的 "Android WebView"
+# 换成 "Google Chrome"——只改 UA 字符串躲不掉 Sec-CH-UA-Mobile 与 navigator.userAgentData.brands，
+# 站点读 client hints 仍能识别为内嵌浏览器（EinkBro updateUserAgentClientHints 同款做法）。
+# 版本红线：1.11.0 要求 compileSdk 34（本项目 34）；1.12+ 需更高 SDK，升级须同步 AGP。
+# 纯 compat 层（无内核、无 so），约 50KB，不破坏 webcore 零依赖与「预览==导出」。
+androidxWebkit = "1.11.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
+# WebView 兼容层：WebSettingsCompat.setUserAgentMetadata（Client Hints 修补）
+androidx-webkit = { group = "androidx.webkit", name = "webkit", version.ref = "androidxWebkit" }
 androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycleRuntimeKtx" }
 androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
 androidx-compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }

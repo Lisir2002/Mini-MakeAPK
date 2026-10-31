@@ -174,6 +174,15 @@ data class ControlScale(
 
     /** 64dp——圆形图标底边长（权限弹窗等"说明型"弹窗的视觉锚点，图标取其一半）。 */
     val badgeIconSize: Dp = 64.dp,
+
+    /**
+     * 84dp——详情页字段名的**最小**宽度（`key: value` 纵向对齐用）。
+     *
+     * 用「最小宽度」而非固定宽度：常见键（traceId / sessionId / threadName，12sp 下约 60~70dp）
+     * 对齐成一条竖线，超长键（如 `preview_load_id`）自然撑开而不被截断。
+     * 历史实现把"label 定宽对齐"写在注释里、代码里却没有宽度约束，冒号全歪。
+     */
+    val fieldLabelMinWidth: Dp = 84.dp,
 )
 
 /** 表面材质档位——骨架「插拔换样式」的粒度单位（DESIGN_LANGUAGE §7 规划）。 */

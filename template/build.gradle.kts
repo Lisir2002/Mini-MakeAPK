@@ -123,6 +123,11 @@ dependencies {
     // ComponentActivity 承载 Compose 内容
     implementation(libs.androidx.activity.compose)
 
+    // WebView 兼容层：webcore/WebSettingsApplier 修补 Client Hints 用
+    // WebSettingsCompat.setUserAgentMetadata。必须与 app 同依赖——webcore 为两模块
+    // 源码共享，缺此导出壳编译失败（预览==导出同源红线）。
+    implementation(libs.androidx.webkit)
+
     // ShellTopTabsPager 使用 snapshotFlow/collect（滑动切页双向同步）
     implementation(libs.kotlinx.coroutines.android)
 

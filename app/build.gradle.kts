@@ -40,8 +40,8 @@ android {
         //   版本号不带 +N 后缀（2026-10-25 起，用户确认）。
         // versionCode：Android 安装唯一性要求的内部整数，单调递增，但不进版本串/tag；
         //   发布 tag = v<versionName>。递增规则与发版流程见 docs/VERSIONING.md。
-        versionCode = 19
-        versionName = "0.0.0.1-rc16"
+        versionCode = 20
+        versionName = "0.0.0.1-rc17"
     }
 
     signingConfigs {
@@ -119,6 +119,9 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
+    // WebView 兼容层：Client Hints 修补（WebSettingsCompat.setUserAgentMetadata）。
+    // 只改 UA 字符串躲不掉 Sec-CH-UA-Mobile / navigator.userAgentData.brands 的二次识别。
+    implementation(libs.androidx.webkit)
     // 顶栏 tab 滑动切页（阶段 6.4）：HorizontalPager 落在 foundation 内（Compose 1.6+）
     implementation(libs.androidx.foundation)
     // Compose BOM 统一管理 ui/material3 等版本（禁止零散写版本号）

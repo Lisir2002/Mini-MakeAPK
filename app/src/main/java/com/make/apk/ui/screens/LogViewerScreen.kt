@@ -26,10 +26,10 @@ import com.make.apk.data.model.LogEntry
 import com.make.apk.logging.LogGroup
 import com.make.apk.logging.LogLevel
 import com.make.apk.ui.components.CuteCard
+import com.make.apk.ui.components.LogLevelBadge
 import com.make.apk.ui.components.MmaChip
 import com.make.apk.ui.components.MmaScreen
 import com.make.apk.ui.components.MmaTextButton
-import com.make.apk.ui.theme.ControlShapes
 import com.make.apk.ui.theme.Spacing
 import com.make.apk.ui.viewmodel.LogFilterState
 import com.make.apk.ui.viewmodel.LogViewerCounts
@@ -298,7 +298,7 @@ private fun LogRow(entry: LogEntry, onClick: () -> Unit) {
             horizontalArrangement = Arrangement.spacedBy(Spacing.space3),
             verticalAlignment = Alignment.Top,
         ) {
-            LevelBadge(levelEnum = entry.levelEnum)
+            LogLevelBadge(level = entry.levelEnum)
             Column(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(Spacing.space1),
@@ -336,27 +336,6 @@ private fun LogRow(entry: LogEntry, onClick: () -> Unit) {
     }
 }
 
-/** 级别徽标：按严重度取语义容器色（令牌化，无硬编码色）。 */
-@Composable
-private fun LevelBadge(levelEnum: LogLevel?) {
-    val colorScheme = MaterialTheme.colorScheme
-    val (container, content) = when (levelEnum?.severityWeight) {
-        in 4..5 -> colorScheme.errorContainer to colorScheme.onErrorContainer
-        3 -> colorScheme.tertiaryContainer to colorScheme.onTertiaryContainer
-        2 -> colorScheme.secondaryContainer to colorScheme.onSecondaryContainer
-        else -> colorScheme.surfaceVariant to colorScheme.onSurfaceVariant
-    }
-    Text(
-        text = levelEnum?.label ?: "未知",
-        style = MaterialTheme.typography.labelSmall,
-        fontWeight = FontWeight.SemiBold,
-        color = content,
-        modifier = Modifier
-            .clip(ControlShapes.pill)
-            .background(container)
-            .padding(horizontal = Spacing.space2, vertical = Spacing.space1),
-    )
-}
-
+/** 级别徽标已收编为共享组件 [LogLevelBadge]（列表与详情弹层同源，禁止各自再拼）。 */
 private fun formatTimestamp(timestampMs: Long): String =
     SimpleDateFormat("MM-dd HH:mm:ss", Locale.getDefault()).format(Date(timestampMs))

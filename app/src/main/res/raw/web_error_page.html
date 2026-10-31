@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>页面无法打开</title>
+<style>
+  :root {
+    --bg: __BG__;
+    --fg: __FG__;
+    --muted: __MUTED__;
+    --accent: __ACCENT__;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: var(--bg); color: var(--fg);
+    font-family: -apple-system, "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap {
+    min-height: 100%;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    padding: 32px 24px calc(32px + env(safe-area-inset-bottom));
+    text-align: center;
+  }
+  .glyph {
+    width: 48px; height: 48px; border-radius: 12px;
+    border: 1.5px solid var(--muted);
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 20px; opacity: .55;
+  }
+  .glyph::before {
+    content: "!"; font-size: 24px; font-weight: 600; color: var(--muted);
+  }
+  h1 {
+    font-size: 17px; font-weight: 600; line-height: 1.4;
+    margin: 0 0 8px; letter-spacing: -0.01em;
+  }
+  p.reason {
+    font-size: 13px; line-height: 1.6; color: var(--muted);
+    margin: 0 0 24px; max-width: 320px;
+  }
+  p.url {
+    font-size: 11px; line-height: 1.5; color: var(--muted);
+    margin: 0 0 24px; max-width: 320px; opacity: .7;
+    word-break: break-all;
+  }
+  a.retry {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 96px; height: 36px; padding: 0 20px;
+    border-radius: 6px; background: var(--accent); color: #FFFFFF;
+    font-size: 13px; font-weight: 500; text-decoration: none;
+    transition: opacity .15s ease;
+  }
+  a.retry:active { opacity: .72; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="glyph"></div>
+    <h1>__TITLE__</h1>
+    <p class="reason">__REASON__</p>
+    <p class="url">__URL__</p>
+    <a class="retry" href="__RETRY_HREF__">重试</a>
+  </div>
+</body>
+</html>
