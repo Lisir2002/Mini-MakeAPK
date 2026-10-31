@@ -66,6 +66,15 @@ internal class InAppWebViewClient(
             is NavDecision.External -> {
                 if (ExternalSchemeDispatcher.dispatchExternal(view, decision.url)) {
                     Log.i(TAG_WEBVIEW_RUNTIME, "in_page_link_external: $url")
+                    // 成功移交外部：留痕（URL 由 app 侧 Sanitizer 裁剪成 scheme://host/***）。
+                    WebViewEventHook.report(
+                        "webview_link_external",
+                        mapOf(
+                            "url" to decision.url,
+                            // 对应 LogFields.PREVIEW_LOAD_ID（webcore 零依赖，只能写字面量）。
+                            "preview_load_id" to engine.loadTraceId,
+                        ),
+                    )
                 } else {
                     reportError(view, "无法在外部打开该链接")
                 }
@@ -91,6 +100,15 @@ internal class InAppWebViewClient(
         val scheme = url.substringBefore(':').ifBlank { "未知协议" }
         reportError(view, "应用内无法打开 $scheme 链接，已阻止跳转")
         Log.w(TAG_WEBVIEW_RUNTIME, "external_scheme_blocked: $scheme")
+        // 拦截即白屏高发点（intent:// 登录链 / 支付 scheme）：落盘留证，只记 scheme 不记 URL。
+        WebViewEventHook.report(
+            "webview_external_scheme_blocked",
+            mapOf(
+                "scheme" to url.substringBefore(':'),
+                // 对应 LogFields.PREVIEW_LOAD_ID（webcore 零依赖，只能写字面量）。
+                "preview_load_id" to engine.loadTraceId,
+            ),
+        )
     }
 
     // ── 生命周期埋点与诊断链 ──
@@ -104,11 +122,17 @@ internal class InAppWebViewClient(
         // 顺带清空上一页的 JS 错误缓存，避免把旧页异常误诊到新页头上。
         engine.nextProbeGeneration()
         engine.lastConsoleRecord = null
+        // 新一轮加载：换发关联 id，把本次加载产生的 page / error / blank 事件串成因果链。
+        engine.loadTraceId = java.util.UUID.randomUUID().toString().replace("-", "").take(8)
         // 明文 http 主帧放行（W4 拍板 3）+ plain_http_loaded 埋点（渐进收紧的数据依据）。
         if (HttpsPolicy.isPlainTextHttp(url)) {
             WebViewEventHook.report(
                 HttpsPolicy.EVENT_PLAIN_HTTP_LOADED,
-                mapOf("has_url" to url.isNotBlank()),
+                mapOf(
+                    "has_url" to url.isNotBlank(),
+                    // 对应 LogFields.PREVIEW_LOAD_ID（webcore 零依赖，只能写字面量）。
+                    "preview_load_id" to engine.loadTraceId,
+                ),
             )
         }
         // 每个新文档的 window 都是全新对象，错误采集器必须随文档重挂（幂等，
@@ -131,7 +155,13 @@ internal class InAppWebViewClient(
         val durationMs = (System.currentTimeMillis() - engine.pageStartedAt).coerceAtLeast(0L)
         WebViewEventHook.report(
             "preview_loaded",
-            mapOf("duration_ms" to durationMs, "success" to true),
+            mapOf(
+                "duration_ms" to durationMs,
+                "success" to true,
+                // 因果链锚点：同一次加载的错误 / 白屏事件都带同一个 preview_load_id。
+                // 对应 LogFields.PREVIEW_LOAD_ID（webcore 零依赖，只能写字面量）。
+                "preview_load_id" to engine.loadTraceId,
+            ),
         )
         engine.emit(EngineEvent.PageLoaded(durationMs))
         blankDetector.onPageFinished(view, url)
@@ -151,6 +181,16 @@ internal class InAppWebViewClient(
         error: WebResourceError,
     ) {
         if (request.isForMainFrame) {
+            // 主帧失败 = 白屏第一现场：落盘留证（logcat 重启即丢）。
+            WebViewEventHook.report(
+                "webview_main_frame_error",
+                mapOf(
+                    "url" to (request.url?.toString() ?: ""),
+                    "error_code" to error.errorCode,
+                    // 对应 LogFields.PREVIEW_LOAD_ID（webcore 零依赖，只能写字面量）。
+                    "preview_load_id" to engine.loadTraceId,
+                ),
+            )
             selfHeal.maybeSelfHeal(view, "main_frame_error: ${error.description}")
             reportError(view, error.description?.toString())
         }
@@ -165,6 +205,15 @@ internal class InAppWebViewClient(
         description: String?,
         failingUrl: String?,
     ) {
+        WebViewEventHook.report(
+            "webview_main_frame_error",
+            mapOf(
+                "url" to (failingUrl ?: ""),
+                "error_code" to errorCode,
+                // 对应 LogFields.PREVIEW_LOAD_ID（webcore 零依赖，只能写字面量）。
+                "preview_load_id" to engine.loadTraceId,
+            ),
+        )
         selfHeal.maybeSelfHeal(view, "main_frame_error_legacy: $errorCode")
         reportError(view, description)
         super.onReceivedError(view, errorCode, description, failingUrl)
@@ -177,6 +226,16 @@ internal class InAppWebViewClient(
         response: WebResourceResponse,
     ) {
         if (request.isForMainFrame && response.statusCode >= 400) {
+            // 4xx/5xx 主帧是"看起来加载成功、实际错误页/空白"的典型来源，必须落盘。
+            WebViewEventHook.report(
+                "webview_http_error",
+                mapOf(
+                    "url" to (request.url?.toString() ?: ""),
+                    "status_code" to response.statusCode,
+                    // 对应 LogFields.PREVIEW_LOAD_ID（webcore 零依赖，只能写字面量）。
+                    "preview_load_id" to engine.loadTraceId,
+                ),
+            )
             reportError(view, "HTTP ${response.statusCode}")
         }
         super.onReceivedHttpError(view, request, response)
@@ -193,6 +252,18 @@ internal class InAppWebViewClient(
         val url = error.url ?: ""
         val ignore = engine.config.webSettings.ignoreSslErrors
         Log.w(TAG_WEBVIEW_RUNTIME, "ssl_error code=${error.primaryError} url=$url ignore=$ignore")
+        // SSL 拦截过去只打 logcat：用户侧表现为"干净白屏 / 打不开"，事后零证据。
+        // url 交由 app 侧 Sanitizer 裁剪（scheme://host/***），此处不做任何自拼。
+        WebViewEventHook.report(
+            "webview_ssl_error",
+            mapOf(
+                "url" to url,
+                "error_code" to error.primaryError,
+                "ignore" to ignore,
+                // 对应 LogFields.PREVIEW_LOAD_ID（webcore 零依赖，只能写字面量）。
+                "preview_load_id" to engine.loadTraceId,
+            ),
+        )
         val message = if (ignore) {
             handler.proceed()
             "已按设置忽略证书错误，连接未加密校验：$url"
@@ -214,6 +285,15 @@ internal class InAppWebViewClient(
      */
     override fun onRenderProcessGone(view: WebView, detail: android.webkit.RenderProcessGoneDetail): Boolean {
         Log.w(TAG_WEBVIEW_RUNTIME, "render_process_gone")
+        // 渲染进程死亡是"整页被回收"级别的事件：落盘留证，否则只能等用户复述"闪了一下"。
+        WebViewEventHook.report(
+            "webview_renderer_gone",
+            mapOf(
+                "url" to (view.url ?: ""),
+                // 对应 LogFields.PREVIEW_LOAD_ID（webcore 零依赖，只能写字面量）。
+                "preview_load_id" to engine.loadTraceId,
+            ),
+        )
         // 单一提示通道：可见说明由 chrome 层在 RendererGone 事件处理时给出（绝不重复 onError）。
         engine.recreateRequest()
         return true

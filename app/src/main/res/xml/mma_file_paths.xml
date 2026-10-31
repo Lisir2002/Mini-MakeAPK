@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  FileProvider 路径登记（日志导出专用）。
+  只暴露 cache/log-export/ 一个目录：诊断包 zip 落在那里，分享走 content:// 而非 file://。
+  刻意**不**登记外部存储与 filesDir——最小暴露面。
+-->
+<paths>
+    <cache-path name="log_exports" path="log-export/" />
+</paths>

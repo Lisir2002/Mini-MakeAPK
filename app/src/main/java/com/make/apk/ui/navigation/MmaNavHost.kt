@@ -1,5 +1,6 @@
 package com.make.apk.ui.navigation
 
+import android.os.Build
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -10,8 +11,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -24,10 +27,16 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.navArgument
+import androidx.paging.compose.collectAsLazyPagingItems
+import com.make.apk.data.model.LogEntry
+import com.make.apk.logging.LogExportManager
 import com.make.apk.logging.MmaLogger
+import com.make.apk.logging.copyToClipboard
 import com.make.apk.requireMmaApplication
 import com.make.apk.storage.IconStore
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import com.make.apk.ui.components.MmaBottomBar
 import com.make.apk.ui.components.MmaNoticeCategory
 import com.make.apk.ui.components.MmaNoticeData
@@ -37,6 +46,7 @@ import com.make.apk.ui.theme.LocalMmaDesign
 import com.make.apk.ui.theme.Spacing
 import com.make.apk.ui.screens.AddProjectScreen
 import com.make.apk.ui.screens.DevelopingScreen
+import com.make.apk.ui.screens.LogDetailSheet
 import com.make.apk.ui.screens.LogViewerScreen
 import com.make.apk.ui.screens.ProfileScreen
 import com.make.apk.ui.screens.ProjectEditScreen
@@ -150,25 +160,72 @@ fun MmaNavHost(
             )
         }
 
-        // ── 运行日志（流程子页：无底栏，rc9 自研分级展示）────────────
+        // ── 运行日志（流程子页：无底栏；全量历史分页 + 单条详情）────────
         composable(MmaRoute.Logs.route) {
             val vm: com.make.apk.ui.viewmodel.LogViewerViewModel = viewModel(
                 factory = remember(app) {
                     com.make.apk.ui.viewmodel.LogViewerViewModel.factory(app.logRepository)
                 },
             )
-            val logsState by vm.uiState.collectAsStateWithLifecycle()
+            // 分页列表：collectAsLazyPagingItems 必须在组合内调用（内部用 remember）。
+            val lazyLogs = vm.logs.collectAsLazyPagingItems()
+            val counts by vm.counts.collectAsStateWithLifecycle()
+            val filters by vm.filterState.collectAsStateWithLifecycle()
+            // 详情弹层：选中哪条就展示哪条（null = 关闭）。用领域对象而非 id，
+            // 避免为了详情再做一次查询（列表项里已带全部字段）。
+            var detailEntry by remember { mutableStateOf<LogEntry?>(null) }
+            // 日志外带（导出 zip / 打开目录 / 复制详情）是磁盘 + Intent + 剪贴板操作：
+            // 一律在路由层做，页面只发事件（Screen 保持零 IO，截图测试可直接渲染）。
+            val logScope = rememberCoroutineScope()
             // 打开日志页是一次用户操作：只在首次进入时记一次（不能随重组重复记）。
             LaunchedEffect(Unit) {
                 MmaLogger.operation("logs_opened", message = "查看运行日志")
             }
             LogViewerScreen(
-                uiState = logsState,
+                logs = lazyLogs,
+                counts = counts,
+                filters = filters,
                 onBack = { navController.popBackStack() },
                 onToggleLevel = vm::toggleLevel,
                 onToggleGroup = vm::toggleGroup,
                 onClearFilters = vm::clearFilters,
+                // 打不开（无 DocumentsUI / 日志落在私有目录）→ Toast 展示绝对路径让用户照样能找到。
+                onOpenLogDirectory = {
+                    if (!LogExportManager.openLogDirectory(context)) {
+                        val path = runCatching { MmaLogger.currentSessionLogRoot()?.absolutePath }
+                            .getOrNull()
+                            ?: "暂不可用"
+                        Toast.makeText(context, "日志目录：$path", Toast.LENGTH_LONG).show()
+                    }
+                },
+                onExportLogs = {
+                    logScope.launch(Dispatchers.IO) {
+                        val zip = LogExportManager.exportDiagnosticBundle(context)
+                        withContext(Dispatchers.Main) {
+                            if (zip == null) {
+                                Toast.makeText(context, "暂无可导出的日志", Toast.LENGTH_LONG).show()
+                            } else if (!LogExportManager.shareZip(context, zip)) {
+                                Toast.makeText(context, "分享失败，请稍后重试", Toast.LENGTH_LONG).show()
+                            }
+                        }
+                    }
+                },
+                onOpenDetail = { entry -> detailEntry = entry },
             )
+            // 详情弹层与页面同级：弹层打开时列表仍在背后，关闭后原位继续翻。
+            detailEntry?.let { entry ->
+                LogDetailSheet(
+                    entry = entry,
+                    onDismiss = { detailEntry = null },
+                    // API 33+ 系统自带"已复制"提示；低版本给一次 Toast，保证有反馈。
+                    onCopy = { text ->
+                        val copied = copyToClipboard(context, "MMA 日志", text)
+                        if (copied && Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+                            Toast.makeText(context, "已复制日志", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                )
+            }
         }
 
         // ── 新建项目（流程子页：无底栏）──────────────────────────────

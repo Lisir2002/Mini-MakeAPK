@@ -35,13 +35,27 @@ internal class SelfHealController(
         engine.blankHandledUrl = null
         engine.nextProbeGeneration()
         // W3 ⑬ 埋点：自愈触发（结构化 reason 字段）。
-        WebViewEventHook.report("preview_self_heal", mapOf("reason" to reason, "success" to true))
+        WebViewEventHook.report(
+            "preview_self_heal",
+            mapOf(
+                "reason" to reason,
+                "success" to true,
+                // 对应 LogFields.PREVIEW_LOAD_ID（webcore 零依赖，只能写字面量）。
+                "preview_load_id" to engine.loadTraceId,
+            ),
+        )
         engine.emit(EngineEvent.SelfHealNotice(msgSelfHealReload))
         val done = engine.reloadNoCache()
         if (!done) {
             WebViewEventHook.report(
                 "preview_self_heal",
-                mapOf("reason" to reason, "success" to false, "detail" to "engine_not_ready"),
+                mapOf(
+                    "reason" to reason,
+                    "success" to false,
+                    "detail" to "engine_not_ready",
+                    // 对应 LogFields.PREVIEW_LOAD_ID（webcore 零依赖，只能写字面量）。
+                    "preview_load_id" to engine.loadTraceId,
+                ),
             )
         }
     }

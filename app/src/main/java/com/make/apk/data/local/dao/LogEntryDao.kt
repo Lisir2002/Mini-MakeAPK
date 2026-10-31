@@ -62,4 +62,25 @@ interface LogEntryDao {
     /** 长列表分页（Paging3）。 */
     @Query("SELECT * FROM log_entries ORDER BY timestampMs DESC")
     fun pagingSource(): PagingSource<Int, LogEntryEntity>
+
+    /**
+     * 带筛选的分页（级别 + 类别双维，参数**永不为空**——调用方负责补全量）。
+     *
+     * 为什么补全量而不动态拼 SQL：SQL 的 `IN ()` 空集合是语法错误，
+     * 且 Room 的 `:list` 绑定空列表会展开成非法 SQL。调用方
+     * （[com.make.apk.data.repository.LogRepository.levelsArg] / `categoriesArg`）
+     * 在空筛选时补成"全量枚举"，等价于不过滤，同时保持查询计划单一（走 timestampMs 索引）。
+     */
+    @Query(
+        "SELECT * FROM log_entries WHERE level IN (:levels) AND category IN (:categories) " +
+            "ORDER BY timestampMs DESC",
+    )
+    fun pagingSourceFiltered(
+        levels: List<String>,
+        categories: List<String>,
+    ): PagingSource<Int, LogEntryEntity>
+
+    /** 按类别计数（分组汇总用；**不受分页窗口限制**，全量口径）。 */
+    @Query("SELECT category AS category, COUNT(*) AS count FROM log_entries GROUP BY category")
+    fun observeCategoryCounts(): Flow<List<CategoryCountRow>>
 }

@@ -9,6 +9,8 @@ import com.make.apk.data.mapper.toDomain
 import com.make.apk.data.model.LogEntry
 import com.make.apk.logging.LogCategory
 import com.make.apk.logging.LogFields
+import com.make.apk.logging.LogGroup
+import com.make.apk.logging.LogLevel
 import com.make.apk.logging.MmaLogger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -38,6 +40,37 @@ class LogRepository(
 
         /** 日志查看页默认拉取的最近条数。 */
         const val RECENT_LIMIT: Int = 500
+
+        /**
+         * 级别筛选 → SQL 参数（空集合展开为全量枚举）。
+         *
+         * 排序：非空时按 name 升序，保证同一个筛选**集合**永远产出同一份参数列表
+         * （[Set] 迭代顺序随插入顺序变，直接 `map` 会让 PagingSource 每次都是新键，
+         * 白白触发一次无效重载）。
+         *
+         * `internal` 是为了让参数展开逻辑可被单元测试直接覆盖（无需造 Room 库）。
+         */
+        internal fun levelsArg(levels: Set<LogLevel>): List<String> =
+            if (levels.isEmpty()) {
+                LogLevel.entries.map { it.name }
+            } else {
+                levels.map { it.name }.sorted()
+            }
+
+        /**
+         * 分组筛选 → SQL 参数（空集合展开为全量类别）。
+         *
+         * 非空时按 [LogCategory.group] 展开为类别名列表；顺序跟随 [LogCategory.entries]
+         * （声明顺序即稳定顺序），理由同 [levelsArg]。
+         *
+         * `internal` 便于单测——尤其"某个分组到底包含哪些类别"这种映射必须可断言。
+         */
+        internal fun categoriesArg(groups: Set<LogGroup>): List<String> =
+            if (groups.isEmpty()) {
+                LogCategory.entries.map { it.name }
+            } else {
+                LogCategory.entries.filter { it.group in groups }.map { it.name }
+            }
     }
 
     // ── 读 ────────────────────────────────────────────────────────────
@@ -56,6 +89,57 @@ class LogRepository(
         Pager(PagingConfig(pageSize = pageSize, enablePlaceholders = false)) { dao.pagingSource() }
             .flow
             .map { page -> page.map { it.toDomain() } }
+
+    /**
+     * 全量分页（带筛选）：级别 × 分组双维，筛选条件下推到 SQL。
+     *
+     * 空集合语义 = 不过滤。但 SQL 的 `IN ()` 非法，故参数构造阶段就把
+     * "空"展开成全量枚举（[levelsArg] / [categoriesArg]），查询本身只有一种形态。
+     *
+     * @param levels 级别筛选（空 = 全部级别）。
+     * @param groups 分组筛选（空 = 全部分组）。
+     * @param pageSize 每页条数。
+     */
+    fun pagedLogs(
+        levels: Set<LogLevel>,
+        groups: Set<LogGroup>,
+        pageSize: Int = DEFAULT_PAGE_SIZE,
+    ): Flow<PagingData<LogEntry>> {
+        val levelArgs = levelsArg(levels)
+        val categoryArgs = categoriesArg(groups)
+        return Pager(PagingConfig(pageSize = pageSize, enablePlaceholders = false)) {
+            dao.pagingSourceFiltered(levelArgs, categoryArgs)
+        }
+            .flow
+            .map { page -> page.map { it.toDomain() } }
+    }
+
+    /**
+     * 分组计数（SQL 聚合，**全量口径**，不随分页窗口变化）。
+     *
+     * 解析失败的行（历史数据里出现未登记的类别名）直接跳过——计数是展示用的
+     * 辅助信息，任何一条脏数据都不该让整页读不出来。
+     */
+    fun observeGroupCounts(): Flow<Map<LogGroup, Int>> =
+        dao.observeCategoryCounts().map { rows ->
+            val totals = MutableList(LogGroup.entries.size) { 0 }
+            val groupIndex = LogGroup.entries.associateWith { it.ordinal }
+            rows.forEach { row ->
+                val category = runCatching { LogCategory.valueOf(row.category) }.getOrNull()
+                    ?: return@forEach
+                val index = groupIndex[category.group] ?: return@forEach
+                totals[index] += row.count
+            }
+            LogGroup.entries.associateWith { totals[it.ordinal] }
+        }
+
+    /**
+     * 级别筛选 → SQL 参数（实现在伴生对象，便于无 DB 单测）。
+     */
+    private fun levelsArg(levels: Set<LogLevel>): List<String> = Companion.levelsArg(levels)
+
+    /** 分组筛选 → SQL 参数（实现在伴生对象）。 */
+    private fun categoriesArg(groups: Set<LogGroup>): List<String> = Companion.categoriesArg(groups)
 
     suspend fun querySince(fromMs: Long): List<LogEntry> = withContext(Dispatchers.IO) {
         dao.querySince(fromMs).map { it.toDomain() }

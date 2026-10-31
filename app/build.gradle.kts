@@ -40,8 +40,8 @@ android {
         //   版本号不带 +N 后缀（2026-10-25 起，用户确认）。
         // versionCode：Android 安装唯一性要求的内部整数，单调递增，但不进版本串/tag；
         //   发布 tag = v<versionName>。递增规则与发版流程见 docs/VERSIONING.md。
-        versionCode = 17
-        versionName = "0.0.0.1-rc14"
+        versionCode = 18
+        versionName = "0.0.0.1-rc15"
     }
 
     signingConfigs {
@@ -152,6 +152,8 @@ dependencies {
     // 协程 / 分页：Room suspend + Flow 响应式查询
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.androidx.paging.runtime)
+    // paging-compose：LazyPagingItems / collectAsLazyPagingItems（日志页全量历史分页）
+    implementation(libs.androidx.paging.compose)
 
     // ── 统一内核契约：WebRuntimeConfig JSON 序列化 ─────────────────────
     // 本地渲染器与导出模板壳共用同一份 runtime-config.json（本地注入架构，无云端）。

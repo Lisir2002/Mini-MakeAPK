@@ -70,17 +70,33 @@ object MmaStorage {
     }.getOrDefault(false)
 
     /**
-     * 日志目录决策：已授权且实测可写 → `MMAFile/Log`；否则私有兜底 `filesDir/logs`。
+     * 公共日志目录「实测可用」时返回 `MMAFile/Log`，否则 `null`（**不降级**，供调用方自行决策）。
+     *
+     * 与 [resolveLogDirectory] 的差别只在「不可用时返回什么」：
+     * 决策类调用方（安装期目录优先级、启动后复查、热迁移目标）需要区分
+     * 「公共可用」与「已降级」，若只有降级后的 File 就无从判断该不该搬。
      *
      * 「授权 ≠ 能写」：外部存储挂载异常时权限可能仍显示已授予，故必须实测
-     * （`mkdirs() || (isDirectory && canWrite())`），失败静默回退私有。
+     * （`mkdirs() || (isDirectory && canWrite())`）。
+     *
+     * 异常一律视为不可用（返回 null）：本方法在 `attachBaseContext` 的日志安装路径上
+     * 被同步调用，抛异常等于启动崩溃。
      */
-    fun resolveLogDirectory(context: Context): File {
-        if (!isAuthorized(context)) return privateFallback(context)
+    fun resolvePublicLogDirectory(context: Context): File? = runCatching {
+        if (!isAuthorized(context)) return@runCatching null
         val publicLog = dir(MmaDir.LOG)
         val writable = publicLog.mkdirs() || (publicLog.isDirectory && publicLog.canWrite())
-        return if (writable) publicLog else privateFallback(context)
-    }
+        if (writable) publicLog else null
+    }.getOrNull()
+
+    /**
+     * 日志目录决策：已授权且实测可写 → `MMAFile/Log`；否则私有兜底 `filesDir/logs`。
+     *
+     * 行为与历史版本完全等价（探测逻辑收敛到 [resolvePublicLogDirectory]，去重）。
+     * 需要「区分是否降级」的调用方请直接用 [resolvePublicLogDirectory]。
+     */
+    fun resolveLogDirectory(context: Context): File =
+        resolvePublicLogDirectory(context) ?: privateFallback(context)
 
     /** 私有日志兜底目录（免存储权限、卸载即清理；未授权/不可写时的降级目标）。 */
     fun privateFallback(context: Context): File = File(context.filesDir, "logs")

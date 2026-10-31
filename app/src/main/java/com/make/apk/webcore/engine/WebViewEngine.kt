@@ -90,6 +90,14 @@ class WebViewEngine(
     /** 页面加载起点时间戳（旧 TAG_PAGE_START_KEY 替代；preview_loaded 埋点 duration 口径）。 */
     internal var pageStartedAt: Long = 0L
 
+    /**
+     * 一次页面加载的短期关联 id（8 位十六进制，[com.make.apk.webcore.navigation.InAppWebViewClient]
+     * 在 onPageStarted 生成）：把同一次加载的 page / error / blank / self_heal 串成**因果链**——
+     * 白屏排查时按 id 聚合即可还原完整现场，无需靠时间戳猜相邻关系。
+     * 仅作埋点字段用（对应 app 侧 `LogFields.PREVIEW_LOAD_ID`），不参与任何业务判定。
+     */
+    internal var loadTraceId: String = ""
+
     /** 当前虚拟文件集（旧 TAG_FILES_KEY 替代；name → content，随每次加载刷新）。 */
     internal var virtualFiles: Map<String, String> = emptyMap()
 

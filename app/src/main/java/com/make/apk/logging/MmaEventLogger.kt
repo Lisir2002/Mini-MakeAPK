@@ -118,17 +118,55 @@ object MmaEventLogger {
     /**
      * WebViewScreen 埋点的桥接入口（模板侧经共享钩子 `WebViewEventHook` 转发到这里，
      * 模板模块不引入 logging 包——Data.local 依赖被模板约束禁止）。
-     * 级别按事件语义固定：根因判定 = ERROR（需人介入），加载完成 = INFO，其余 = WARN。
+     *
+     * **事件白名单 + 级别映射表**（[levelOf]）：webcore 侧只传字符串事件名，
+     * 分类 / 级别一律在此收口——白屏排查的全部证据（加载、SSL、主帧错误、HTTP 4xx/5xx、
+     * 渲染进程死亡、外部 scheme 拦截、存储隔离降级）统一归入 PREVIEW 类别，
+     * 落加密 DB + preview.log（90 天）。
+     *
+     * 未登记的事件名返回 false（**只抓该抓的**：webcore 里还有大量高频调试事件，
+     * 如 page_started / page_finished，进白名单会淹没有效证据）。新增事件请先在
+     * [levelOf] 登记级别——漏登记表现为"日志里查不到"，比写错级别更难查。
      */
     fun webViewEvent(event: String, fields: Map<String, Any?> = emptyMap()): Boolean {
-        if (!event.startsWith("preview_")) return false
-        val level = when (event) {
-            "preview_blank_root_cause" -> LogLevel.ERROR
-            "preview_loaded" -> LogLevel.INFO
-            else -> LogLevel.WARN
-        }
-        return MmaLogger.log(level, LogCategory.PREVIEW, event, fields = fields)
+        val level = levelOf[event] ?: return false
+        // message 交给显式 msg 字段（多数 webcore 事件只带结构化字段，不重复进 message）。
+        return MmaLogger.log(
+            level = level,
+            category = LogCategory.PREVIEW,
+            event = event,
+            message = fields["msg"]?.toString(),
+            fields = fields,
+        )
     }
+
+    /**
+     * WebView 诊断事件 → 级别映射（**唯一级别事实源**）。
+     *
+     * 级别口径：ERROR = 用户必然看到故障（证书拦截 / 主帧失败 / 渲染进程死亡 / 白屏根因），
+     * WARN = 已自动降级或自愈但仍需关注，INFO = 正常路径的可观测性留痕。
+     */
+    private val levelOf: Map<String, LogLevel> = mapOf(
+        // 预览 / 白屏探测链（W3 ⑬ 契约）
+        "preview_loaded" to LogLevel.INFO,
+        "preview_blank_confirmed" to LogLevel.WARN,
+        "preview_self_heal" to LogLevel.WARN,
+        "preview_blank_root_cause" to LogLevel.ERROR,
+        // 内核加载失败面（此前只打 logcat，重启即丢）
+        "webview_ssl_error" to LogLevel.ERROR,
+        "webview_main_frame_error" to LogLevel.ERROR,
+        "webview_http_error" to LogLevel.ERROR,
+        "webview_renderer_gone" to LogLevel.ERROR,
+        // 平台能力降级（隔离失败 / 不支持 → 回落共享存储，多项目共存会串扰）
+        "storage_isolation_conflict" to LogLevel.WARN,
+        "storage_isolation_unsupported" to LogLevel.WARN,
+        "storage_isolation_failed" to LogLevel.WARN,
+        // 明文 http 主帧放行（渐进收紧 https 的数据依据）
+        "plain_http_loaded" to LogLevel.INFO,
+        // 导航逃逸防护
+        "webview_external_scheme_blocked" to LogLevel.WARN,
+        "webview_link_external" to LogLevel.INFO,
+    )
 
     // ── 设置 / 导出 ───────────────────────────────────────────────────
 

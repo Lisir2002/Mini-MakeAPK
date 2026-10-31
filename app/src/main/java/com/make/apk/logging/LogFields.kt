@@ -46,6 +46,15 @@ object LogFields {
     /** 采样率（0.0–1.0），用于还原真实量级。 */
     const val SAMPLE_RATE = "sample_rate"
 
+    /**
+     * 预览加载的会话关联 id（每次 onPageStarted 生成，8 位十六进制）。
+     *
+     * 白屏排查的核心维度：同一次加载的 page / ssl_error / main_frame_error / http_error /
+     * blank_confirmed / self_heal 共享同一 id，按 id 聚合即可还原完整因果链（无需时序猜测）。
+     * webcore 侧零依赖，只能用字面量 `"preview_load_id"`——本常量是 app 侧的规范词条。
+     */
+    const val PREVIEW_LOAD_ID = "preview_load_id"
+
     // ── 设备 / 应用上下文（仅设备类别信息，不含任何可识别标识）───────────
 
     /** 应用版本名（如 0.0.0.1-rc5）。 */

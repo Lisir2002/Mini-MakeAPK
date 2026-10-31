@@ -129,10 +129,10 @@ class MmaEventLoggerTest {
     }
 
     @Test
-    fun webViewEvent_onlyAcceptsPreviewPrefixedNames() {
+    fun webViewEvent_rejectsNamesOutsideWhitelist() {
         install()
         assertTrue(MmaEventLogger.webViewEvent("preview_loaded", mapOf("duration_ms" to 5L)))
-        assertFalse("非 preview_ 前缀一律拒绝（防事件名漂移）", MmaEventLogger.webViewEvent("page_started"))
+        assertFalse("白名单外事件一律拒绝（防事件名漂移）", MmaEventLogger.webViewEvent("page_started"))
         assertEquals("preview_loaded", sink.events.single().event)
     }
 

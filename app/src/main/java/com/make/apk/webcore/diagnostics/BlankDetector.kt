@@ -77,7 +77,14 @@ internal class BlankDetector(
         if (engine.blankHandledUrl == pageUrl) return
         engine.blankHandledUrl = pageUrl
         // W3 ⑬ 埋点：两段式探测都为空 = 白屏最终确认（自愈与否由后续链路细分）。
-        WebViewEventHook.report("preview_blank_confirmed", mapOf("has_url" to pageUrl.isNotBlank()))
+        WebViewEventHook.report(
+            "preview_blank_confirmed",
+            mapOf(
+                "has_url" to pageUrl.isNotBlank(),
+                // 对应 LogFields.PREVIEW_LOAD_ID（webcore 零依赖，只能写字面量）。
+                "preview_load_id" to engine.loadTraceId,
+            ),
+        )
         if (!engine.selfHealed) {
             selfHeal.maybeSelfHeal(view, "blank_content")
             return
@@ -103,7 +110,12 @@ internal class BlankDetector(
         }.onFailure {
             WebViewEventHook.report(
                 "preview_blank_root_cause",
-                mapOf("reason" to "PROBE_FAILED", "detail" to "evaluate_failed"),
+                mapOf(
+                    "reason" to "PROBE_FAILED",
+                    "detail" to "evaluate_failed",
+                    // 对应 LogFields.PREVIEW_LOAD_ID（webcore 零依赖，只能写字面量）。
+                    "preview_load_id" to engine.loadTraceId,
+                ),
             )
             emitCause(BlankRootCause.ProbeFailed)
         }
@@ -120,7 +132,12 @@ internal class BlankDetector(
         }.onFailure {
             WebViewEventHook.report(
                 "preview_blank_root_cause",
-                mapOf("reason" to "UNKNOWN", "detail" to "read_js_error_failed"),
+                mapOf(
+                    "reason" to "UNKNOWN",
+                    "detail" to "read_js_error_failed",
+                    // 对应 LogFields.PREVIEW_LOAD_ID（webcore 零依赖，只能写字面量）。
+                    "preview_load_id" to engine.loadTraceId,
+                ),
             )
             emitCause(BlankRootCause.Unknown)
         }
@@ -131,6 +148,8 @@ internal class BlankDetector(
         val fields = buildMap {
             put("reason", cause.eventReason)
             (cause as? BlankRootCause.JsError)?.detail?.let { put("detail", it) }
+            // 对应 LogFields.PREVIEW_LOAD_ID（webcore 零依赖，只能写字面量）。
+            put("preview_load_id", engine.loadTraceId)
         }
         WebViewEventHook.report("preview_blank_root_cause", fields)
         engine.emit(EngineEvent.BlankConfirmed(reason = cause.eventReason, message = cause.message))

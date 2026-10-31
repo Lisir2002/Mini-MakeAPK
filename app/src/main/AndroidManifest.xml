@@ -34,6 +34,22 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!--
+          日志导出诊断包分享：FileProvider 把 cache/log-export/*.zip 暴露成
+          content://<applicationId>.fileprovider/log_exports/...（Android 7+ 禁 file:// 直传）。
+          路径白名单见 res/xml/mma_file_paths.xml；authority 用 applicationId 占位符，
+          保证 debug/release 不同 applicationIdSuffix 下不冲突。
+        -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/mma_file_paths" />
+        </provider>
     </application>
 
 </manifest>

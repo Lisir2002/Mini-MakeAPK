@@ -232,6 +232,50 @@ class MmaLoggerTest {
         assertTrue("format() 应含构建类型", line.contains("bt=debug"))
     }
 
+    // ── 白屏诊断日志接入：webcore 事件白名单映射 ─────────────────────
+
+    /**
+     * 白名单事件统一归 PREVIEW 且级别按语义：SSL / 主帧 / HTTP / 渲染进程死亡 = ERROR，
+     * 隔离降级 / 自愈 = WARN，正常加载 = INFO。
+     */
+    @Test
+    fun webViewEvent_mapsWhitelistToPreviewCategoryAndLevel() {
+        installForTest()
+        assertTrue(MmaEventLogger.webViewEvent("webview_ssl_error", mapOf("url" to "https://a.example/p?token=1")))
+        assertTrue("此前被前缀过滤丢弃，接入后必须落盘", MmaEventLogger.webViewEvent("plain_http_loaded", mapOf("has_url" to true)))
+        assertTrue("此前被前缀过滤丢弃，接入后必须落盘", MmaEventLogger.webViewEvent("storage_isolation_conflict", mapOf("reason" to "shared_storage")))
+        assertTrue(MmaEventLogger.webViewEvent("preview_loaded", mapOf(LogFields.DURATION_MS to 120L)))
+
+        val byEvent = sink.events.associateBy { it.event }
+        assertEquals(
+            setOf("webview_ssl_error", "plain_http_loaded", "storage_isolation_conflict", "preview_loaded"),
+            byEvent.keys,
+        )
+        byEvent.values.forEach {
+            assertEquals("白屏诊断统一归 PREVIEW", LogCategory.PREVIEW, it.category)
+            assertTrue("PREVIEW 必须落库", it.category.persistToDatabase)
+            assertTrue("PREVIEW 必须落 preview.log", it.category.persistToFile)
+        }
+        assertEquals(LogLevel.ERROR, byEvent.getValue("webview_ssl_error").level)
+        assertEquals(LogLevel.INFO, byEvent.getValue("plain_http_loaded").level)
+        assertEquals(LogLevel.WARN, byEvent.getValue("storage_isolation_conflict").level)
+        assertEquals(LogLevel.INFO, byEvent.getValue("preview_loaded").level)
+
+        // 脱敏红线：url 键经 Sanitizer 裁剪成 scheme://host/***，查询串不外泄。
+        val redactedUrl = byEvent.getValue("webview_ssl_error").fields["url"].toString()
+        assertEquals("https://a.example/${Sanitizer.MASK}", redactedUrl)
+        assertFalse("查询串不得落盘", redactedUrl.contains("token"))
+    }
+
+    /** 未知事件名一律拒绝（webcore 里高频调试事件不得淹没有效证据）。 */
+    @Test
+    fun webViewEvent_rejectsUnknownEventName() {
+        installForTest()
+        assertFalse("未登记事件应拒发", MmaEventLogger.webViewEvent("foo_bar"))
+        assertFalse("page_started 不在白名单（生命周期高频，不落盘）", MmaEventLogger.webViewEvent("page_started"))
+        assertTrue("被拒事件不得产生任何日志", sink.events.isEmpty())
+    }
+
     @Test
     fun contextFields_areCarriedIntoPersistedFieldsJson() {
         installForTest()

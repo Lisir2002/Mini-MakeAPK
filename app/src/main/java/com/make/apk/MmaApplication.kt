@@ -18,6 +18,8 @@ import com.make.apk.logging.MmaEventLogger
 import com.make.apk.logging.MmaLogger
 import com.make.apk.logging.SessionLogPolicy
 import com.make.apk.logging.StartupTracer
+import com.make.apk.storage.LogDirectoryPicker
+import com.make.apk.storage.MmaDir
 import com.make.apk.storage.MmaStorage
 import com.make.apk.storage.ProjectWorkspaceStore
 import com.make.apk.webcore.diagnostics.WebViewEventHook
@@ -79,21 +81,15 @@ class MmaApplication : Application() {
     private fun installLogging() {
         val debuggable = (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
         // 启动链防御（2026-10-26 rc2 闪退修复）：目录决策不得杀死进程。
-        // resolveLogDirectory → isAuthorized → Environment.isExternalStorageManager
-        // 在部分 ROM 上会抛异常；此处兜底私有目录，保证日志系统永远装得上。
+        // resolvePublicLogDirectory → isAuthorized → Environment.isExternalStorageManager
+        // 在部分 ROM 上会抛异常；决策链内每步都 runCatching，最终兜底私有目录，
+        // 保证日志系统永远装得上。
         //
-        // 诊断版（debuggable，2026-10-26 rc3 装机仍闪退定位期）：日志优先写
-        // getExternalFilesDir/mma-logs——免权限、用户可用文件管理器查看，
-        // 崩溃文件重启后由 MainActivity 的诊断对话框直接展示（见 CrashReportUI）。
-        val logDirectory = if (debuggable) {
-            runCatching {
-                @Suppress("DEPRECATION")
-                File(getExternalFilesDir(null), "mma-logs").apply { mkdirs() }
-            }.getOrElse { runCatching { MmaStorage.resolveLogDirectory(this) }.getOrElse { MmaStorage.privateFallback(this) } }
-        } else {
-            runCatching { MmaStorage.resolveLogDirectory(this) }
-                .getOrElse { MmaStorage.privateFallback(this) }
-        }
+        // 目录优先级（全量接线，debug 与 release 同一套）：公共 MMAFile/Log
+        // → debuggable 专属外部目录（免权限、USB 可取）→ 私有兜底。
+        // 此前 debug 包硬编码 getExternalFilesDir（Android 11+ 文件管理器进不去），
+        // 即使已授权也从不写 MMAFile/Log——这是本次修复的核心。
+        val logDirectory = resolveInstallLogDirectory(this, debuggable)
         MmaLogger.install(
             LogConfig(
                 minLevel = if (debuggable) LogLevel.DEBUG else LogLevel.INFO,
@@ -114,6 +110,51 @@ class MmaApplication : Application() {
             event = "logging_installed",
             message = "日志系统就绪",
             fields = mapOf(LogFields.SUCCESS to true, "debuggable" to debuggable),
+        )
+    }
+
+    /**
+     * 安装期日志根目录（debuggable 与 release 走同一套优先级）：
+     * 公共 `MMAFile/Log` → debuggable 专属外部目录 → 私有兜底。
+     *
+     * 每一步都吞异常：本方法在 `attachBaseContext` 路径上执行，抛出即启动崩溃。
+     * 决策本身交给纯函数 [LogDirectoryPicker.pick]（JVM 单测钉死优先级）。
+     */
+    private fun resolveInstallLogDirectory(context: Context, debuggable: Boolean): File {
+        val publicLog = runCatching { MmaStorage.resolvePublicLogDirectory(context) }.getOrNull()
+        val externalPrivate = if (debuggable) {
+            runCatching {
+                context.getExternalFilesDir(null)?.let { dir -> File(dir, "mma-logs").apply { mkdirs() } }
+            }.getOrNull()
+        } else {
+            null
+        }
+        val fallback = runCatching { MmaStorage.privateFallback(context) }
+            .getOrElse { File(context.filesDir, "logs") }
+        return LogDirectoryPicker.pick(publicLog, externalPrivate, fallback)
+    }
+
+    /**
+     * 启动后复查（全量接线）：已授权但当前日志根不在 `MMAFile/Log` → 补一次热迁移。
+     *
+     * 覆盖「用户在系统设置里手动授权、没走 App 内权限门」的路径——此前热迁移只挂在
+     * `StoragePermissionGate.ensurePublicStorage()` 上，手动授权后日志仍留在旧目录，
+     * 用户在文件管理器里永远看不到。
+     *
+     * 只搬当前会话目录（[MmaLogger.redirectFileSink] 内部保证迁移失败时旧 sink 复位、
+     * 不丢日志）。整体吞异常：复查只是尽力而为，失败不得影响启动。
+     *
+     * `internal` = Robolectric 集成测试缝，可直调触发真实迁移路径。
+     */
+    internal fun syncLogDirectoryWithStoragePermission() {
+        val target = runCatching { MmaStorage.resolvePublicLogDirectory(this) }.getOrNull() ?: return
+        val currentRoot = runCatching { MmaLogger.currentSessionLogRoot() }.getOrNull() ?: return
+        if (runCatching { currentRoot.canonicalPath == target.canonicalPath }.getOrDefault(false)) return
+        val moved = runCatching { MmaLogger.redirectFileSink(target) }.getOrDefault(false)
+        MmaLogger.operation(
+            event = if (moved) "log_dir_synced_to_public" else "log_dir_sync_failed",
+            message = if (moved) "日志目录已切换到 MMAFile/Log" else "日志目录切换失败，继续使用原目录",
+            fields = mapOf(LogFields.SUCCESS to moved, "target" to MmaDir.LOG.folderName),
         )
     }
 
@@ -158,6 +199,9 @@ class MmaApplication : Application() {
                 // 专用守护线程内 runBlocking：一次性启动对账（无 UI 生命周期语义，
                 // 不值得为它建协程作用域）；阻塞只影响本线程，不影响主线程。
                 kotlinx.coroutines.runBlocking {
+                    // 先对齐目录、再回灌：手动在系统设置授权的用户，日志根要在这里
+                    // 迁到 MMAFile/Log，否则下面的回灌仍会落到旧的（用户不可见）目录。
+                    syncLogDirectoryWithStoragePermission()
                     restoreExternalMirrors()
                     cleanupExpiredSessionLogDirs()
                 }
@@ -193,8 +237,11 @@ class MmaApplication : Application() {
     private suspend fun restoreLogFilesFromDatabase() {
         // W3 ⑦：优先落当前会话目录（app.restored-<ts>.log 与三路由文件同目录，
         // 排障时一个会话一个现场）；会话布局未生效（如单测/异常兜底）回落日志根。
+        // 回落的日志根必须与 install 期决策同源（resolveInstallLogDirectory），
+        // 否则 debug 包会出现「装到 A 目录、回灌到 B 目录」的分叉。
+        val debuggable = (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
         val dir = MmaLogger.currentSessionLogDirectory()
-            ?: MmaStorage.resolveLogDirectory(this)
+            ?: resolveInstallLogDirectory(this, debuggable)
         if (!dir.isDirectory) return
         val hasActiveLogs = dir.listFiles()?.any { it.isFile && it.name.endsWith(".log") } == true
         if (hasActiveLogs) return

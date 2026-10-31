@@ -91,6 +91,9 @@ android {
                 "**/AddProjectScreen.kt",
                 "**/DevelopingScreen.kt",
                 "**/LogViewerScreen.kt",
+                // 日志详情弹层：与 LogViewerScreen 同源（依赖 app 的 data/logging/主题），
+                // 模板不引入日志查看能力，故一并剔除（否则模板侧编译缺依赖即失败）。
+                "**/LogDetailSheet.kt",
                 "**/ProfileItem.kt",
                 "**/ProfileScreen.kt",
                 "**/ProjectsScreen.kt",
