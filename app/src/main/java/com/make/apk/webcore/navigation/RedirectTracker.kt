@@ -1,57 +1,119 @@
 package com.make.apk.webcore.navigation
 
+import java.util.Locale
+
 /**
  * 重定向链判定（rc17 新增）：**纯函数**，不持有状态、不依赖 WebView，便于单测。
  *
  * 背景：`WebViewClient` 没有重定向回调（`onReceivedHttpRedirectFor` 在 android-34 与
- * `androidx.webkit.WebViewClientCompat` 中均不存在，已用 javap 核对）。唯一全 API 可用的
+ * `androidx.webkit` 的 `WebViewClientCompat` 中均不存在，已用 javap 核对）。唯一全 API 可用的
  * 观测点是 `doUpdateVisitedHistory`——每次主帧导航提交都会触发，含 302 跳。
  *
- * 判定口径：
- * - 首次提交（[prevUrl] 为空）且地址等于起始地址 → 0 跳，不报；
- * - 首次提交但地址已不同于起始地址 → 记作第 1 跳（内核未给起始回调的极端情况）；
- * - 后续每次地址变化 → 跳数 +1，记为一次重定向；
- * - 地址未变（同页 reload / 重复回调）→ 跳数与上报均不变，避免刷屏。
+ * ## 两个必须避开的坑
  *
- * 拿不到状态码，故不伪造：`preview_redirect` 只记 from/to 与第几跳。
+ * **1. 不能直接比较 URL 字符串。** 内核回调的地址与起始地址常常只是**写法不同**：
+ * 补了末尾斜杠（`https://a.com` → `https://a.com/`）、域名大小写、默认端口（`:443`）、
+ * 追加了空锚点（`#`）。字符串判等会把这些全部误报成重定向，跳数虚高，
+ * 于是「等网络」被误判成「站点在反复跳转」。故比较前先走 [normalize]。
+ *
+ * **2. 不能把 URL 写进日志字段。** 脱敏器对键名含 `url|uri|link|href` 的字段一律裁成
+ * 「协议 + 域名 + 掩码」三截（脱敏红线，见 `Sanitizer.URL_KEY`）。若记录
+ * `from_url` / `to_url`，二者会被裁成**同一个字符串**，
+ * 事件读起来像「X 重定向到 X」，既无用又误导。
+ * 故本类只输出**判定结论**（第几跳 / 域名是否变 / 路径是否变），不输出地址。
+ * 拿不到状态码，同样不伪造。
+ *
+ * 注：Kotlin 的块注释**可嵌套**，注释里再出现「斜杠 + 星号」会让闭合失配，故上处以文字描述掩码。
  */
 internal object RedirectTracker {
 
     /**
-     * 判定结果。
+     * 判定结果：一次**实质**的地址跳变。
      *
-     * @property changed 提交地址是否发生变化（变化才需要刷新 [prevUrl]）。
-     * @property hops 判定后的跳数。
-     * @property isHop 本次是否为一次重定向跳（决定是否上报 `preview_redirect`）。
-     * @property fromUrl 重定向来源地址（上报用）。
+     * @property hops 计入本次后的跳数。
+     * @property hostChanged 域名是否变化（跨站跳转 = 要重付 DNS/TLS，白屏时长的主要来源）。
+     * @property pathChanged 路径或查询是否变化（同站内跳转）。
      */
     data class Step(
-        val changed: Boolean,
         val hops: Int,
-        val isHop: Boolean,
-        val fromUrl: String,
+        val hostChanged: Boolean,
+        val pathChanged: Boolean,
     )
 
-    /** 地址未变化时的惰性结果：不刷新、不计数、不上报。 */
-    private fun unchanged(hops: Int) = Step(changed = false, hops = hops, isHop = false, fromUrl = "")
+    /**
+     * 归一化后的可比结构：只保留比较需要的域名与路径，不含敏感查询值以外的身份信息，
+     * 且**不落盘**——仅供 [evaluate] 内部比较。
+     */
+    internal data class Normalized(
+        val host: String,
+        val path: String,
+    )
 
+    /**
+     * 判定一次主帧导航提交。
+     *
+     * @param prevUrl 上一次提交的地址（首次为空）。
+     * @param url 本次提交的地址。
+     * @param startUrl 本次加载的起始地址（`onPageStarted` 写入）。
+     * @param hops 当前跳数。
+     * @return 发生实质跳变时返回结果；**null = 地址未变**（同页 reload / 重复回调 /
+     *         仅锚点或斜杠差异），调用方据此不刷新状态、不计数、不上报。
+     */
     fun evaluate(
         prevUrl: String,
         url: String,
         startUrl: String,
         hops: Int,
-    ): Step {
-        if (url.isBlank() || url == prevUrl) return unchanged(hops)
-        val from = prevUrl.ifEmpty { startUrl }
-        // 起始地址缺失时（内核未回调 onPageStarted 的极端情况）不臆造来源，
-        // 但仍计跳——跳数本身是可信的，from_url 留空即可。
-        val next = if (prevUrl.isEmpty() && url == startUrl) hops else hops + 1
-        val isHop = url != startUrl || prevUrl.isNotEmpty()
+    ): Step? {
+        val from = normalize(prevUrl.ifEmpty { startUrl })
+        val to = normalize(url)
+        if (to.path.isEmpty()) return null
+        // 没有任何基线（起始回调缺失）：无法判定是否发生跳转，宁可不上报，
+        // 也不能把「首次提交」谎报成「一次重定向」。
+        if (from.host.isEmpty() && from.path.isEmpty()) return null
+        // 归一化后相同 → 只是写法差异或重复回调，不是重定向。
+        if (from == to) return null
         return Step(
-            changed = true,
-            hops = next,
-            isHop = isHop && from.isNotEmpty(),
-            fromUrl = from,
+            hops = hops + 1,
+            hostChanged = from.host != to.host,
+            pathChanged = from.path != to.path,
         )
+    }
+
+    /**
+     * URL 归一化：仅用于**比较**，不对外输出、不落盘。
+     *
+     * 处理顺序：去锚点 → 分离 authority 与路径 → 去 userinfo → 去默认端口
+     * → 域名小写（`Locale.US`，规避土耳其 'I' 大小写问题）→ 空路径补 `/`。
+     * 保留查询串：`?p=1` 与 `?p=2` 是不同页面。
+     */
+    internal fun normalize(raw: String): Normalized {
+        val s = raw.trim()
+        val hash = s.indexOf('#')
+        val noFragment = if (hash >= 0) s.substring(0, hash) else s
+        val marker = noFragment.indexOf("://")
+        val scheme = if (marker >= 0) noFragment.substring(0, marker).lowercase(Locale.US) else ""
+        val rest = if (marker >= 0) noFragment.substring(marker + 3) else noFragment
+        val slash = rest.indexOf('/')
+        val authority = if (slash >= 0) rest.substring(0, slash) else rest
+        val tail = if (slash >= 0) rest.substring(slash) else ""
+        var host = authority
+        val at = authority.indexOf('@')
+        if (at >= 0) host = authority.substring(at + 1)
+        var port = ""
+        val colon = host.lastIndexOf(':')
+        if (colon >= 0 && colon < host.length - 1) {
+            val maybe = host.substring(colon + 1)
+            if (maybe.isNotEmpty() && maybe.all { it.isDigit() }) {
+                port = maybe
+                host = host.substring(0, colon)
+            }
+        }
+        if ((scheme == "http" && port == "80") || (scheme == "https" && port == "443")) port = ""
+        val portPart = if (port.isEmpty()) "" else ":$port"
+        val normalizedHost = "$host$portPart".lowercase(Locale.US)
+        // 相对地址（无 authority）时 tail 即全部路径；绝对地址空路径按规范补 `/`。
+        val path = tail.ifEmpty { if (marker >= 0) "/" else "" }
+        return Normalized(host = normalizedHost, path = path)
     }
 }

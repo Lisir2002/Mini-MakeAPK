@@ -192,23 +192,24 @@ internal class InAppWebViewClient(
             startUrl = engine.navigationStartUrl,
             hops = engine.redirectHops,
         )
-        if (step.changed) {
+        if (step != null) {
             engine.lastVisitedUrl = url
             engine.redirectHops = step.hops
-        }
-        if (step.isHop) {
             WebViewEventHook.report(
                 "preview_redirect",
                 mapOf(
-                    "from_url" to step.fromUrl,
-                    "to_url" to url,
                     "hop" to step.hops,
+                    // 跨站跳转要重付 DNS + TLS，是白屏时长的主要来源；同站内跳转则不然。
+                    // 不能记 URL：脱敏器会把 url 键裁成 scheme://host/***，
+                    // from / to 会变成同一串，事件既无用又像 bug。
+                    "host_changed" to step.hostChanged,
+                    "path_changed" to step.pathChanged,
                     "is_reload" to isReload,
                     // 对应 LogFields.PREVIEW_LOAD_ID（webcore 零依赖，只能写字面量）。
                     "preview_load_id" to engine.loadTraceId,
                 ),
             )
-            Log.i(TAG_WEBVIEW_RUNTIME, "redirect hop${step.hops}: ${step.fromUrl} -> $url")
+            Log.i(TAG_WEBVIEW_RUNTIME, "redirect hop${step.hops}: host_changed=${step.hostChanged} -> $url")
         }
         super.doUpdateVisitedHistory(view, url, isReload)
     }
