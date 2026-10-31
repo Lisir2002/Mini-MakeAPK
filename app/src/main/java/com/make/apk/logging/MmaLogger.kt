@@ -57,6 +57,9 @@ object MmaLogger {
 
     private val sinks = CopyOnWriteArrayList<LogSink>()
 
+    /** 文件出口重定向互斥锁：redirect 的「摘除→迁移→重建→挂载」必须整体原子。 */
+    private val redirectLock = Any()
+
     @Volatile
     private var minLevel: LogLevel = LogLevel.INFO
 
@@ -93,6 +96,7 @@ object MmaLogger {
     // ── 安装 ──────────────────────────────────────────────────────────
 
     /** 安装日志系统。应在 `Application.attachBaseContext()` 中尽早调用。 */
+    @Synchronized
     fun install(config: LogConfig) {
         if (installed) return
         minLevel = config.minLevel
@@ -100,7 +104,7 @@ object MmaLogger {
 
         AsyncLogDispatcher.start()
 
-        config.logcatMinLevel?.let { level -> sinks.add(LogcatSink(level)) }
+        config.logcatMinLevel?.let { level -> sinks.addIfAbsent(LogcatSink(level)) }
 
         config.fileDirectory?.let { dir ->
             if (config.sessionLogLayout) {
@@ -117,7 +121,7 @@ object MmaLogger {
                     minLevel = config.fileMinLevel,
                 )
                 sessionSink = sink
-                sinks.add(sink)
+                sinks.addIfAbsent(sink)
                 sessionSinkSettings = SessionSinkSettings(
                     sessionDirName = sessionDirName,
                     maxFileSizeBytes = config.maxFileSizeBytes,
@@ -132,7 +136,7 @@ object MmaLogger {
                     minLevel = config.fileMinLevel,
                 )
                 fileSink = sink
-                sinks.add(sink)
+                sinks.addIfAbsent(sink)
                 fileSinkSettings = FileSinkSettings(
                     maxFileSizeBytes = config.maxFileSizeBytes,
                     maxFiles = config.maxFiles,
@@ -143,7 +147,7 @@ object MmaLogger {
 
         val dbSink = DatabaseSink(config.minLevel)
         databaseSink = dbSink
-        sinks.add(dbSink)
+        sinks.addIfAbsent(dbSink)
 
         if (config.enableCrashHandler) {
             val handler = CrashHandler { throwable, thread, stack ->
@@ -162,6 +166,10 @@ object MmaLogger {
         }
 
         installed = true
+
+        // 防御性自愈（安装期兜底）：若已有重复文件出口（并发安装 / 未知路径重复挂载），立即收敛。
+        // 注意：此处 prune 计数为 0 是常态——重定向在 install 之后才开始，这里只兜未知路径。
+        reportPrunedFileSinks(pruneDuplicateSessionSinks())
     }
 
     /** 数据库就绪后接入，回灌启动期缓冲的日志。 */
@@ -186,9 +194,26 @@ object MmaLogger {
      * @return 是否迁移成功；未安装文件出口或迁移失败返回 false（旧 sink 复位，不丢日志）。
      */
     fun redirectFileSink(newDirectory: File): Boolean {
-        // 会话布局（W3 ⑦）：整体搬迁当前会话目录（保留 sessionDirName，路由不变）。
-        sessionSink?.let { session -> return redirectSessionSink(session, newDirectory) }
+        // 整体原子：并行调用方（db-init 后台线程 / Compose LaunchedEffect 的 IO 线程）交错时，
+        // 各自 add 一个 newSink 而 remove(old) 只对第一个生效 → 同一条日志被写 N 份。
+        val (redirected, pruned) = synchronized(redirectLock) {
+            val session = sessionSink
+            val redirectedNow = if (session != null) {
+                // 会话布局（W3 ⑦）：整体搬迁当前会话目录（保留 sessionDirName，路由不变）。
+                redirectSessionSink(session, newDirectory)
+            } else {
+                redirectSingleFileSink(newDirectory)
+            }
+            // 自愈兜底：即便仍有未知路径重复挂载，也在返回前把文件出口收敛到单实例。
+            redirectedNow to pruneDuplicateSessionSinks()
+        }
+        // 锁外上报：持锁回调 log() 会把整条 Sink 链路拉进临界区（写盘可能长时间阻塞）。
+        reportPrunedFileSinks(pruned)
+        return redirected
+    }
 
+    /** 单一大文件出口（非会话布局）重定向；调用方必须已持有 [redirectLock]。 */
+    private fun redirectSingleFileSink(newDirectory: File): Boolean {
         val old = fileSink ?: return false
         val settings = fileSinkSettings ?: return false
 
@@ -204,7 +229,7 @@ object MmaLogger {
             .getOrDefault(false)
         if (!migrated) {
             // 迁移失败：旧 sink 复位保持原状（旧目录数据完整，应用继续用私有日志）
-            sinks.add(old)
+            sinks.addIfAbsent(old)
             return false
         }
 
@@ -214,7 +239,7 @@ object MmaLogger {
             maxFiles = settings.maxFiles,
             minLevel = settings.minLevel,
         )
-        sinks.add(newSink)
+        sinks.addIfAbsent(newSink)
         fileSink = newSink
         return true
     }
@@ -287,10 +312,22 @@ object MmaLogger {
      * 优先 `renameTo`（同分区瞬时完成）；失败（跨挂载点等）逐文件追加拷贝。
      * 任何一步失败返回 false（**旧目录不动**，调用方复位旧 sink，可安全重试）。
      */
-    private fun redirectSessionSink(session: SessionFileSink, newRoot: File): Boolean {
+    private fun redirectSessionSink(session: SessionFileSink, newRoot: File): Boolean =
+        // 可重入：redirectFileSink 已持锁时再次进入是安全的（synchronized 同线程重入）。
+        synchronized(redirectLock) { redirectSessionSinkLocked(session, newRoot) }
+
+    /**
+     * [redirectSessionSink] 的锁内实现（**调用方必须已持有 [redirectLock]**）：
+     * 「读 sessionSink → 摘除 → drain → 搬迁 → 挂载新 sink」必须整体原子，
+     * 否则并发路径各自 `add` 一个新 sink，`remove(old)` 只对第一个生效 → 日志写 N 份。
+     */
+    private fun redirectSessionSinkLocked(session: SessionFileSink, newRoot: File): Boolean {
         val settings = sessionSinkSettings ?: return false
         // 同根重定向是空操作（安装时已授权的典型场景），短路防误搬。
         if (session.root.canonicalPath == newRoot.canonicalPath) return true
+        // 并发守卫：另一个线程已完成重定向（sessionSink 已换新），本线程不得再建一个。
+        // 同根短路优先（安装期已授权的典型场景，见上）。
+        if (session !== sessionSink) return true
 
         sinks.remove(session)
         AsyncLogDispatcher.drain(1_000L)
@@ -300,7 +337,7 @@ object MmaLogger {
             .getOrDefault(false)
         if (!moved) {
             // 搬迁失败：旧 sink 复位（旧目录数据完整），应用继续用原根目录。
-            sinks.add(session)
+            sinks.addIfAbsent(session)
             return false
         }
 
@@ -314,7 +351,7 @@ object MmaLogger {
             maxFilesPerFile = settings.maxFilesPerFile,
             minLevel = settings.minLevel,
         )
-        sinks.add(newSink)
+        sinks.addIfAbsent(newSink)
         sessionSink = newSink
         return true
     }
@@ -339,8 +376,42 @@ object MmaLogger {
     }
 
     fun addSink(sink: LogSink) {
-        sinks.add(sink)
+        sinks.addIfAbsent(sink)
     }
+
+    /**
+     * 重复文件出口自愈：只保留 [sessionSink] 指向的最新实例，移除其余 SessionFileSink。
+     * 每条日志被写 N 份的根因修复的兜底（并发 redirect 曾累积多个同目录实例）。
+     * @return 移除数量
+     */
+    private fun pruneDuplicateSessionSinks(): Int {
+        val keep = sessionSink ?: return 0
+        val duplicates = sinks.filter { it is SessionFileSink && it !== keep }
+        if (duplicates.isEmpty()) return 0
+        sinks.removeAll(duplicates)
+        return duplicates.size
+    }
+
+    /**
+     * 上报重复出口自愈结果（自诊断）。**必须在 [redirectLock] 之外调用**——
+     * 持锁回调 [log] 会把整条 Sink 链路拉进临界区，写盘慢时阻塞其它重定向。
+     * @param pruned [pruneDuplicateSessionSinks] 返回的移除数量（0 表示无重复，不上报）
+     */
+    private fun reportPrunedFileSinks(pruned: Int) {
+        if (pruned <= 0) return
+        runCatching {
+            log(
+                level = LogLevel.WARN,
+                category = LogCategory.ERROR,
+                event = "logger_duplicate_file_sink",
+                message = "检测到重复文件日志出口，已自动收敛",
+                fields = mapOf("removed" to pruned),
+            )
+        }.onFailure { logW(TAG_SELF, "prune_report_failed: ${it.javaClass.simpleName}") }
+    }
+
+    /** 当前挂载的 SessionFileSink 数量（自愈/并发回归测试用）。 */
+    internal fun sessionSinkCountForTest(): Int = sinks.count { it is SessionFileSink }
 
     // ── 通用入口 ──────────────────────────────────────────────────────
 

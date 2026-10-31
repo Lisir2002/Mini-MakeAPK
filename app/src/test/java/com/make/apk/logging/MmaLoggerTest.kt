@@ -244,11 +244,24 @@ class MmaLoggerTest {
         assertTrue(MmaEventLogger.webViewEvent("webview_ssl_error", mapOf("url" to "https://a.example/p?token=1")))
         assertTrue("此前被前缀过滤丢弃，接入后必须落盘", MmaEventLogger.webViewEvent("plain_http_loaded", mapOf("has_url" to true)))
         assertTrue("此前被前缀过滤丢弃，接入后必须落盘", MmaEventLogger.webViewEvent("storage_isolation_conflict", mapOf("reason" to "shared_storage")))
+        assertTrue(
+            "加载起点必须落盘（否则「没开始加载」与「开始未完成」无法区分）",
+            MmaEventLogger.webViewEvent(
+                "preview_load_started",
+                mapOf("url" to "https://a.example/p?token=1", LogFields.PREVIEW_LOAD_ID to "ab12cd34"),
+            ),
+        )
         assertTrue(MmaEventLogger.webViewEvent("preview_loaded", mapOf(LogFields.DURATION_MS to 120L)))
 
         val byEvent = sink.events.associateBy { it.event }
         assertEquals(
-            setOf("webview_ssl_error", "plain_http_loaded", "storage_isolation_conflict", "preview_loaded"),
+            setOf(
+                "webview_ssl_error",
+                "plain_http_loaded",
+                "storage_isolation_conflict",
+                "preview_load_started",
+                "preview_loaded",
+            ),
             byEvent.keys,
         )
         byEvent.values.forEach {
@@ -259,12 +272,18 @@ class MmaLoggerTest {
         assertEquals(LogLevel.ERROR, byEvent.getValue("webview_ssl_error").level)
         assertEquals(LogLevel.INFO, byEvent.getValue("plain_http_loaded").level)
         assertEquals(LogLevel.WARN, byEvent.getValue("storage_isolation_conflict").level)
+        assertEquals("加载起点为正常路径留痕，级别 INFO", LogLevel.INFO, byEvent.getValue("preview_load_started").level)
         assertEquals(LogLevel.INFO, byEvent.getValue("preview_loaded").level)
 
         // 脱敏红线：url 键经 Sanitizer 裁剪成 scheme://host/***，查询串不外泄。
         val redactedUrl = byEvent.getValue("webview_ssl_error").fields["url"].toString()
         assertEquals("https://a.example/${Sanitizer.MASK}", redactedUrl)
         assertFalse("查询串不得落盘", redactedUrl.contains("token"))
+        // 加载起点的 url 同样脱敏（不允许自拼 host）
+        assertEquals(
+            "https://a.example/${Sanitizer.MASK}",
+            byEvent.getValue("preview_load_started").fields["url"].toString(),
+        )
     }
 
     /** 未知事件名一律拒绝（webcore 里高频调试事件不得淹没有效证据）。 */

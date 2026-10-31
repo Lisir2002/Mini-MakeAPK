@@ -148,6 +148,8 @@ object MmaEventLogger {
      */
     private val levelOf: Map<String, LogLevel> = mapOf(
         // 预览 / 白屏探测链（W3 ⑬ 契约）
+        // 加载起点：补齐「没开始加载」vs「开始但没完成」的区分（此前只打 logcat）。
+        "preview_load_started" to LogLevel.INFO,
         "preview_loaded" to LogLevel.INFO,
         "preview_blank_confirmed" to LogLevel.WARN,
         "preview_self_heal" to LogLevel.WARN,

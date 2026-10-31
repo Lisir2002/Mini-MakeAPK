@@ -124,6 +124,16 @@ internal class InAppWebViewClient(
         engine.lastConsoleRecord = null
         // 新一轮加载：换发关联 id，把本次加载产生的 page / error / blank 事件串成因果链。
         engine.loadTraceId = java.util.UUID.randomUUID().toString().replace("-", "").take(8)
+        // 加载起点埋点（诊断盲区补齐）：此前只打 logcat，重启即丢——「没开始加载」与
+        // 「开始但没完成」无法区分。必须放在 loadTraceId 赋值**之后**（否则 load_id 是旧值/空）。
+        WebViewEventHook.report(
+            "preview_load_started",
+            mapOf(
+                "url" to url,
+                // 对应 LogFields.PREVIEW_LOAD_ID（webcore 零依赖，只能写字面量）。
+                "preview_load_id" to engine.loadTraceId,
+            ),
+        )
         // 明文 http 主帧放行（W4 拍板 3）+ plain_http_loaded 埋点（渐进收紧的数据依据）。
         if (HttpsPolicy.isPlainTextHttp(url)) {
             WebViewEventHook.report(

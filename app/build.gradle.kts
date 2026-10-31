@@ -40,8 +40,8 @@ android {
         //   版本号不带 +N 后缀（2026-10-25 起，用户确认）。
         // versionCode：Android 安装唯一性要求的内部整数，单调递增，但不进版本串/tag；
         //   发布 tag = v<versionName>。递增规则与发版流程见 docs/VERSIONING.md。
-        versionCode = 18
-        versionName = "0.0.0.1-rc15"
+        versionCode = 19
+        versionName = "0.0.0.1-rc16"
     }
 
     signingConfigs {
