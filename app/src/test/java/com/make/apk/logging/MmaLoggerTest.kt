@@ -226,8 +226,8 @@ class MmaLoggerTest {
         )
         // 设备类别信息
         assertTrue("format() 应含机型 model=", line.contains("model="))
-        // 应用版本号（当前 0.0.0.1-rc13 / versionCode 16）
-        assertTrue("format() 应含 app 版本", line.contains("app=0.0.0.1-rc13/16"))
+        // 应用版本号：不写死具体版本（否则每次发版都要改），只验证 app=<version>/<code> 形态
+        assertTrue("format() 应含 app 版本（形如 x.y.z-rcN/code）", line.contains(Regex("app=[^/\\s]+/\\d+")))
         // 构建类型（debug 测试变体）
         assertTrue("format() 应含构建类型", line.contains("bt=debug"))
     }
