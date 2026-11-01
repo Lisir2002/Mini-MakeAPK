@@ -37,37 +37,46 @@ internal object RenderProbe {
     private const val TAG = "webcore_render_probe"
 
     /**
-     * 布局度量脚本：返回 `|` 分隔的紧凑串（webcore 零依赖，不引 JSON 库）。
+     * 布局度量脚本 v2（rc23 DOM 结构取证）：返回 `|` 分隔的紧凑串。
      *
-     * 字段顺序：布局视口宽高、innerWidth/innerHeight、visualViewport 缩放百分比、
-     * 首个含文本元素 rect（left/top/width/height，无文本元素为 -9999/-9999/-1/-1）、
-     * 该元素计算样式（opacity 百分比,visibility,display,transform,inline zoom）,
-     * body 计算样式（同格式）、body 背景色、元素前景色、文档 scrollWidth/scrollHeight、
-     * 元素文本样例（URL 编码截 16 字）、行内 zoom。
-     * 颜色串剥掉空白防混入分隔符；出错返回 'ERR'。
+     * 背景：rc22 实锤登录页表面纯白 + DOM 107 节点，而该站静态壳只有 ~8 个节点
+     * （noscript + 空 root + 全屏 loading 遮罩）。分叉点：React 到底挂没挂载、
+     * 白色 loading 遮罩是否卡在页面上。字段顺序：
+     * 0 readyState；1 visibilityState；2 深色模式(D/L)；
+     * 3 root 容器：子元素数/后代节点数/innerHTML 长度（React 是否挂载的铁证）；
+     * 4 loading 遮罩 display；5 遮罩 rect；6 遮罩 color（spinner 的 currentColor，
+     *   白色 spinner 叠白底 = 隐形）；7 遮罩 mask display；
+     * 8 script 总数/外链数/module 数；9/10 前两个外链 src；
+     * 11 body 各子树 节点名#id:后代数（107 个节点住在哪）；
+     * 12 root innerHTML 前 60 字；13 innerText 长度。
+     * 出错返回 ERR 前缀 + 编码后的异常文本。
      */
     internal const val LAYOUT_PROBE_JS: String =
         "(function(){try{" +
             "var de=document.documentElement,b=document.body;if(!b)return '';" +
-            "function st(e){var s=getComputedStyle(e);return Math.round(parseFloat(s.opacity)*100)+" +
-            "','+(s.visibility==='visible'?1:0)+','+(s.display==='none'?1:0)+','+" +
-            "(s.transform&&s.transform!=='none'?1:0)+','+(s.zoom||'');}" +
-            "var el=null,ws=b.querySelectorAll('*');" +
-            "for(var i=0;i<ws.length;i++){var c=ws[i].childNodes;" +
-            "for(var j=0;j<c.length;j++){if(c[j].nodeType===3&&c[j].textContent.trim().length>0){el=ws[i];break;}}" +
-            "if(el)break;}" +
-            "var r=el?el.getBoundingClientRect():null;" +
-            "var vv=window.visualViewport;" +
-            "return [de.clientWidth,de.clientHeight,window.innerWidth,window.innerHeight," +
-            "vv?Math.round(vv.scale*100):-1," +
-            "r?Math.round(r.left):-9999,r?Math.round(r.top):-9999,r?Math.round(r.width):-1,r?Math.round(r.height):-1," +
-            "el?st(el):'noel',st(b)," +
-            "(getComputedStyle(b).backgroundColor||'').replace(/[^a-z0-9%().#]/gi,'')," +
-            "(el?(getComputedStyle(el).color||''):'').replace(/[^a-z0-9%().#]/gi,'')," +
-            "b.scrollWidth,b.scrollHeight," +
-            "encodeURIComponent((el?el.textContent:'').trim().slice(0,16))," +
-            "(b.style.zoom||de.style.zoom||'0')].join('|');" +
-            "}catch(e){return 'ERR';}})()"
+            "var root=document.getElementById('root');" +
+            "var ov=document.getElementById('__page_loading');" +
+            "var mask=document.getElementById('__page_loading__mask');" +
+            "function cd(e){return e?getComputedStyle(e).display:'noel';}" +
+            "var ovR=ov?ov.getBoundingClientRect():null;" +
+            "var dark=window.matchMedia?window.matchMedia('(prefers-color-scheme: dark)').matches:'?';" +
+            "var scripts=document.scripts,ext=0,mod=0,src1='',src2='';" +
+            "for(var i=0;i<scripts.length;i++){var s=scripts[i];" +
+            "if(s.type==='module')mod++;" +
+            "if(s.src){ext++;if(!src1)src1=s.src;else if(!src2)src2=s.src;}}" +
+            "var parts=[],ch=b.children;" +
+            "for(var i2=0;i2<ch.length&&i2<8;i2++){parts.push(ch[i2].tagName.toLowerCase()+" +
+            "(ch[i2].id?'#'+ch[i2].id:'')+':'+ch[i2].querySelectorAll('*').length);}" +
+            "return [document.readyState,document.visibilityState,dark?'D':'L'," +
+            "root?(root.childElementCount+'/'+root.querySelectorAll('*').length+'/'+root.innerHTML.length):'noroot'," +
+            "cd(ov),ovR?Math.round(ovR.width)+'x'+Math.round(ovR.height):'?'," +
+            "ov?getComputedStyle(ov).color:'',cd(mask)," +
+            "scripts.length+'/'+ext+'/'+mod," +
+            "encodeURIComponent(src1.slice(0,80)),encodeURIComponent(src2.slice(0,80))," +
+            "encodeURIComponent(parts.join(','))," +
+            "encodeURIComponent(root?root.innerHTML.slice(0,60):'')," +
+            "b.innerText.length].join('|');" +
+            "}catch(e){return 'ERR:'+encodeURIComponent(''+e);}})()"
 
     /** 入口：在空白探针同一时点（加载完成 + 2s，SPA 已挂载）触发。 */
     fun run(view: WebView, engine: WebViewEngine) {
