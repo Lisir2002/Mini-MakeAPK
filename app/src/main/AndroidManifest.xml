@@ -22,6 +22,7 @@
         android:label="MMA"
         android:supportsRtl="true"
         android:extractNativeLibs="true"
+        android:networkSecurityConfig="@xml/network_security_config"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
 
         <activity

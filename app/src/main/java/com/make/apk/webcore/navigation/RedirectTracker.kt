@@ -33,11 +33,16 @@ internal object RedirectTracker {
      * @property hops 计入本次后的跳数。
      * @property hostChanged 域名是否变化（跨站跳转 = 要重付 DNS/TLS，白屏时长的主要来源）。
      * @property pathChanged 路径或查询是否变化（同站内跳转）。
+     * @property sameDoc 是否**同文档**地址变化（rc19 新增）。SPA 路由（pushState /
+     *   replaceState）与 bfcache 前进后退只改地址不换文档——它们不产生网络请求、
+     *   不重付 DNS/TLS，与白屏时长无关，**不计入跳数**，否则 rc18 实机日志已实证
+     *   （account.xiaomi.com 的登录 SPA 两次路由被误报成 hop1/hop2）。
      */
     data class Step(
         val hops: Int,
         val hostChanged: Boolean,
         val pathChanged: Boolean,
+        val sameDoc: Boolean = false,
     )
 
     /**
@@ -56,6 +61,10 @@ internal object RedirectTracker {
      * @param url 本次提交的地址。
      * @param startUrl 本次加载的起始地址（`onPageStarted` 写入）。
      * @param hops 当前跳数。
+     * @param sameDoc 本次提交是否未伴随新的 `onPageStarted`（rc19 新增）：
+     *   判据由调用方给出——`onPageStarted` 会把「上次提交地址」清空，因此
+     *   上次提交地址非空即说明自上次提交后没有新文档开始，是同文档地址变化
+     *   （SPA 路由 / history 前进后退）。同文档变化不计跳数。
      * @return 发生实质跳变时返回结果；**null = 地址未变**（同页 reload / 重复回调 /
      *         仅锚点或斜杠差异），调用方据此不刷新状态、不计数、不上报。
      */
@@ -64,6 +73,7 @@ internal object RedirectTracker {
         url: String,
         startUrl: String,
         hops: Int,
+        sameDoc: Boolean = false,
     ): Step? {
         val from = normalize(prevUrl.ifEmpty { startUrl })
         val to = normalize(url)
@@ -74,9 +84,10 @@ internal object RedirectTracker {
         // 归一化后相同 → 只是写法差异或重复回调，不是重定向。
         if (from == to) return null
         return Step(
-            hops = hops + 1,
+            hops = if (sameDoc) hops else hops + 1,
             hostChanged = from.host != to.host,
             pathChanged = from.path != to.path,
+            sameDoc = sameDoc,
         )
     }
 

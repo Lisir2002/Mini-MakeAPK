@@ -109,6 +109,18 @@ class WebViewEngine(
     internal var firstPaintAt: Long = 0L
 
     /**
+     * 本次加载的 `preview_loaded` 是否已上报（rc19 新增；`onPageStarted` 归零）。
+     *
+     * 存在意义：rc18 实机日志实证，个别页面 `onPageFinished` 会**早于**首帧提交
+     * （mimo.mi.com：finished 124ms、commit 171ms）。此时 `preview_loaded` 里
+     * `first_paint_ms` 只能记 -1——但这不代表页面画不出来，首帧随后就到了。
+     * 有了本标记，[com.make.apk.webcore.navigation.InAppWebViewClient] 在
+     * `onPageCommitVisible` 里就能识别「loaded 已发、首帧才来」的晚到场景，
+     * 补发 `preview_paint_late` 事件，避免把时序假象误读成渲染失败。
+     */
+    internal var loadFinishedReported: Boolean = false
+
+    /**
      * 一次页面加载的短期关联 id（8 位十六进制，[com.make.apk.webcore.navigation.InAppWebViewClient]
      * 在 onPageStarted 生成）：把同一次加载的 page / error / blank / self_heal 串成**因果链**——
      * 白屏排查时按 id 聚合即可还原完整现场，无需靠时间戳猜相邻关系。

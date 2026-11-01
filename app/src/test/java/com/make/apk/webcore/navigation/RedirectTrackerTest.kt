@@ -104,4 +104,47 @@ class RedirectTrackerTest {
         // 内核未回调 onPageStarted 的极端情况：直接返回 null，不记为重定向。
         assertNull(RedirectTracker.evaluate("", hop1, "", 0))
     }
+
+    // ── 同文档路由（rc19：SPA pushState 不再冒充 302）──
+
+    @Test
+    fun `同文档路由上报但不计跳数`() {
+        // rc18 实机实证：account.xiaomi.com 登录 SPA 两次 pushState 被误报成 hop1/hop2。
+        val s = RedirectTracker.evaluate(
+            prevUrl = "https://account.xiaomi.com/login",
+            url = "https://account.xiaomi.com/login?ticket=abc",
+            startUrl = "https://account.xiaomi.com/login",
+            hops = 0,
+            sameDoc = true,
+        )
+        checkNotNull(s)
+        assertTrue("同文档变化必须标记 sameDoc", s.sameDoc)
+        assertEquals("同文档路由不计入跳数", 0, s.hops)
+        assertFalse(s.hostChanged)
+        assertTrue(s.pathChanged)
+    }
+
+    @Test
+    fun `同文档跨域路由同样不计跳数`() {
+        // pushState 一般不改域，但 replaceState 理论上可跨域；跳数口径保持一致。
+        val s = RedirectTracker.evaluate(
+            prevUrl = "https://a.com/x",
+            url = "https://b.com/y",
+            startUrl = "https://a.com/x",
+            hops = 3,
+            sameDoc = true,
+        )
+        checkNotNull(s)
+        assertTrue(s.sameDoc)
+        assertEquals(3, s.hops)
+        assertTrue(s.hostChanged)
+    }
+
+    @Test
+    fun `新文档导航仍逐跳累加（默认行为不变）`() {
+        val s = RedirectTracker.evaluate("https://a.com/x", "https://b.com/y", "https://a.com/x", 0)
+        checkNotNull(s)
+        assertFalse(s.sameDoc)
+        assertEquals(1, s.hops)
+    }
 }

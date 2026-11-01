@@ -133,6 +133,8 @@ internal class InAppWebViewClient(
         engine.pageStartedAt = System.currentTimeMillis()
         // 首帧时刻归零：本轮若从未收到 onPageCommitVisible，就是"提交了但没画出来"。
         engine.firstPaintAt = 0L
+        // loaded 上报标记归零：新一轮加载的 preview_loaded 尚未发出。
+        engine.loadFinishedReported = false
         // 换页时释放一次性降级额度（同一地址间隔访问仍可再降级，同次停留至多一次）。
         errorPresenter.onPageStarted(url)
         // 新一轮加载：作废在途空内容探测（旧页的延迟回调不得串扰新页）；
@@ -186,11 +188,16 @@ internal class InAppWebViewClient(
      * 「提交地址 != 起始地址」判定重定向跳，不伪造状态码（拿不到就记 -1）。
      */
     override fun doUpdateVisitedHistory(view: WebView, url: String, isReload: Boolean) {
+        // 同文档判定（rc19）：onPageStarted 会把 lastVisitedUrl 清空，因此它非空即说明
+        // 自上次提交后没有新文档开始——本次地址变化是 SPA 路由（pushState/replaceState）
+        // 或 history 前进后退，不换文档、不发网络请求，不计入跳数。
+        val sameDoc = !isReload && engine.lastVisitedUrl.isNotEmpty()
         val step = RedirectTracker.evaluate(
             prevUrl = engine.lastVisitedUrl,
             url = url,
             startUrl = engine.navigationStartUrl,
             hops = engine.redirectHops,
+            sameDoc = sameDoc,
         )
         if (step != null) {
             engine.lastVisitedUrl = url
@@ -205,11 +212,16 @@ internal class InAppWebViewClient(
                     "host_changed" to step.hostChanged,
                     "path_changed" to step.pathChanged,
                     "is_reload" to isReload,
+                    // 同文档路由（SPA pushState 等）：true 时不计跳数，与 302 区分开。
+                    "same_doc" to step.sameDoc,
                     // 对应 LogFields.PREVIEW_LOAD_ID（webcore 零依赖，只能写字面量）。
                     "preview_load_id" to engine.loadTraceId,
                 ),
             )
-            Log.i(TAG_WEBVIEW_RUNTIME, "redirect hop${step.hops}: host_changed=${step.hostChanged} -> $url")
+            Log.i(
+                TAG_WEBVIEW_RUNTIME,
+                "redirect hop${step.hops}: same_doc=${step.sameDoc} host_changed=${step.hostChanged} -> $url",
+            )
         }
         super.doUpdateVisitedHistory(view, url, isReload)
     }
@@ -228,6 +240,20 @@ internal class InAppWebViewClient(
         engine.firstPaintAt = System.currentTimeMillis()
         val firstPaintMs = (engine.firstPaintAt - engine.pageStartedAt).coerceAtLeast(0L)
         Log.i(TAG_WEBVIEW_RUNTIME, "page_commit_visible: ${firstPaintMs}ms $url")
+        // 晚到首帧（rc19）：preview_loaded 已发出、首帧才来——这不是渲染失败，
+        // 而是 finished 早于 commit 的时序假象（rc18 实机实证：mimo.mi.com
+        // finished 124ms、commit 171ms）。补发 preview_paint_late 把证据链补全，
+        // 否则 loaded 里的 first_paint_ms=-1 会被误读成"画不出来"。
+        if (engine.loadFinishedReported) {
+            WebViewEventHook.report(
+                "preview_paint_late",
+                mapOf(
+                    "first_paint_ms" to firstPaintMs,
+                    // 对应 LogFields.PREVIEW_LOAD_ID（webcore 零依赖，只能写字面量）。
+                    "preview_load_id" to engine.loadTraceId,
+                ),
+            )
+        }
         WebViewEventHook.report(
             "preview_first_paint",
             mapOf(
@@ -278,6 +304,8 @@ internal class InAppWebViewClient(
                 "preview_load_id" to engine.loadTraceId,
             ),
         )
+        // loaded 已发出：之后若首帧才提交（onPageCommitVisible），按"晚到首帧"补报。
+        engine.loadFinishedReported = true
         engine.emit(EngineEvent.PageLoaded(durationMs))
         // 加载后处理（rc17）：UA 指纹自检 + Declarative Shadow DOM 兜底。
         // 异步执行、不阻塞 onPageFinished 返回。

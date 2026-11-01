@@ -8,7 +8,8 @@
         android:icon="@mipmap/ic_launcher"
         android:label="MMA Template"
         android:theme="@android:style/Theme.Material.Light.NoActionBar"
-        android:supportsRtl="true">
+        android:supportsRtl="true"
+        android:networkSecurityConfig="@xml/network_security_config">
 
         <!--
             入口 Activity：用默认 Application（不自定义 android:name），

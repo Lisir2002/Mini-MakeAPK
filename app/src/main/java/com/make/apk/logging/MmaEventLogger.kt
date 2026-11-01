@@ -155,6 +155,8 @@ object MmaEventLogger {
         "preview_first_paint" to LogLevel.INFO,
         // 服务端 302 跳（rc17）：白屏时长归因的关键——区分"等网络"与"渲染失败"。
         "preview_redirect" to LogLevel.INFO,
+        // 晚到首帧（rc19）：finished 早于 commit 的时序假象补报，避免误读成渲染失败。
+        "preview_paint_late" to LogLevel.INFO,
         // UA 指纹自检（rc17）：站点视角下是否仍残留 wv / Version/4.0 / Android WebView brand。
         // 这组数据是「某些链接永远白」判定 UA 因素是否已排除的硬证据。
         "preview_ua_probe" to LogLevel.INFO,

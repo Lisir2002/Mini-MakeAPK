@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    网络安全配置（rc19 白屏专项）。
+
+    为什么必须声明：Android 9（API 28）起系统默认禁止明文 http 流量，未声明的应用
+    加载 http 页面会直接失败（ERR_CLEARTEXT_NOT_PERMITTED），且 rc17 引入的
+    「SSL 协议错误自动降级 http 重试」也会在同一堵墙上失败——降级重试自食其果，
+    用户视角就是转一圈白屏、零提示。
+
+    浏览器类应用必须能打开用户输入的任意地址（包括仍只有 http 的小站），
+    这是 Chrome / 系统浏览器同样采用的声明方式，不属于安全疏漏。
+
+    本文件是 app 与 template 共用的唯一资源：template 的 sourceSets 直接指向
+    app 的 res（预览 == 导出铁律）。切勿在 template/res 下再放副本——两份同名
+    资源合并时会报 Duplicate resources（rc19 实测踩坑）。
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>
