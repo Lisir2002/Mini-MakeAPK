@@ -165,6 +165,9 @@ object MmaEventLogger {
         "preview_ua_probe" to LogLevel.INFO,
         // 空内容探测被作废（rc17）：此前完全静默，"探测没跑"与"页面没白"无法区分。
         "preview_probe_discarded" to LogLevel.INFO,
+        // 内容度量（rc21）：首探总是上报 DOM 正文长度与节点数——
+        // 「内核报首帧、用户看白屏」可一次裁定是 DOM 空还是显示层没上屏。
+        "preview_content_metrics" to LogLevel.INFO,
         "preview_blank_confirmed" to LogLevel.WARN,
         "preview_self_heal" to LogLevel.WARN,
         // SSL 协议错误自动降级明文 http 重试（rc17）：已自动恢复，但仍需关注站点质量。

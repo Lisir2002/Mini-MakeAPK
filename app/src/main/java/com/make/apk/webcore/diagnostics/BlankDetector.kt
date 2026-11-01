@@ -62,32 +62,68 @@ internal class BlankDetector(
                 return@postDelayed
             }
             runCatching {
-                view.evaluateJavascript(BLANK_PROBE_JS) { result ->
+                view.evaluateJavascript(CONTENT_METRICS_JS) { result ->
                     // 期间已有新加载：本探测作废
                     if (engine.probeGeneration != generation) return@evaluateJavascript
-                    if (result?.trim('"') != "1") return@evaluateJavascript
-                    // 首探为空：可能是 SPA 慢渲染，复探一次再定论
-                    Handler(Looper.getMainLooper()).postDelayed({
-                        runCatching {
-                            view.evaluateJavascript(BLANK_PROBE_JS) { again ->
-                                if (engine.probeGeneration != generation) {
-                                    WebViewEventHook.report(
-                                        "preview_probe_discarded",
-                                        mapOf(
-                                            "phase" to "reprobe",
-                                            // 对应 LogFields.PREVIEW_LOAD_ID（webcore 零依赖，只能写字面量）。
-                                            "preview_load_id" to loadId,
-                                        ),
-                                    )
-                                    return@evaluateJavascript
+                    val metrics = parseMetrics(result)
+                    // 内容度量总是落盘（rc21）：此前只有"确认空白"才有事件，用户看到白屏
+                    // 而探针报"没白"时毫无证据可对质。现在每次首探都报 DOM 真实状态
+                    // （正文长度 / 节点数），「内核说画了、用户看到白」到底是
+                    // DOM 空（JS 没挂载）还是显示层没上屏，一次日志即可裁定。
+                    WebViewEventHook.report(
+                        "preview_content_metrics",
+                        mapOf(
+                            "text_len" to metrics.first,
+                            "nodes" to metrics.second,
+                            "blank" to isBlankMetrics(metrics),
+                            // 对应 LogFields.PREVIEW_LOAD_ID（webcore 零依赖，只能写字面量）。
+                            "preview_load_id" to loadId,
+                        ),
+                    )
+                    if (isBlankMetrics(metrics)) {
+                        // 首探为空：可能是 SPA 慢渲染，复探一次再定论
+                        Handler(Looper.getMainLooper()).postDelayed({
+                            runCatching {
+                                view.evaluateJavascript(CONTENT_METRICS_JS) { again ->
+                                    if (engine.probeGeneration != generation) {
+                                        WebViewEventHook.report(
+                                            "preview_probe_discarded",
+                                            mapOf(
+                                                "phase" to "reprobe",
+                                                // 对应 LogFields.PREVIEW_LOAD_ID（webcore 零依赖，只能写字面量）。
+                                                "preview_load_id" to loadId,
+                                            ),
+                                        )
+                                        return@evaluateJavascript
+                                    }
+                                    if (isBlankMetrics(parseMetrics(again))) {
+                                        handleBlankConfirmed(view, pageUrl)
+                                    }
                                 }
-                                if (again?.trim('"') == "1") handleBlankConfirmed(view, pageUrl)
                             }
-                        }
-                    }, blankReprobeDelayMs)
+                        }, blankReprobeDelayMs)
+                    }
                 }
             }
         }, blankProbeDelayMs)
+    }
+
+    /**
+     * 解析度量脚本返回值：`"text_len|nodes"`（JSON 字符串带引号）。
+     * 解析失败按「无 body」处理（旧脚本对 body 缺失返回 "1" = 空白，语义等价）。
+     */
+    private fun parseMetrics(raw: String?): Pair<Int, Int> {
+        val s = raw?.trim().orEmpty().trim('"')
+        val parts = s.split('|')
+        val textLen = parts.getOrNull(0)?.toIntOrNull() ?: -1
+        val nodes = parts.getOrNull(1)?.toIntOrNull() ?: 0
+        return textLen to nodes
+    }
+
+    /** 空白判定口径（与旧 BLANK_PROBE_JS 完全等价）：无 body、或正文为空且节点数 <= 2。 */
+    private fun isBlankMetrics(metrics: Pair<Int, Int>): Boolean {
+        val (textLen, nodes) = metrics
+        return textLen < 0 || (textLen == 0 && nodes <= 2)
     }
 
     /**
@@ -186,17 +222,19 @@ internal class BlankDetector(
 
     companion object {
         /**
-         * 空内容探测脚本：body 既无文本、且排除脚本类元素后几乎没有子节点 → 返回 "1"。
-         * 计数用 querySelectorAll 排除 script/style/noscript——SPA 空壳页（如小米 MiMo）body 下
-         * 只有 1 个 root div 加 1-2 个 <script>，旧口径把脚本计入导致两级脚本时 n=3 漏判；
-         * 新口径下空壳页只剩 root div 及其极少容器（n<=2）。
+         * 内容度量脚本（rc21，由旧空白探测脚本升级）：返回 `正文长度|有效节点数`。
+         *
+         * 计数口径与旧脚本一致：querySelectoAll 排除 script/style/noscript——SPA 空壳页
+         * （如小米 MiMo）body 下只有 1 个 root div 加 1-2 个 script，旧口径把脚本计入
+         * 导致两级脚本时 n=3 漏判；有效口径下空壳页只剩 root div 及其极少容器（n<=2）。
          * 不排除 iframe 的权衡：iframe 壳页里 iframe 往往是唯一内容节点，排除会把正常壳页
          * 误判为空壳；loading 占位页通常也是纯 div，不排除 iframe 不影响占位页判定。
+         * body 缺失返回 `-1|0`（判定为空白，语义与旧脚本的 "1" 一致）。
          */
-        private const val BLANK_PROBE_JS: String =
-            "(function(){var b=document.body;if(!b)return '1';" +
+        private const val CONTENT_METRICS_JS: String =
+            "(function(){var b=document.body;if(!b)return '-1|0';" +
                 "var t=(b.innerText||'').trim();" +
                 "var n=document.querySelectorAll('body *:not(script):not(style):not(noscript)').length;" +
-                "return (t.length===0&&n<=2)?'1':'0';})()"
+                "return t.length+'|'+n;})()"
     }
 }
