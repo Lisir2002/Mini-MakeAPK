@@ -40,6 +40,12 @@ internal class EngineChromeClient(
      * 2. 缓存"最后一条错误"到引擎闭包字段（旧 TAG_JS_ERROR_KEY 替代），
      *    供空内容探测做根因分级，并上行 [EngineEvent.ConsoleError]。
      * 限流去重：SPA 循环报错会瞬间刷屏，与上一条相同则只缓存不重复记日志/上行。
+     *
+     * rc20 补缺口：此前错误只走 Logcat（`Log.w`），**从未进持久化事件日志**——
+     * `EngineEvent.ConsoleError` 在 chrome 层被显式忽略（WebViewSurface `-> Unit`），
+     * 用户导出的日志里永远看不到 JS 报错，白屏根因判定只能靠猜。
+     * 现增经 [WebViewEventHook.report] 落盘（PREVIEW 通道，与 blank 探测链同路），
+     * 截断 200 字符防刷屏；脱敏器对 message 值内的地址照常处理。
      */
     override fun onConsoleMessage(consoleMessage: ConsoleMessage?): Boolean {
         val message = consoleMessage
@@ -48,6 +54,14 @@ internal class EngineChromeClient(
             if (engine.lastConsoleRecord != record) {
                 engine.lastConsoleRecord = record
                 Log.w(TAG_WEBVIEW_RUNTIME, "js_console_error: $record")
+                com.make.apk.webcore.diagnostics.WebViewEventHook.report(
+                    "js_console_error",
+                    mapOf(
+                        "message" to record.take(200),
+                        // 对应 LogFields.PREVIEW_LOAD_ID（webcore 零依赖，只能写字面量）。
+                        "preview_load_id" to engine.loadTraceId,
+                    ),
+                )
                 engine.emit(EngineEvent.ConsoleError(record))
             }
         }

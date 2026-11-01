@@ -157,6 +157,9 @@ object MmaEventLogger {
         "preview_redirect" to LogLevel.INFO,
         // 晚到首帧（rc19）：finished 早于 commit 的时序假象补报，避免误读成渲染失败。
         "preview_paint_late" to LogLevel.INFO,
+        // JS console 错误（rc20）：此前只写 Logcat 未落盘，导出日志永远看不到；
+        // SPA 白屏根因判定的第一手证据，与 preview_load_id 串成因果链。
+        "js_console_error" to LogLevel.WARN,
         // UA 指纹自检（rc17）：站点视角下是否仍残留 wv / Version/4.0 / Android WebView brand。
         // 这组数据是「某些链接永远白」判定 UA 因素是否已排除的硬证据。
         "preview_ua_probe" to LogLevel.INFO,
