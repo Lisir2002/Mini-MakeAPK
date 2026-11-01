@@ -165,6 +165,9 @@ object MmaEventLogger {
         "preview_ua_probe" to LogLevel.INFO,
         // 空内容探测被作废（rc17）：此前完全静默，"探测没跑"与"页面没白"无法区分。
         "preview_probe_discarded" to LogLevel.INFO,
+        // 渲染层探针（rc22 白屏终审）：布局度量 + 表面像素统计，裁定"DOM 有内容但没上屏"。
+        "preview_render_metrics" to LogLevel.INFO,
+        "preview_surface_shot" to LogLevel.INFO,
         // 内容度量（rc21）：首探总是上报 DOM 正文长度与节点数——
         // 「内核报首帧、用户看白屏」可一次裁定是 DOM 空还是显示层没上屏。
         "preview_content_metrics" to LogLevel.INFO,

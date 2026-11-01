@@ -103,6 +103,9 @@ internal class BlankDetector(
                             }
                         }, blankReprobeDelayMs)
                     }
+                    // rc22 渲染层探针：与内容度量同一时点触发（DOM 度量 + 表面像素 +
+                    // 布局度量三联，一次日志裁定「DOM 有内容但没上屏」卡在哪一层）。
+                    RenderProbe.run(view, engine)
                 }
             }
         }, blankProbeDelayMs)
